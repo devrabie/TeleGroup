@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import random
+from telegram.ext import ContextTypes
 from pyrogram import Client
 from pyrogram.errors import FloodWait
 
@@ -16,7 +17,7 @@ from src.database import (
 
 log = logging.getLogger(__name__)
 
-async def run_group_creation_cycle():
+async def run_group_creation_cycle(context: ContextTypes.DEFAULT_TYPE):
     """The main automation cycle that creates groups."""
     log.info("Automation cycle started.")
     eligible_accounts = get_eligible_accounts()
