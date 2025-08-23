@@ -4,7 +4,7 @@ import random
 from pyrogram import Client
 from pyrogram.errors import FloodWait
 
-from database import (
+from src.database import (
     get_eligible_accounts,
     get_groups_created_today,
     get_account_stats,
