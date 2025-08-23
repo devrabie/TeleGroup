@@ -1,62 +1,54 @@
 import logging
-from pyrogram import Client, filters
-from pyrogram.types import Message
 
-from src import config
-from src.database import add_plan, get_all_plans, get_all_users, get_user_details, grant_subscription
-from src.translation import get_translation_func_for_user
+from telegram import Update
+from telegram.ext import ContextTypes, CommandHandler
+
+import config
+from database import add_plan, get_all_plans, get_all_users, get_user_details, grant_subscription
+from translation import get_translation_func_for_user
 
 log = logging.getLogger(__name__)
 
 # --- Custom Filters ---
-
-async def _is_admin_check(_, __, message: Message):
-    """Custom filter to check if the user is an admin."""
-    return bool(message.from_user and message.from_user.id in config.ADMIN_IDS)
-
-is_admin = filters.create(_is_admin_check)
-
+# In python-telegram-bot, filters are handled differently. We'll apply them when creating the CommandHandler.
+admin_filter = filters.User(user_id=config.ADMIN_IDS)
 
 # --- Command Handlers ---
 
-async def create_plan_handler(client: Client, message: Message):
-    """
-    Admin command to create a new subscription plan.
-    Usage: /create_plan <name> <price_stars> <duration_days> <max_accounts> <daily_group_limit>
-    """
-    _ = get_translation_func_for_user(message.from_user.id)
+async def create_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to create a new subscription plan."""
+    _ = get_translation_func_for_user(update.effective_user.id)
 
-    parts = message.text.split(maxsplit=5)
-    if len(parts) != 6:
-        await message.reply_text(
+    if len(context.args) != 5:
+        await update.message.reply_text(
             _("<b>Usage:</b> <code>/create_plan &lt;name&gt; &lt;price&gt; &lt;days&gt; &lt;accounts&gt; &lt;limit&gt;</code>\n\n"
               "<b>Example:</b> <code>/create_plan Basic 100 30 2 10</code>")
         )
         return
 
     try:
-        _, name, price_str, days_str, accounts_str, limit_str = parts
+        name, price_str, days_str, accounts_str, limit_str = context.args
         price = int(price_str)
         days = int(days_str)
         accounts = int(accounts_str)
         limit = int(limit_str)
     except ValueError:
-        await message.reply_text(_("❌ Invalid number format in arguments."))
+        await update.message.reply_text(_("❌ Invalid number format in arguments."))
         return
 
     if add_plan(name, price, days, accounts, limit):
-        await message.reply_text(_("✅ Plan '<b>{plan_name}</b>' created successfully.").format(plan_name=name))
+        await update.message.reply_text(_("✅ Plan '<b>{plan_name}</b>' created successfully.").format(plan_name=name))
     else:
-        await message.reply_text(_("❌ Failed to create plan '<b>{plan_name}</b>'. It might already exist or a database error occurred.").format(plan_name=name))
+        await update.message.reply_text(_("❌ Failed to create plan '<b>{plan_name}</b>'. It might already exist or a database error occurred.").format(plan_name=name))
 
 
-async def list_plans_handler(client: Client, message: Message):
+async def list_plans_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to list all subscription plans."""
-    _ = get_translation_func_for_user(message.from_user.id)
+    _ = get_translation_func_for_user(update.effective_user.id)
 
     plans = get_all_plans(active_only=False)
     if not plans:
-        await message.reply_text(_("No subscription plans found."))
+        await update.message.reply_text(_("No subscription plans found."))
         return
 
     reply = _("<b>Subscription Plans:</b>\n\n")
@@ -77,17 +69,16 @@ async def list_plans_handler(client: Client, message: Message):
             )
         )
 
-    await message.reply_text(reply)
+    await update.message.reply_text(reply)
 
-# --- User Management Handlers ---
 
-async def list_users_handler(client: Client, message: Message):
+async def list_users_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to list all users."""
-    _ = get_translation_func_for_user(message.from_user.id)
+    _ = get_translation_func_for_user(update.effective_user.id)
 
     users = get_all_users()
     if not users:
-        await message.reply_text(_("No users found."))
+        await update.message.reply_text(_("No users found."))
         return
 
     reply = _("<b>Bot Users:</b>\n\n")
@@ -95,27 +86,26 @@ async def list_users_handler(client: Client, message: Message):
         admin_badge = _(" (Admin)") if user['is_admin'] else ""
         reply += f"👤 <code>{user['telegram_id']}</code>{admin_badge}\n"
 
-    await message.reply_text(reply)
+    await update.message.reply_text(reply)
 
 
-async def view_user_handler(client: Client, message: Message):
+async def view_user_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to view details of a specific user."""
-    _ = get_translation_func_for_user(message.from_user.id)
+    _ = get_translation_func_for_user(update.effective_user.id)
 
-    parts = message.text.split()
-    if len(parts) != 2:
-        await message.reply_text(_("<b>Usage:</b> <code>/view_user &lt;telegram_id&gt;</code>"))
+    if len(context.args) != 1:
+        await update.message.reply_text(_("<b>Usage:</b> <code>/view_user &lt;telegram_id&gt;</code>"))
         return
 
     try:
-        user_id = int(parts[1])
+        user_id = int(context.args[0])
     except ValueError:
-        await message.reply_text(_("Invalid Telegram ID."))
+        await update.message.reply_text(_("Invalid Telegram ID."))
         return
 
     details = get_user_details(user_id)
     if not details:
-        await message.reply_text(_("No user found with ID <code>{user_id}</code>.").format(user_id=user_id))
+        await update.message.reply_text(_("No user found with ID <code>{user_id}</code>.").format(user_id=user_id))
         return
 
     user = details['user']
@@ -147,39 +137,37 @@ async def view_user_handler(client: Client, message: Message):
     else:
         reply += _("  None\n")
 
-    await message.reply_text(reply)
+    await update.message.reply_text(reply)
 
-async def grant_subscription_handler(client: Client, message: Message):
+async def grant_subscription_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to manually grant a subscription to a user."""
-    _ = get_translation_func_for_user(message.from_user.id)
+    _ = get_translation_func_for_user(update.effective_user.id)
 
-    parts = message.text.split()
-    if len(parts) != 4:
-        await message.reply_text(_("<b>Usage:</b> <code>/grant_subscription &lt;telegram_id&gt; &lt;plan_id&gt; &lt;duration_days&gt;</code>"))
+    if len(context.args) != 3:
+        await update.message.reply_text(_("<b>Usage:</b> <code>/grant_subscription &lt;telegram_id&gt; &lt;plan_id&gt; &lt;duration_days&gt;</code>"))
         return
 
     try:
-        user_id = int(parts[1])
-        plan_id = int(parts[2])
-        days = int(parts[3])
+        user_id = int(context.args[0])
+        plan_id = int(context.args[1])
+        days = int(context.args[2])
     except ValueError:
-        await message.reply_text(_("Invalid number format in arguments."))
+        await update.message.reply_text(_("Invalid number format in arguments."))
         return
 
     success, msg = grant_subscription(user_id, plan_id, days)
-    # The msg from DB is not translated, but it's simple english. Good enough for an admin command.
     if success:
-        await message.reply_text(f"✅ {msg}")
+        await update.message.reply_text(f"✅ {msg}")
     else:
-        await message.reply_text(f"❌ {msg}")
+        await update.message.reply_text(f"❌ {msg}")
 
 
 # --- Handler Registration ---
-# A list of tuples: (handler_function, filter, handler_type)
+# A list of Handler objects for the main application to register.
 admin_handlers_list = [
-    (create_plan_handler, filters.command("create_plan") & is_admin, "message"),
-    (list_plans_handler, filters.command("list_plans") & is_admin, "message"),
-    (list_users_handler, filters.command("list_users") & is_admin, "message"),
-    (view_user_handler, filters.command("view_user") & is_admin, "message"),
-    (grant_subscription_handler, filters.command("grant_subscription") & is_admin, "message"),
+    CommandHandler("create_plan", create_plan_handler, filters=admin_filter),
+    CommandHandler("list_plans", list_plans_handler, filters=admin_filter),
+    CommandHandler("list_users", list_users_handler, filters=admin_filter),
+    CommandHandler("view_user", view_user_handler, filters=admin_filter),
+    CommandHandler("grant_subscription", grant_subscription_handler, filters=admin_filter),
 ]
