@@ -15,28 +15,28 @@ async def subscribe_handler(client: Client, message: Message):
     """
     Handles the /subscribe command, showing available plans to the user.
     """
-    log.info(f"User {message.from_user.id} requested /subscribe.")
+    user_id = message.from_user.id
+    _ = get_translation_func_for_user(user_id)
+    log.info(f"User {user_id} requested /subscribe.")
 
     plans = get_all_plans(active_only=True)
     if not plans:
-        await message.reply_text("There are currently no subscription plans available. Please check back later.")
+        await message.reply_text(_("There are currently no subscription plans available. Please check back later."))
         return
 
     buttons = []
     for plan in plans:
-        # Text for the button, e.g., "Basic - 100 Stars"
-        button_text = f"{plan['name']} - {plan['price_stars']} Stars"
-        # Callback data to identify the plan, e.g., "select_plan_1"
+        button_text = _("{plan_name} - {price} Stars").format(plan_name=plan['name'], price=plan['price_stars'])
         callback_data = f"select_plan_{plan['id']}"
         buttons.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
 
     if not buttons:
-        await message.reply_text("No active plans to display.")
+        await message.reply_text(_("No active plans to display."))
         return
 
     reply_markup = InlineKeyboardMarkup(buttons)
     await message.reply_text(
-        "Please select a subscription plan from the list below:",
+        _("Please select a subscription plan from the list below:"),
         reply_markup=reply_markup
     )
 
@@ -44,8 +44,10 @@ async def subscribe_handler(client: Client, message: Message):
 from pyrogram.types import CallbackQuery, LabeledPrice, PreCheckoutQuery
 from src.database import (
     get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
-    delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats
+    delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
+    set_user_language
 )
+from src.translation import get_translation_func_for_user
 from pyrogram.errors import (
     PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired, SessionPasswordRequired
 )
@@ -61,20 +63,23 @@ user_states = {}    # {user_id: "state_name"}
 @filters.create(lambda _, __, query: query.data.startswith("select_plan_"))
 async def select_plan_callback_handler(client: Client, callback_query: CallbackQuery):
     """Handles the user selecting a subscription plan from the inline keyboard."""
-    plan_id = int(callback_query.data.split("_")[2])
     user_id = callback_query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+    plan_id = int(callback_query.data.split("_")[2])
     log.info(f"User {user_id} selected plan {plan_id}.")
 
     plan = get_plan_by_id(plan_id)
     if not plan:
-        await callback_query.answer("This plan is no longer available.", show_alert=True)
+        await callback_query.answer(_("This plan is no longer available."), show_alert=True)
         return
 
     # Prepare invoice
-    title = f"Subscription: {plan['name']}"
-    description = f"Access to {plan['max_accounts']} accounts and {plan['daily_group_limit']} groups/day."
+    title = _("Subscription: {plan_name}").format(plan_name=plan['name'])
+    description = _("Access to {accounts} accounts and {limit} groups/day.").format(
+        accounts=plan['max_accounts'], limit=plan['daily_group_limit']
+    )
     payload = f"plan_{plan_id}_user_{user_id}"
-    price = LabeledPrice("Subscription", plan['price_stars'] * 100) # Price is in the smallest units of the currency
+    price = LabeledPrice(_("Subscription"), plan['price_stars'] * 100)
 
     try:
         await client.send_invoice(
@@ -82,15 +87,15 @@ async def select_plan_callback_handler(client: Client, callback_query: CallbackQ
             title=title,
             description=description,
             payload=payload,
-            provider_token=config.PAYMENT_PROVIDER_TOKEN,
-            currency="XTR",  # Telegram Stars currency code
+            provider_token="",
+            currency="XTR",
             prices=[price],
             start_parameter="subscribe"
         )
-        await callback_query.answer() # Acknowledge the button press
+        await callback_query.answer()
     except Exception as e:
         log.error(f"Failed to send invoice for plan {plan_id} to user {user_id}: {e}")
-        await callback_query.answer("Could not process your request. Please try again.", show_alert=True)
+        await callback_query.answer(_("Could not process your request. Please try again."), show_alert=True)
 
 
 @filters.pre_checkout_query
@@ -104,31 +109,39 @@ async def pre_checkout_handler(client: Client, pre_checkout_query: PreCheckoutQu
 async def successful_payment_handler(client: Client, message: Message):
     """Handles a successful payment, activating the user's subscription."""
     user_id = message.from_user.id
+    _ = get_translation_func_for_user(user_id)
     log.info(f"Received successful payment from user {user_id}")
 
     payment_info = message.successful_payment
     payload = payment_info.invoice_payload
 
-    # Expected payload format: "plan_{plan_id}_user_{user_id}"
     try:
         plan_id = int(payload.split("_")[1])
     except (IndexError, ValueError):
         log.error(f"Invalid payload received from successful payment: {payload}")
-        # Notify user of an issue
-        await client.send_message(user_id, "There was an issue processing your subscription. Please contact support.")
+        await client.send_message(user_id, _("There was an issue processing your subscription. Please contact support."))
         return
 
-    # For now, we'll assume a 30-day subscription for any payment
-    # In a real scenario, you might have different durations
-    duration_days = 30
+    plan = get_plan_by_id(plan_id)
+    if not plan:
+        log.error(f"Could not find plan {plan_id} after successful payment. Payload: {payload}")
+        await client.send_message(user_id, _("There was an issue finding your selected plan. Please contact support."))
+        return
 
+    duration_days = plan['duration_days']
     success, msg = grant_subscription(user_id, plan_id, duration_days)
 
     if success:
-        await client.send_message(user_id, f"✅ Thank you! Your subscription is now active for {duration_days} days.")
+        reply_text = _("✅ Thank you! Your '{plan_name}' subscription is now active for {days} days.").format(
+            plan_name=plan['name'], days=duration_days
+        )
+        await client.send_message(user_id, reply_text)
     else:
         log.error(f"Failed to grant subscription via payment for payload: {payload}. Reason: {msg}")
-        await client.send_message(user_id, f"There was a database error activating your subscription. Please contact support with payload: `{payload}`")
+        reply_text = _("There was a database error activating your subscription. Please contact support with payload: `{payload}`").format(
+            payload=payload
+        )
+        await client.send_message(user_id, reply_text)
 
 
 # --- Account Adding Flow ---
@@ -137,11 +150,12 @@ async def successful_payment_handler(client: Client, message: Message):
 async def add_account_handler(client: Client, message: Message):
     """Starts the process of adding a new Telegram account."""
     user_id = message.from_user.id
+    _ = get_translation_func_for_user(user_id)
     log.info(f"User {user_id} initiated /add_account.")
 
     details = get_user_details(user_id)
     if not details or not details.get('subscription'):
-        await message.reply_text("You need an active subscription to add accounts. Use /subscribe to get one.")
+        await message.reply_text(_("You need an active subscription to add accounts. Use /subscribe to get one."))
         return
 
     sub = details['subscription']
@@ -149,11 +163,14 @@ async def add_account_handler(client: Client, message: Message):
     plan = get_plan_by_id(sub['plan_id'])
 
     if not plan:
-        await message.reply_text("Your subscription plan could not be found. Please contact support.")
+        await message.reply_text(_("Your subscription plan could not be found. Please contact support."))
         return
 
     if len(accounts) >= plan['max_accounts']:
-        await message.reply_text(f"You have reached the maximum of {plan['max_accounts']} accounts for your '{plan['name']}' plan.")
+        reply = _("You have reached the maximum of {max_accounts} accounts for your '{plan_name}' plan.").format(
+            max_accounts=plan['max_accounts'], plan_name=plan['name']
+        )
+        await message.reply_text(reply)
         return
 
     # Cancel any previous attempts
@@ -166,23 +183,24 @@ async def add_account_handler(client: Client, message: Message):
 
     user_states[user_id] = "awaiting_phone"
     await message.reply_text(
-        "Please send the phone number of the account you want to add.\n"
-        "<i>(Must be in international format, e.g., +1234567890)</i>"
+        _("Please send the phone number of the account you want to add.\n"
+          "<i>(Must be in international format, e.g., +1234567890)</i>")
     )
 
 @filters.command("cancel")
 async def cancel_handler(client: Client, message: Message):
     """Cancels the current operation (like adding an account)."""
     user_id = message.from_user.id
+    _ = get_translation_func_for_user(user_id)
     if user_id in user_states:
         del user_states[user_id]
         if user_id in user_sessions:
             if user_sessions[user_id]['client'].is_connected:
                 await user_sessions[user_id]['client'].disconnect()
             del user_sessions[user_id]
-        await message.reply_text("Operation cancelled.")
+        await message.reply_text(_("Operation cancelled."))
     else:
-        await message.reply_text("Nothing to cancel.")
+        await message.reply_text(_("Nothing to cancel."))
 
 
 @filters.private & ~filters.command()
@@ -207,18 +225,17 @@ async def conversation_handler(client: Client, message: Message):
 
 async def handle_phone_number(client: Client, message: Message):
     user_id = message.from_user.id
+    _ = get_translation_func_for_user(user_id)
     phone_number = message.text
 
-    await message.reply_text(f"Trying to log in with <code>{phone_number}</code>. Please wait...",)
+    await message.reply_text(_("Trying to log in with <code>{phone_number}</code>. Please wait...").format(phone_number=phone_number))
 
-    # Create a new client instance for the user in memory
     user_client = Client(
         f"user_session_{user_id}",
         api_id=config.API_ID,
         api_hash=config.API_HASH,
-        in_memory=True # Use in-memory storage for the session string
+        in_memory=True
     )
-
     user_sessions[user_id] = {"client": user_client, "phone": phone_number}
 
     try:
@@ -228,25 +245,25 @@ async def handle_phone_number(client: Client, message: Message):
 
         user_states[user_id] = "awaiting_code"
         await message.reply_text(
-            "A login code has been sent to your Telegram account. Please send it here.\n"
-            "Use /cancel to stop this process."
+            _("A login code has been sent to your Telegram account. Please send it here.\n"
+              "Use /cancel to stop this process.")
         )
     except PhoneNumberInvalid:
-        await message.reply_text("The phone number is invalid. Please try again with a valid number in international format.")
-        # State remains 'awaiting_phone'
+        await message.reply_text(_("The phone number is invalid. Please try again with a valid number in international format."))
     except Exception as e:
         log.error(f"Error during phone number handling for user {user_id}: {e}")
-        await message.reply_text("An unexpected error occurred. Please try again or use /cancel.")
+        await message.reply_text(_("An unexpected error occurred. Please try again or use /cancel."))
         del user_states[user_id]
 
 
 async def handle_phone_code(client: Client, message: Message):
     user_id = message.from_user.id
+    _ = get_translation_func_for_user(user_id)
     code = message.text.strip()
     session_info = user_sessions.get(user_id)
 
     if not session_info:
-        await message.reply_text("Your session has expired. Please start over with /add_account.")
+        await message.reply_text(_("Your session has expired. Please start over with /add_account."))
         del user_states[user_id]
         return
 
@@ -257,28 +274,27 @@ async def handle_phone_code(client: Client, message: Message):
             session_info['phone_code_hash'],
             code
         )
-        # If we are here, login was successful (or 2FA is needed)
         await complete_login(user_client, message)
 
     except SessionPasswordRequired:
         user_states[user_id] = "awaiting_password"
-        await message.reply_text("This account has Two-Factor Authentication enabled. Please send your password.\nUse /cancel to stop.")
+        await message.reply_text(_("This account has Two-Factor Authentication enabled. Please send your password.\nUse /cancel to stop."))
     except (PhoneCodeInvalid, PhoneCodeExpired):
-        await message.reply_text("Invalid or expired code. Please send the correct code again.")
-        # State remains 'awaiting_code'
+        await message.reply_text(_("Invalid or expired code. Please send the correct code again."))
     except Exception as e:
         log.error(f"Error during code handling for user {user_id}: {e}")
-        await message.reply_text("An unexpected error occurred. Please try again or use /cancel.")
+        await message.reply_text(_("An unexpected error occurred. Please try again or use /cancel."))
         if user_id in user_states: del user_states[user_id]
 
 
 async def handle_password(client: Client, message: Message):
     user_id = message.from_user.id
+    _ = get_translation_func_for_user(user_id)
     password = message.text
     session_info = user_sessions.get(user_id)
 
     if not session_info:
-        await message.reply_text("Your session has expired. Please start over with /add_account.")
+        await message.reply_text(_("Your session has expired. Please start over with /add_account."))
         del user_states[user_id]
         return
 
@@ -288,13 +304,13 @@ async def handle_password(client: Client, message: Message):
         await complete_login(user_client, message)
     except Exception as e:
         log.error(f"Error during password handling for user {user_id}: {e}")
-        await message.reply_text("Incorrect password or an error occurred. Please try again or use /cancel.")
-        # State remains 'awaiting_password'
+        await message.reply_text(_("Incorrect password or an error occurred. Please try again or use /cancel."))
 
 
 async def complete_login(user_client: Client, message: Message):
     """Finalizes the login process, saves the session, and cleans up."""
     user_id = message.from_user.id
+    _ = get_translation_func_for_user(user_id)
     session_info = user_sessions.get(user_id)
     phone = session_info['phone']
 
@@ -302,11 +318,10 @@ async def complete_login(user_client: Client, message: Message):
     await user_client.disconnect()
 
     if add_managed_account(user_id, phone, session_string):
-        await message.reply_text("✅ Account added successfully!")
+        await message.reply_text(_("✅ Account added successfully!"))
     else:
-        await message.reply_text("❌ Could not save your account to the database. It might already be registered.")
+        await message.reply_text(_("❌ Could not save your account to the database. It might already be registered."))
 
-    # Cleanup
     if user_id in user_states: del user_states[user_id]
     if user_id in user_sessions: del user_sessions[user_id]
 
@@ -317,26 +332,27 @@ async def complete_login(user_client: Client, message: Message):
 async def my_accounts_handler(client: Client, message: Message):
     """Displays a list of the user's managed accounts with control buttons."""
     user_id = message.from_user.id
+    _ = get_translation_func_for_user(user_id)
     details = get_user_details(user_id)
 
     if not details or not details['accounts']:
-        await message.reply_text("You have not added any accounts yet. Use /add_account to get started.")
+        await message.reply_text(_("You have not added any accounts yet. Use /add_account to get started."))
         return
 
-    await message.reply_text("Your managed accounts:")
+    await message.reply_text(_("Your managed accounts:"))
     for acc in details['accounts']:
         acc_id = acc['id']
-        status = "🟢 Active" if acc['is_active'] else "🔴 Inactive"
-        text = f"<b>Account:</b> <code>{acc['phone']}</code>\n<b>Status:</b> {status}"
+        status = _("🟢 Active") if acc['is_active'] else _("🔴 Inactive")
+        text = _("<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}").format(phone=acc['phone'], status=status)
 
         buttons = [
             [
-                InlineKeyboardButton("📊 Stats", callback_data=f"mng_stats_{acc_id}"),
-                InlineKeyboardButton("Toggle " + ("Off" if acc['is_active'] else "On"), callback_data=f"mng_toggle_{acc_id}")
+                InlineKeyboardButton(_("📊 Stats"), callback_data=f"mng_stats_{acc_id}"),
+                InlineKeyboardButton(_("Toggle On") if not acc['is_active'] else _("Toggle Off"), callback_data=f"mng_toggle_{acc_id}")
             ],
             [
-                InlineKeyboardButton("🔄 Change Proxy", callback_data=f"mng_proxy_{acc_id}"),
-                InlineKeyboardButton("❌ Delete", callback_data=f"mng_delete_{acc_id}")
+                InlineKeyboardButton(_("🔄 Change Proxy"), callback_data=f"mng_proxy_{acc_id}"),
+                InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc_id}")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(buttons)
@@ -348,52 +364,84 @@ async def my_accounts_handler(client: Client, message: Message):
 async def manage_account_callback_handler(client: Client, callback_query: CallbackQuery):
     """Main router for all management callbacks."""
     user_id = callback_query.from_user.id
-    action, account_id_str = callback_query.data.split("_", 2)[1:]
-    account_id = int(account_id_str)
+    _ = get_translation_func_for_user(user_id)
+
+    action_parts = callback_query.data.split("_")
+    action = action_parts[1]
+    account_id = int(action_parts[2]) if len(action_parts) > 2 else 0
 
     if action == "stats":
         total_groups = get_account_stats(account_id)
-        await callback_query.answer(f"This account has created {total_groups} groups.", show_alert=True)
+        await callback_query.answer(
+            _("This account has created {count} groups.").format(count=total_groups),
+            show_alert=True
+        )
 
     elif action == "toggle":
         new_status = toggle_account_status(account_id, user_id)
         if new_status is not None:
-            status_text = "activated" if new_status else "deactivated"
-            await callback_query.answer(f"Account has been {status_text}.")
-            # TODO: Refresh the original message to show the new status
+            status_text = _("activated") if new_status else _("deactivated")
+            await callback_query.answer(_("Account has been {status}.").format(status=status_text))
         else:
-            await callback_query.answer("Could not change status.", show_alert=True)
-        # To refresh the message, one would typically edit the original message with the new state.
-        # This requires more complex state management to refetch and rebuild the message.
-        # For now, we just show an alert.
+            await callback_query.answer(_("Could not change status."), show_alert=True)
 
     elif action == "proxy":
         success, msg = reassign_proxy(account_id, user_id)
+        # This msg is not translated as it's from the DB and simple.
+        # For a full implementation, we would use error codes.
         await callback_query.answer(msg, show_alert=True)
 
     elif action == "delete":
-        # Ask for confirmation
         buttons = [
             [
-                InlineKeyboardButton("Yes, delete it", callback_data=f"mng_delete_confirm_{account_id}"),
-                InlineKeyboardButton("No, cancel", callback_data="mng_cancel")
+                InlineKeyboardButton(_("Yes, delete it"), callback_data=f"mng_deleteconfirm_{account_id}"),
+                InlineKeyboardButton(_("No, cancel"), callback_data="mng_cancel")
             ]
         ]
         await callback_query.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(buttons))
         await callback_query.answer()
 
-    elif action == "delete_confirm":
+    elif action == "deleteconfirm":
         if delete_managed_account(account_id, user_id):
-            await callback_query.message.edit_text("✅ Account has been deleted.")
+            await callback_query.message.edit_text(_("✅ Account has been deleted."))
         else:
-            await callback_query.message.edit_text("❌ Could not delete account.")
+            await callback_query.message.edit_text(_("❌ Could not delete account."))
         await callback_query.answer()
 
     elif action == "cancel":
-        # This is a simple way to cancel the delete confirmation.
-        # A better way would be to refetch and rebuild the original button layout.
         await callback_query.message.delete()
-        await callback_query.answer("Cancelled.")
+        await callback_query.answer(_("Cancelled."))
+
+
+# --- Language Selection ---
+
+@filters.command("language")
+async def language_handler(client: Client, message: Message):
+    """Allows the user to select their interface language."""
+    user_id = message.from_user.id
+    _ = get_translation_func_for_user(user_id)
+    buttons = [
+        [InlineKeyboardButton("English 🇬🇧", callback_data="set_lang_en")],
+        [InlineKeyboardButton("العربية 🇸🇦", callback_data="set_lang_ar")]
+    ]
+    reply_markup = InlineKeyboardMarkup(buttons)
+    await message.reply_text(_("Please choose your language:"), reply_markup=reply_markup)
+
+
+@filters.create(lambda _, __, query: query.data.startswith("set_lang_"))
+async def set_language_callback_handler(client: Client, callback_query: CallbackQuery):
+    """Handles language selection callback."""
+    lang_code = callback_query.data.split("_")[2]
+    user_id = callback_query.from_user.id
+    _ = get_translation_func_for_user(user_id) # Get translator for the old language
+
+    if set_user_language(user_id, lang_code):
+        _new = get_translation_func_for_user(user_id) # Get translator for the new language
+        await callback_query.answer(_new("Language changed successfully."), show_alert=True)
+    else:
+        await callback_query.answer(_("Could not change language."), show_alert=True)
+
+    await callback_query.message.delete()
 
 
 # --- Handler Registration ---
@@ -406,6 +454,8 @@ user_handlers_list = [
     add_account_handler,
     cancel_handler,
     my_accounts_handler,
+    language_handler,
+    set_language_callback_handler,
     manage_account_callback_handler, # Handles all `mng_*` callbacks
     conversation_handler, # Must be last to act as a fallback for non-command messages
 ]

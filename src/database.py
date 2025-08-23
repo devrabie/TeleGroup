@@ -17,6 +17,7 @@ TABLE_DEFINITIONS = {
             id INTEGER PRIMARY KEY,
             telegram_id INTEGER NOT NULL UNIQUE,
             is_admin BOOLEAN NOT NULL DEFAULT 0,
+            language_code TEXT NOT NULL DEFAULT 'en',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """,
@@ -25,6 +26,7 @@ TABLE_DEFINITIONS = {
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
             price_stars INTEGER NOT NULL,
+            duration_days INTEGER NOT NULL DEFAULT 30,
             max_accounts INTEGER NOT NULL,
             daily_group_limit INTEGER NOT NULL,
             is_active BOOLEAN NOT NULL DEFAULT 1
@@ -110,16 +112,16 @@ def get_db_connection():
 
 # --- Plan Management Functions ---
 
-def add_plan(name: str, price_stars: int, max_accounts: int, daily_group_limit: int):
+def add_plan(name: str, price_stars: int, duration_days: int, max_accounts: int, daily_group_limit: int):
     """Adds a new subscription plan to the database."""
     sql = """
-        INSERT INTO plans (name, price_stars, max_accounts, daily_group_limit)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO plans (name, price_stars, duration_days, max_accounts, daily_group_limit)
+        VALUES (?, ?, ?, ?, ?)
     """
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (name, price_stars, max_accounts, daily_group_limit))
+            cursor.execute(sql, (name, price_stars, duration_days, max_accounts, daily_group_limit))
             conn.commit()
         log.info(f"Successfully added new plan: {name}")
         return True
@@ -444,6 +446,32 @@ def log_group_creation(account_id: int, group_id: int, group_name: str):
     except sqlite3.Error as e:
         log.error(f"Failed to log group creation for account {account_id}: {e}")
         return False
+
+def set_user_language(telegram_id: int, lang_code: str):
+    """Sets the preferred language for a user."""
+    sql = "UPDATE users SET language_code = ? WHERE telegram_id = ?"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (lang_code, telegram_id))
+            conn.commit()
+        return True
+    except sqlite3.Error as e:
+        log.error(f"Failed to set language for user {telegram_id}: {e}")
+        return False
+
+def get_user_language(telegram_id: int):
+    """Gets the preferred language for a user."""
+    sql = "SELECT language_code FROM users WHERE telegram_id = ?"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (telegram_id,))
+            row = cursor.fetchone()
+            return row['language_code'] if row else 'en' # Default to 'en'
+    except sqlite3.Error:
+        return 'en' # Default to 'en' on error
+
 
 def get_user_details(telegram_id: int):
     """Retrieves details for a user, including their active subscription and managed accounts."""

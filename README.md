@@ -10,6 +10,7 @@ This is a comprehensive Telegram bot designed to manage multiple Telegram user a
 - **Automated Group Creation**: Managed accounts automatically create new private supergroups based on user-defined limits.
 - **Proxy Management**: Automatically downloads and rotates proxies to avoid rate-limiting and bans.
 - **User Dashboard**: Users can manage their added accounts, view stats, and control automation.
+- **Multi-Language Support**: Interface is available in English and Arabic, with easy extension to other languages.
 
 ## Project Structure
 
@@ -23,9 +24,12 @@ This is a comprehensive Telegram bot designed to manage multiple Telegram user a
 │   ├── database.py          # Database schema and interaction logic
 │   ├── main.py              # Main entry point of the bot
 │   ├── proxy_manager.py     # Logic for downloading and managing proxies
+│   ├── translation.py       # Internationalization (i18n) setup
 │   └── user_handlers.py     # Command handlers for regular users
 ├── .env.example           # Example environment variables file
 ├── .gitignore             # Git ignore rules
+├── babel.cfg              # Babel configuration for i18n
+├── locales/               # Translation files
 ├── requirements.txt       # Python dependencies
 └── README.md              # This file
 ```
@@ -90,3 +94,19 @@ python3 src/main.py
 ```
 
 The bot will start, connect to Telegram, and the automation engine will begin its cycles. You can interact with the bot from the Telegram account you designated as the admin.
+
+### Key Commands
+
+- `/start`: Initialize the bot.
+- `/subscribe`: View and subscribe to a plan.
+- `/add_account`: Start the process to add a new Telegram account to manage.
+- `/my_accounts`: View and manage your added accounts.
+- `/language`: Change the interface language.
+
+### Admin Commands
+
+- `/create_plan <name> <price> <days> <accounts> <limit>`: Create a new subscription plan.
+- `/list_plans`: View all created plans.
+- `/list_users`: See all users of the bot.
+- `/view_user <user_id>`: Get details for a specific user.
+- `/grant_subscription <user_id> <plan_id> <days>`: Manually give a subscription to a user.
