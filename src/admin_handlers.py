@@ -2,9 +2,9 @@ import logging
 from pyrogram import Client, filters
 from pyrogram.types import Message
 
-from src import config
-from src.database import add_plan, get_all_plans, get_all_users, get_user_details, grant_subscription
-from src.translation import get_translation_func_for_user
+import config
+from database import add_plan, get_all_plans, get_all_users, get_user_details, grant_subscription
+from translation import get_translation_func_for_user
 
 log = logging.getLogger(__name__)
 

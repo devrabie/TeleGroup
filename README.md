@@ -87,10 +87,10 @@ python3 src/database.py
 
 ## Running the Bot
 
-Once the setup is complete, you can run the bot with the following command:
+Once the setup is complete, you can run the bot with the following command from the root directory of the project:
 
 ```bash
-python3 src/main.py
+python3 -m src.main
 ```
 
 The bot will start, connect to Telegram, and the automation engine will begin its cycles. You can interact with the bot from the Telegram account you designated as the admin.

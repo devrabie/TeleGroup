@@ -1,8 +1,8 @@
 import logging
 import requests
 
-from src import config
-from src.database import batch_insert_proxies
+import config
+from database import batch_insert_proxies
 
 log = logging.getLogger(__name__)
 
