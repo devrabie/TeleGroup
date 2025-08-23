@@ -13,8 +13,15 @@ from telegram.ext import (
 )
 
 from pyrogram import Client
+try:
+    # For newer Pyrogram versions
+    from pyrogram.errors import SessionPasswordRequired
+except ImportError:
+    # For older Pyrogram versions
+    from pyrogram.errors.exceptions.auth import SessionPasswordRequiredError as SessionPasswordRequired
+
 from pyrogram.errors import (
-    PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired, SessionPasswordRequired
+    PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired
 )
 
 from src import config
