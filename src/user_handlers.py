@@ -43,6 +43,20 @@ def run_pyrogram_task(target, args):
 
 # --- Handlers for various bot features ---
 
+async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Greets the user and shows available commands."""
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    welcome_text = _(
+        "Welcome to the bot! Here are the available commands:\n"
+        "/subscribe - View and purchase subscription plans.\n"
+        "/my_accounts - Manage your connected accounts.\n"
+        "/add_account - Add a new account to manage.\n"
+        "/language - Change the bot's language."
+    )
+    await update.message.reply_text(welcome_text)
+
+
 async def subscribe_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
@@ -297,6 +311,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
 
 # --- Handler Registration ---
 user_handlers_list = [
+    CommandHandler("start", start_handler),
     CommandHandler("subscribe", subscribe_handler),
     CallbackQueryHandler(select_plan_callback, pattern="^select_plan_"),
     PreCheckoutQueryHandler(precheckout_callback),
