@@ -1,12 +1,13 @@
 import logging
 import requests
+from telegram.ext import ContextTypes
 
 from src import config
 from src.database import batch_insert_proxies
 
 log = logging.getLogger(__name__)
 
-def update_proxies_from_url():
+def update_proxies_from_url(context: ContextTypes.DEFAULT_TYPE):
     """
     Downloads the proxy list from the configured URL and updates the database.
     """
