@@ -15,9 +15,8 @@ API_HASH = os.getenv("API_HASH")
 if not all([API_ID, API_HASH]):
     raise ValueError("Missing required environment variables: API_ID and/or API_HASH")
 
+# This is now optional. It's only required for non-Star payments.
 PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN")
-if not PAYMENT_PROVIDER_TOKEN:
-    raise ValueError("Missing required environment variable: PAYMENT_PROVIDER_TOKEN")
 
 # --- Bot Administration ---
 # The Telegram user ID of the bot administrator.

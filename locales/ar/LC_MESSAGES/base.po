@@ -1,0 +1,434 @@
+# Arabic translations for PROJECT.
+# Copyright (C) 2025 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2025-08-23 18:25+0000\n"
+"PO-Revision-Date: 2025-08-23 18:25+0000\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ar\n"
+"Language-Team: ar <LL@li.org>\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 "
+"&& n%100<=10 ? 3 : n%100>=11 ? 4 : 5);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: src/admin_handlers.py:35
+msgid ""
+"<b>Usage:</b> <code>/create_plan &lt;name&gt; &lt;price&gt; &lt;days&gt; "
+"&lt;accounts&gt; &lt;limit&gt;</code>\n"
+"\n"
+"<b>Example:</b> <code>/create_plan Basic 100 30 2 10</code>"
+msgstr ""
+"<b>الاستخدام:</b> <code>/create_plan &lt;الاسم&gt; &lt;السعر&gt; "
+"&lt;الأيام&gt; &lt;الحسابات&gt; &lt;الحد&gt;</code>\n"
+"\n"
+"<b>مثال:</b> <code>/create_plan أساسية 100 30 2 10</code>"
+
+#: src/admin_handlers.py:47
+msgid "❌ Invalid number format in arguments."
+msgstr "❌ صيغة الأرقام في المعاملات غير صالحة."
+
+#: src/admin_handlers.py:51
+#, python-brace-format
+msgid "✅ Plan '<b>{plan_name}</b>' created successfully."
+msgstr "✅ تم إنشاء الباقة '<b>{plan_name}</b>' بنجاح."
+
+#: src/admin_handlers.py:53
+#, python-brace-format
+msgid ""
+"❌ Failed to create plan '<b>{plan_name}</b>'. It might already exist or a"
+" database error occurred."
+msgstr ""
+"❌ فشل إنشاء الباقة '<b>{plan_name}</b>'. قد تكون موجودة بالفعل أو حدث خطأ"
+" في قاعدة البيانات."
+
+#: src/admin_handlers.py:65
+msgid "No subscription plans found."
+msgstr "لم يتم العثور على باقات اشتراك."
+
+#: src/admin_handlers.py:68
+msgid ""
+"<b>Subscription Plans:</b>\n"
+"\n"
+msgstr ""
+"<b>باقات الاشتراك:</b>\n"
+"\n"
+
+#: src/admin_handlers.py:70 src/admin_handlers.py:157
+msgid "Active"
+msgstr "نشطة"
+
+#: src/admin_handlers.py:70 src/admin_handlers.py:157
+msgid "Inactive"
+msgstr "غير نشطة"
+
+#: src/admin_handlers.py:72
+#, python-brace-format
+msgid ""
+"<b>ID:</b> <code>{id}</code>\n"
+"<b>Name:</b> {name}\n"
+"<b>Price:</b> {price} Stars\n"
+"<b>Duration:</b> {days} days\n"
+"<b>Accounts:</b> {accounts}\n"
+"<b>Daily Limit:</b> {limit} groups/day\n"
+"<b>Status:</b> {status}\n"
+"--------------------\n"
+msgstr ""
+"<b>المعرف:</b> <code>{id}</code>\n"
+"<b>الاسم:</b> {name}\n"
+"<b>السعر:</b> {price} نجمة\n"
+"<b>المدة:</b> {days} يومًا\n"
+"<b>الحسابات:</b> {accounts}\n"
+"<b>الحد اليومي:</b> {limit} مجموعة/يوم\n"
+"<b>الحالة:</b> {status}\n"
+"--------------------\n"
+
+#: src/admin_handlers.py:99
+msgid "No users found."
+msgstr "لم يتم العثور على مستخدمين."
+
+#: src/admin_handlers.py:102
+msgid ""
+"<b>Bot Users:</b>\n"
+"\n"
+msgstr ""
+"<b>مستخدمو البوت:</b>\n"
+"\n"
+
+#: src/admin_handlers.py:104
+msgid " (Admin)"
+msgstr " (أدمن)"
+
+#: src/admin_handlers.py:119
+msgid "<b>Usage:</b> <code>/view_user &lt;telegram_id&gt;</code>"
+msgstr "<b>الاستخدام:</b> <code>/view_user &lt;معرف_تليجرام&gt;</code>"
+
+#: src/admin_handlers.py:125
+msgid "Invalid Telegram ID."
+msgstr "معرف تليجرام غير صالح."
+
+#: src/admin_handlers.py:130
+#, python-brace-format
+msgid "No user found with ID <code>{user_id}</code>."
+msgstr "لم يتم العثور على مستخدم بالمعرف <code>{user_id}</code>."
+
+#: src/admin_handlers.py:137
+#, python-brace-format
+msgid "<b>User Details for:</b> <code>{user_id}</code>\n"
+msgstr "<b>تفاصيل المستخدم:</b> <code>{user_id}</code>\n"
+
+#: src/admin_handlers.py:138
+msgid "Yes"
+msgstr "نعم"
+
+#: src/admin_handlers.py:138
+msgid "No"
+msgstr "لا"
+
+#: src/admin_handlers.py:139
+#, python-brace-format
+msgid "<b>Admin:</b> {is_admin}\n"
+msgstr "<b>أدمن:</b> {is_admin}\n"
+
+#: src/admin_handlers.py:140
+#, python-brace-format
+msgid "<b>Joined:</b> {join_date}\n"
+msgstr "<b>تاريخ الانضمام:</b> {join_date}\n"
+
+#: src/admin_handlers.py:145
+#, python-brace-format
+msgid ""
+"<b>Subscription:</b> {plan_name} (Plan ID: {plan_id})\n"
+"<b>Expires:</b> {end_date}\n"
+msgstr ""
+"<b>الاشتراك:</b> {plan_name} (معرف الباقة: {plan_id})\n"
+"<b>ينتهي في:</b> {end_date}\n"
+
+#: src/admin_handlers.py:151
+msgid "<b>Subscription:</b> None\n"
+msgstr "<b>الاشتراك:</b> لا يوجد\n"
+
+#: src/admin_handlers.py:154
+#, python-brace-format
+msgid "<b>Managed Accounts ({count}):</b>\n"
+msgstr "<b>الحسابات المدارة ({count}):</b>\n"
+
+#: src/admin_handlers.py:158
+#, python-brace-format
+msgid "  - <code>{phone}</code> ({status})\n"
+msgstr "  - <code>{phone}</code> ({status})\n"
+
+#: src/admin_handlers.py:160
+msgid "  None\n"
+msgstr "  لا يوجد\n"
+
+#: src/admin_handlers.py:173
+msgid ""
+"<b>Usage:</b> <code>/grant_subscription &lt;telegram_id&gt; "
+"&lt;plan_id&gt; &lt;duration_days&gt;</code>"
+msgstr ""
+"<b>الاستخدام:</b> <code>/grant_subscription &lt;معرف_تليجرام&gt; "
+"&lt;معرف_الباقة&gt; &lt;مدة_الأيام&gt;</code>"
+
+#: src/admin_handlers.py:181
+msgid "Invalid number format in arguments."
+msgstr "صيغة الأرقام في المعاملات غير صالحة."
+
+#: src/user_handlers.py:24
+msgid ""
+"There are currently no subscription plans available. Please check back "
+"later."
+msgstr "لا توجد باقات اشتراك متاحة حاليًا. يرجى المراجعة لاحقًا."
+
+#: src/user_handlers.py:29
+#, python-brace-format
+msgid "{plan_name} - {price} Stars"
+msgstr "{plan_name} - {price} نجمة"
+
+#: src/user_handlers.py:34
+msgid "No active plans to display."
+msgstr "لا توجد باقات نشطة لعرضها."
+
+#: src/user_handlers.py:39
+msgid "Please select a subscription plan from the list below:"
+msgstr "الرجاء اختيار باقة اشتراك من القائمة أدناه:"
+
+#: src/user_handlers.py:73
+msgid "This plan is no longer available."
+msgstr "هذه الباقة لم تعد متوفرة."
+
+#: src/user_handlers.py:77
+#, python-brace-format
+msgid "Subscription: {plan_name}"
+msgstr "اشتراك: {plan_name}"
+
+#: src/user_handlers.py:78
+#, python-brace-format
+msgid "Access to {accounts} accounts and {limit} groups/day."
+msgstr "وصول إلى {accounts} حساب و {limit} مجموعة/يوم."
+
+#: src/user_handlers.py:82
+msgid "Subscription"
+msgstr "اشتراك"
+
+#: src/user_handlers.py:98
+msgid "Could not process your request. Please try again."
+msgstr "تعذر معالجة طلبك. يرجى المحاولة مرة أخرى."
+
+#: src/user_handlers.py:122
+msgid "There was an issue processing your subscription. Please contact support."
+msgstr "حدثت مشكلة أثناء معالجة اشتراكك. يرجى التواصل مع الدعم."
+
+#: src/user_handlers.py:128
+msgid "There was an issue finding your selected plan. Please contact support."
+msgstr "حدثت مشكلة في العثور على الباقة التي اخترتها. يرجى التواصل مع الدعم."
+
+#: src/user_handlers.py:135
+#, python-brace-format
+msgid ""
+"✅ Thank you! Your '{plan_name}' subscription is now active for {days} "
+"days."
+msgstr "✅ شكرًا لك! اشتراكك في '{plan_name}' نشط الآن لمدة {days} يومًا."
+
+#: src/user_handlers.py:141
+#, python-brace-format
+msgid ""
+"There was a database error activating your subscription. Please contact "
+"support with payload: `{payload}`"
+msgstr ""
+"حدث خطأ في قاعدة البيانات أثناء تفعيل اشتراكك. يرجى التواصل مع الدعم "
+"وإرسال الحمولة التالية: `{payload}`"
+
+#: src/user_handlers.py:158
+msgid ""
+"You need an active subscription to add accounts. Use /subscribe to get "
+"one."
+msgstr "تحتاج إلى اشتراك نشط لإضافة حسابات. استخدم /subscribe للحصول على واحد."
+
+#: src/user_handlers.py:166
+msgid "Your subscription plan could not be found. Please contact support."
+msgstr "تعذر العثور على باقة اشتراكك. يرجى التواصل مع الدعم."
+
+#: src/user_handlers.py:170
+#, python-brace-format
+msgid ""
+"You have reached the maximum of {max_accounts} accounts for your "
+"'{plan_name}' plan."
+msgstr "لقد وصلت إلى الحد الأقصى وهو {max_accounts} حسابًا لباقتك '{plan_name}'."
+
+#: src/user_handlers.py:186
+msgid ""
+"Please send the phone number of the account you want to add.\n"
+"<i>(Must be in international format, e.g., +1234567890)</i>"
+msgstr ""
+"الرجاء إرسال رقم هاتف الحساب الذي تريد إضافته.\n"
+"<i>(يجب أن يكون بالصيغة الدولية، مثال: +1234567890)</i>"
+
+#: src/user_handlers.py:201
+msgid "Operation cancelled."
+msgstr "تم إلغاء العملية."
+
+#: src/user_handlers.py:203
+msgid "Nothing to cancel."
+msgstr "لا يوجد شيء لإلغائه."
+
+#: src/user_handlers.py:231
+#, python-brace-format
+msgid "Trying to log in with <code>{phone_number}</code>. Please wait..."
+msgstr "جاري محاولة تسجيل الدخول بالرقم <code>{phone_number}</code>. الرجاء الانتظار..."
+
+#: src/user_handlers.py:248
+msgid ""
+"A login code has been sent to your Telegram account. Please send it here."
+"\n"
+"Use /cancel to stop this process."
+msgstr ""
+"تم إرسال رمز تسجيل الدخول إلى حسابك في تليجرام. الرجاء إرساله هنا.\n"
+"استخدم /cancel لإيقاف هذه العملية."
+
+#: src/user_handlers.py:252
+msgid ""
+"The phone number is invalid. Please try again with a valid number in "
+"international format."
+msgstr "رقم الهاتف غير صالح. يرجى المحاولة مرة أخرى برقم صالح بالصيغة الدولية."
+
+#: src/user_handlers.py:255 src/user_handlers.py:286
+msgid "An unexpected error occurred. Please try again or use /cancel."
+msgstr "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى أو استخدام /cancel."
+
+#: src/user_handlers.py:266 src/user_handlers.py:297
+msgid "Your session has expired. Please start over with /add_account."
+msgstr "انتهت صلاحية جلستك. يرجى البدء من جديد باستخدام /add_account."
+
+#: src/user_handlers.py:281
+msgid ""
+"This account has Two-Factor Authentication enabled. Please send your "
+"password.\n"
+"Use /cancel to stop."
+msgstr ""
+"هذا الحساب لديه مصادقة ثنائية مفعلة. الرجاء إرسال كلمة المرور الخاصة بك.\n"
+"استخدم /cancel للإيقاف."
+
+#: src/user_handlers.py:283
+msgid "Invalid or expired code. Please send the correct code again."
+msgstr "رمز غير صالح أو منتهي الصلاحية. يرجى إرسال الرمز الصحيح مرة أخرى."
+
+#: src/user_handlers.py:307
+msgid "Incorrect password or an error occurred. Please try again or use /cancel."
+msgstr "كلمة مرور غير صحيحة أو حدث خطأ. يرجى المحاولة مرة أخرى أو استخدام /cancel."
+
+#: src/user_handlers.py:321
+msgid "✅ Account added successfully!"
+msgstr "✅ تمت إضافة الحساب بنجاح!"
+
+#: src/user_handlers.py:323
+msgid ""
+"❌ Could not save your account to the database. It might already be "
+"registered."
+msgstr "❌ تعذر حفظ حسابك في قاعدة البيانات. قد يكون مسجلاً بالفعل."
+
+#: src/user_handlers.py:339
+msgid "You have not added any accounts yet. Use /add_account to get started."
+msgstr "لم تقم بإضافة أي حسابات بعد. استخدم /add_account للبدء."
+
+#: src/user_handlers.py:342
+msgid "Your managed accounts:"
+msgstr "حساباتك المدارة:"
+
+#: src/user_handlers.py:345
+msgid "🟢 Active"
+msgstr "🟢 نشط"
+
+#: src/user_handlers.py:345
+msgid "🔴 Inactive"
+msgstr "🔴 غير نشط"
+
+#: src/user_handlers.py:346
+#, python-brace-format
+msgid ""
+"<b>Account:</b> <code>{phone}</code>\n"
+"<b>Status:</b> {status}"
+msgstr ""
+"<b>الحساب:</b> <code>{phone}</code>\n"
+"<b>الحالة:</b> {status}"
+
+#: src/user_handlers.py:350
+msgid "📊 Stats"
+msgstr "📊 إحصائيات"
+
+#: src/user_handlers.py:351
+msgid "Toggle On"
+msgstr "تفعيل"
+
+#: src/user_handlers.py:351
+msgid "Toggle Off"
+msgstr "إيقاف"
+
+#: src/user_handlers.py:354
+msgid "🔄 Change Proxy"
+msgstr "🔄 تغيير البروكسي"
+
+#: src/user_handlers.py:355
+msgid "❌ Delete"
+msgstr "❌ حذف"
+
+#: src/user_handlers.py:376
+#, python-brace-format
+msgid "This account has created {count} groups."
+msgstr "هذا الحساب أنشأ {count} مجموعات."
+
+#: src/user_handlers.py:383
+msgid "activated"
+msgstr "تم تفعيله"
+
+#: src/user_handlers.py:383
+msgid "deactivated"
+msgstr "تم إيقافه"
+
+#: src/user_handlers.py:384
+#, python-brace-format
+msgid "Account has been {status}."
+msgstr "تم {status} الحساب."
+
+#: src/user_handlers.py:386
+msgid "Could not change status."
+msgstr "تعذر تغيير الحالة."
+
+#: src/user_handlers.py:397
+msgid "Yes, delete it"
+msgstr "نعم، احذفه"
+
+#: src/user_handlers.py:398
+msgid "No, cancel"
+msgstr "لا، إلغاء"
+
+#: src/user_handlers.py:406
+msgid "✅ Account has been deleted."
+msgstr "✅ تم حذف الحساب."
+
+#: src/user_handlers.py:408
+msgid "❌ Could not delete account."
+msgstr "❌ تعذر حذف الحساب."
+
+#: src/user_handlers.py:413
+msgid "Cancelled."
+msgstr "تم الإلغاء."
+
+#: src/user_handlers.py:428
+msgid "Please choose your language:"
+msgstr "الرجاء اختيار لغتك:"
+
+#: src/user_handlers.py:442
+msgid "Could not change language."
+msgstr "تعذر تغيير اللغة."
+
+#: src/user_handlers.py:442
+msgid "Language changed successfully."
+msgstr "تم تغيير اللغة بنجاح."

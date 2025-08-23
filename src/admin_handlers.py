@@ -3,7 +3,8 @@ from pyrogram import Client, filters
 from pyrogram.types import Message
 
 from src import config
-from src.database import add_plan, get_all_plans
+from src.database import add_plan, get_all_plans, get_all_users, get_user_details, grant_subscription
+from src.translation import get_translation_func_for_user
 
 log = logging.getLogger(__name__)
 
@@ -22,32 +23,34 @@ is_admin = filters.create(_is_admin_check)
 async def create_plan_handler(client: Client, message: Message):
     """
     Admin command to create a new subscription plan.
-    Usage: /create_plan <name> <price_stars> <max_accounts> <daily_group_limit>
+    Usage: /create_plan <name> <price_stars> <duration_days> <max_accounts> <daily_group_limit>
     """
     if not await is_admin.check(message):
-        return  # Silently ignore non-admins
+        return
+    _ = get_translation_func_for_user(message.from_user.id)
 
-    parts = message.text.split(maxsplit=4)
-    if len(parts) != 5:
+    parts = message.text.split(maxsplit=5)
+    if len(parts) != 6:
         await message.reply_text(
-            "<b>Usage:</b> <code>/create_plan &lt;name&gt; &lt;price_stars&gt; &lt;max_accounts&gt; &lt;daily_group_limit&gt;</code>\n\n"
-            "<b>Example:</b> <code>/create_plan Basic 100 2 10</code>"
+            _("<b>Usage:</b> <code>/create_plan &lt;name&gt; &lt;price&gt; &lt;days&gt; &lt;accounts&gt; &lt;limit&gt;</code>\n\n"
+              "<b>Example:</b> <code>/create_plan Basic 100 30 2 10</code>")
         )
         return
 
     try:
-        _, name, price_str, accounts_str, limit_str = parts
+        _, name, price_str, days_str, accounts_str, limit_str = parts
         price = int(price_str)
+        days = int(days_str)
         accounts = int(accounts_str)
         limit = int(limit_str)
     except ValueError:
-        await message.reply_text("❌ Invalid number format in arguments.")
+        await message.reply_text(_("❌ Invalid number format in arguments."))
         return
 
-    if add_plan(name, price, accounts, limit):
-        await message.reply_text(f"✅ Plan '<b>{name}</b>' created successfully.")
+    if add_plan(name, price, days, accounts, limit):
+        await message.reply_text(_("✅ Plan '<b>{plan_name}</b>' created successfully.").format(plan_name=name))
     else:
-        await message.reply_text(f"❌ Failed to create plan '<b>{name}</b>'. It might already exist or a database error occurred.")
+        await message.reply_text(_("❌ Failed to create plan '<b>{plan_name}</b>'. It might already exist or a database error occurred.").format(plan_name=name))
 
 
 @filters.command("list_plans")
@@ -55,23 +58,29 @@ async def list_plans_handler(client: Client, message: Message):
     """Admin command to list all subscription plans."""
     if not await is_admin.check(message):
         return
+    _ = get_translation_func_for_user(message.from_user.id)
 
     plans = get_all_plans(active_only=False)
     if not plans:
-        await message.reply_text("No subscription plans found.")
+        await message.reply_text(_("No subscription plans found."))
         return
 
-    reply = "<b>Subscription Plans:</b>\n\n"
+    reply = _("<b>Subscription Plans:</b>\n\n")
     for plan in plans:
-        status = "Active" if plan['is_active'] else "Inactive"
+        status = _("Active") if plan['is_active'] else _("Inactive")
         reply += (
-            f"<b>ID:</b> <code>{plan['id']}</code>\n"
-            f"<b>Name:</b> {plan['name']}\n"
-            f"<b>Price:</b> {plan['price_stars']} Stars\n"
-            f"<b>Accounts:</b> {plan['max_accounts']}\n"
-            f"<b>Daily Limit:</b> {plan['daily_group_limit']} groups/day\n"
-            f"<b>Status:</b> {status}\n"
-            "--------------------\n"
+            _("<b>ID:</b> <code>{id}</code>\n"
+              "<b>Name:</b> {name}\n"
+              "<b>Price:</b> {price} Stars\n"
+              "<b>Duration:</b> {days} days\n"
+              "<b>Accounts:</b> {accounts}\n"
+              "<b>Daily Limit:</b> {limit} groups/day\n"
+              "<b>Status:</b> {status}\n"
+              "--------------------\n").format(
+                id=plan['id'], name=plan['name'], price=plan['price_stars'],
+                days=plan['duration_days'], accounts=plan['max_accounts'],
+                limit=plan['daily_group_limit'], status=status
+            )
         )
 
     await message.reply_text(reply)
@@ -83,15 +92,16 @@ async def list_users_handler(client: Client, message: Message):
     """Admin command to list all users."""
     if not await is_admin.check(message):
         return
+    _ = get_translation_func_for_user(message.from_user.id)
 
     users = get_all_users()
     if not users:
-        await message.reply_text("No users found.")
+        await message.reply_text(_("No users found."))
         return
 
-    reply = "<b>Bot Users:</b>\n\n"
+    reply = _("<b>Bot Users:</b>\n\n")
     for user in users:
-        admin_badge = " (Admin)" if user['is_admin'] else ""
+        admin_badge = _(" (Admin)") if user['is_admin'] else ""
         reply += f"👤 <code>{user['telegram_id']}</code>{admin_badge}\n"
 
     await message.reply_text(reply)
@@ -102,48 +112,52 @@ async def view_user_handler(client: Client, message: Message):
     """Admin command to view details of a specific user."""
     if not await is_admin.check(message):
         return
+    _ = get_translation_func_for_user(message.from_user.id)
 
     parts = message.text.split()
     if len(parts) != 2:
-        await message.reply_text("<b>Usage:</b> <code>/view_user &lt;telegram_id&gt;</code>")
+        await message.reply_text(_("<b>Usage:</b> <code>/view_user &lt;telegram_id&gt;</code>"))
         return
 
     try:
         user_id = int(parts[1])
     except ValueError:
-        await message.reply_text("Invalid Telegram ID.")
+        await message.reply_text(_("Invalid Telegram ID."))
         return
 
     details = get_user_details(user_id)
     if not details:
-        await message.reply_text(f"No user found with ID <code>{user_id}</code>.")
+        await message.reply_text(_("No user found with ID <code>{user_id}</code>.").format(user_id=user_id))
         return
 
     user = details['user']
     sub = details['subscription']
     accounts = details['accounts']
 
-    reply = f"<b>User Details for:</b> <code>{user['telegram_id']}</code>\n"
-    reply += f"<b>Admin:</b> {'Yes' if user['is_admin'] else 'No'}\n"
-    reply += f"<b>Joined:</b> {user['created_at']}\n"
+    reply = _("<b>User Details for:</b> <code>{user_id}</code>\n").format(user_id=user['telegram_id'])
+    is_admin_text = _("Yes") if user['is_admin'] else _("No")
+    reply += _("<b>Admin:</b> {is_admin}\n").format(is_admin=is_admin_text)
+    reply += _("<b>Joined:</b> {join_date}\n").format(join_date=user['created_at'])
     reply += "--------------------\n"
 
     if sub:
         reply += (
-            f"<b>Subscription:</b> {sub['plan_name']} (Plan ID: {sub['plan_id']})\n"
-            f"<b>Expires:</b> {sub['end_date']}\n"
+            _("<b>Subscription:</b> {plan_name} (Plan ID: {plan_id})\n"
+              "<b>Expires:</b> {end_date}\n").format(
+                plan_name=sub['plan_name'], plan_id=sub['plan_id'], end_date=sub['end_date']
+            )
         )
     else:
-        reply += "<b>Subscription:</b> None\n"
+        reply += _("<b>Subscription:</b> None\n")
 
     reply += "--------------------\n"
-    reply += f"<b>Managed Accounts ({len(accounts)}):</b>\n"
+    reply += _("<b>Managed Accounts ({count}):</b>\n").format(count=len(accounts))
     if accounts:
         for acc in accounts:
-            status = "Active" if acc['is_active'] else "Inactive"
-            reply += f"  - <code>{acc['phone']}</code> ({status})\n"
+            status = _("Active") if acc['is_active'] else _("Inactive")
+            reply += _("  - <code>{phone}</code> ({status})\n").format(phone=acc['phone'], status=status)
     else:
-        reply += "  None\n"
+        reply += _("  None\n")
 
     await message.reply_text(reply)
 
@@ -152,10 +166,11 @@ async def grant_subscription_handler(client: Client, message: Message):
     """Admin command to manually grant a subscription to a user."""
     if not await is_admin.check(message):
         return
+    _ = get_translation_func_for_user(message.from_user.id)
 
     parts = message.text.split()
     if len(parts) != 4:
-        await message.reply_text("<b>Usage:</b> <code>/grant_subscription &lt;telegram_id&gt; &lt;plan_id&gt; &lt;duration_days&gt;</code>")
+        await message.reply_text(_("<b>Usage:</b> <code>/grant_subscription &lt;telegram_id&gt; &lt;plan_id&gt; &lt;duration_days&gt;</code>"))
         return
 
     try:
@@ -163,10 +178,11 @@ async def grant_subscription_handler(client: Client, message: Message):
         plan_id = int(parts[2])
         days = int(parts[3])
     except ValueError:
-        await message.reply_text("Invalid number format in arguments.")
+        await message.reply_text(_("Invalid number format in arguments."))
         return
 
     success, msg = grant_subscription(user_id, plan_id, days)
+    # The msg from DB is not translated, but it's simple english. Good enough for an admin command.
     if success:
         await message.reply_text(f"✅ {msg}")
     else:
