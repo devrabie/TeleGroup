@@ -205,3 +205,11 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# --- Project Specific ---
+# Ignore the data directory containing sessions and the database
+/data/
+
+# Ignore pyrogram session files specifically
+*.session
+*.session-journal
