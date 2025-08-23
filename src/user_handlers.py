@@ -13,14 +13,8 @@ from telegram.ext import (
 )
 
 from pyrogram import Client
-try:
-    # For newer Pyrogram versions
-    from pyrogram.errors import SessionPasswordRequired
-except ImportError:
-    # For older Pyrogram versions
-    from pyrogram.errors.exceptions.auth import SessionPasswordRequiredError as SessionPasswordRequired
-
 from pyrogram.errors import (
+    SessionPasswordNeeded,
     PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired
 )
 
@@ -165,7 +159,7 @@ async def async_sign_in(code, context, user_id, _):
     try:
         await client.sign_in(phone, phone_code_hash, code)
         await async_complete_login(context, user_id, _)
-    except SessionPasswordRequired:
+    except SessionPasswordNeeded:
         await context.bot.send_message(user_id, _("This account has Two-Factor Authentication enabled. Please send your password."))
         next_state = PASSWORD
     except (PhoneCodeInvalid, PhoneCodeExpired):
