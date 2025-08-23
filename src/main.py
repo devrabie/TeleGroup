@@ -3,12 +3,12 @@ import asyncio
 
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, PreCheckoutQueryHandler
 
-import config
-from database import initialize_database
-from admin_handlers import admin_handlers_list
-from user_handlers import user_handlers_list
-from proxy_manager import update_proxies_from_url
-from automation import run_group_creation_cycle
+from src import config
+from src.database import initialize_database
+from src.admin_handlers import admin_handlers_list
+from src.user_handlers import user_handlers_list
+from src.proxy_manager import update_proxies_from_url
+from src.automation import run_group_creation_cycle
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -34,14 +34,6 @@ def main() -> None:
     job_queue.run_repeating(update_proxies_from_url, interval=86400, first=10) # Daily, start after 10s
     job_queue.run_repeating(run_group_creation_cycle, interval=300, first=20) # Every 5 mins, start after 20s
     log.info("Scheduled background jobs.")
-
-    # --- Handler Registration ---
-    # TODO: The handler lists from admin_handlers and user_handlers need to be refactored
-    # to work with python-telegram-bot's structure. This is a placeholder.
-    #
-    # Example:
-    # from admin_handlers import start_handler
-    # application.add_handler(CommandHandler("start", start_handler))
 
     # --- Handler Registration ---
     all_handlers = admin_handlers_list + user_handlers_list

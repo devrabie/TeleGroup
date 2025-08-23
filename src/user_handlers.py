@@ -17,13 +17,13 @@ from pyrogram.errors import (
     PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired, SessionPasswordRequired
 )
 
-import config
-from database import (
+from src import config
+from src.database import (
     get_all_plans, get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
     delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
     set_user_language
 )
-from translation import get_translation_func_for_user
+from src.translation import get_translation_func_for_user
 
 log = logging.getLogger(__name__)
 
