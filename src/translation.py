@@ -1,6 +1,6 @@
 import gettext
 import os
-from src.database import get_user_language
+from database import get_user_language
 
 # Define the location of the locale files.
 # os.path.dirname(__file__) -> /app/src

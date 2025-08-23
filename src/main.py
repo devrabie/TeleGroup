@@ -6,12 +6,12 @@ from pyrogram.types import Message
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from src import config
-from src.database import initialize_database, get_db_connection
-from src.admin_handlers import admin_handlers_list
-from src.user_handlers import user_handlers_list
-from src.proxy_manager import update_proxies_from_url
-from src.automation import run_group_creation_cycle
+import config
+from database import initialize_database, get_db_connection
+from admin_handlers import admin_handlers_list
+from user_handlers import user_handlers_list
+from proxy_manager import update_proxies_from_url
+from automation import run_group_creation_cycle
 
 # --- Logging Setup ---
 logging.basicConfig(
