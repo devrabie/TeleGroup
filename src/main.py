@@ -78,16 +78,23 @@ async def main():
     log.info("Initializing database...")
     initialize_database()
 
-    log.info("Registering handlers...")
-    # Register admin handlers
-    for handler in admin_handlers_list:
-        app.add_handler(handler)
-    log.info(f"Registered {len(admin_handlers_list)} admin handlers.")
+    from pyrogram.handlers import MessageHandler, CallbackQueryHandler, PreCheckoutQueryHandler
 
-    # Register user handlers
-    for handler in user_handlers_list:
-        app.add_handler(handler)
-    log.info(f"Registered {len(user_handlers_list)} user handlers.")
+    log.info("Registering handlers...")
+
+    # Combined list of all handlers
+    all_handlers = admin_handlers_list + user_handlers_list
+
+    for handler_func, handler_filter, handler_type in all_handlers:
+        if handler_type == "message":
+            app.add_handler(MessageHandler(handler_func, filters=handler_filter))
+        elif handler_type == "callback":
+            app.add_handler(CallbackQueryHandler(handler_func, filters=handler_filter))
+        elif handler_type == "pre_checkout":
+            app.add_handler(PreCheckoutQueryHandler(handler_func, filters=handler_filter))
+        # Add other handler types like EditedMessageHandler if needed in the future
+
+    log.info(f"Registered {len(all_handlers)} handlers.")
 
     # --- Scheduler Setup ---
     scheduler = AsyncIOScheduler()

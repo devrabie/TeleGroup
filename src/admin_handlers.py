@@ -19,14 +19,11 @@ is_admin = filters.create(_is_admin_check)
 
 # --- Command Handlers ---
 
-@filters.command("create_plan")
 async def create_plan_handler(client: Client, message: Message):
     """
     Admin command to create a new subscription plan.
     Usage: /create_plan <name> <price_stars> <duration_days> <max_accounts> <daily_group_limit>
     """
-    if not await is_admin.check(message):
-        return
     _ = get_translation_func_for_user(message.from_user.id)
 
     parts = message.text.split(maxsplit=5)
@@ -53,11 +50,8 @@ async def create_plan_handler(client: Client, message: Message):
         await message.reply_text(_("❌ Failed to create plan '<b>{plan_name}</b>'. It might already exist or a database error occurred.").format(plan_name=name))
 
 
-@filters.command("list_plans")
 async def list_plans_handler(client: Client, message: Message):
     """Admin command to list all subscription plans."""
-    if not await is_admin.check(message):
-        return
     _ = get_translation_func_for_user(message.from_user.id)
 
     plans = get_all_plans(active_only=False)
@@ -87,11 +81,8 @@ async def list_plans_handler(client: Client, message: Message):
 
 # --- User Management Handlers ---
 
-@filters.command("list_users")
 async def list_users_handler(client: Client, message: Message):
     """Admin command to list all users."""
-    if not await is_admin.check(message):
-        return
     _ = get_translation_func_for_user(message.from_user.id)
 
     users = get_all_users()
@@ -107,11 +98,8 @@ async def list_users_handler(client: Client, message: Message):
     await message.reply_text(reply)
 
 
-@filters.command("view_user")
 async def view_user_handler(client: Client, message: Message):
     """Admin command to view details of a specific user."""
-    if not await is_admin.check(message):
-        return
     _ = get_translation_func_for_user(message.from_user.id)
 
     parts = message.text.split()
@@ -161,11 +149,8 @@ async def view_user_handler(client: Client, message: Message):
 
     await message.reply_text(reply)
 
-@filters.command("grant_subscription")
 async def grant_subscription_handler(client: Client, message: Message):
     """Admin command to manually grant a subscription to a user."""
-    if not await is_admin.check(message):
-        return
     _ = get_translation_func_for_user(message.from_user.id)
 
     parts = message.text.split()
@@ -190,12 +175,11 @@ async def grant_subscription_handler(client: Client, message: Message):
 
 
 # --- Handler Registration ---
-# A list of all handlers to be registered in the main app
-# The handlers themselves are decorated with filters, so we just need to list the functions
+# A list of tuples: (handler_function, filter, handler_type)
 admin_handlers_list = [
-    create_plan_handler,
-    list_plans_handler,
-    list_users_handler,
-    view_user_handler,
-    grant_subscription_handler,
+    (create_plan_handler, filters.command("create_plan") & is_admin, "message"),
+    (list_plans_handler, filters.command("list_plans") & is_admin, "message"),
+    (list_users_handler, filters.command("list_users") & is_admin, "message"),
+    (view_user_handler, filters.command("view_user") & is_admin, "message"),
+    (grant_subscription_handler, filters.command("grant_subscription") & is_admin, "message"),
 ]

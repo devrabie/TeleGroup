@@ -10,7 +10,6 @@ log = logging.getLogger(__name__)
 
 # --- /subscribe command ---
 
-@filters.command("subscribe")
 async def subscribe_handler(client: Client, message: Message):
     """
     Handles the /subscribe command, showing available plans to the user.
@@ -41,17 +40,6 @@ async def subscribe_handler(client: Client, message: Message):
     )
 
 
-from pyrogram.types import CallbackQuery, LabeledPrice, PreCheckoutQuery
-from src.database import (
-    get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
-    delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
-    set_user_language
-)
-from src.translation import get_translation_func_for_user
-from pyrogram.errors import (
-    PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired, SessionPasswordRequired
-)
-
 # In-memory storage for the login flow.
 # In a real-world, scalable bot, this should be moved to a persistent store like Redis.
 user_sessions = {}  # {user_id: {"client": PyrogramClient, "phone": str}}
@@ -60,7 +48,6 @@ user_states = {}    # {user_id: "state_name"}
 
 # --- Callbacks and Payment ---
 
-@filters.create(lambda _, __, query: query.data.startswith("select_plan_"))
 async def select_plan_callback_handler(client: Client, callback_query: CallbackQuery):
     """Handles the user selecting a subscription plan from the inline keyboard."""
     user_id = callback_query.from_user.id
@@ -98,14 +85,12 @@ async def select_plan_callback_handler(client: Client, callback_query: CallbackQ
         await callback_query.answer(_("Could not process your request. Please try again."), show_alert=True)
 
 
-@filters.pre_checkout_query
 async def pre_checkout_handler(client: Client, pre_checkout_query: PreCheckoutQuery):
     """Confirms to Telegram that the bot is ready to accept the payment."""
     log.info(f"Received pre_checkout_query from user {pre_checkout_query.from_user.id}")
     await pre_checkout_query.answer(ok=True)
 
 
-@filters.successful_payment
 async def successful_payment_handler(client: Client, message: Message):
     """Handles a successful payment, activating the user's subscription."""
     user_id = message.from_user.id
@@ -146,7 +131,6 @@ async def successful_payment_handler(client: Client, message: Message):
 
 # --- Account Adding Flow ---
 
-@filters.command("add_account")
 async def add_account_handler(client: Client, message: Message):
     """Starts the process of adding a new Telegram account."""
     user_id = message.from_user.id
@@ -187,7 +171,6 @@ async def add_account_handler(client: Client, message: Message):
           "<i>(Must be in international format, e.g., +1234567890)</i>")
     )
 
-@filters.command("cancel")
 async def cancel_handler(client: Client, message: Message):
     """Cancels the current operation (like adding an account)."""
     user_id = message.from_user.id
@@ -203,7 +186,6 @@ async def cancel_handler(client: Client, message: Message):
         await message.reply_text(_("Nothing to cancel."))
 
 
-@filters.private & ~filters.command()
 async def conversation_handler(client: Client, message: Message):
     """
     Handles the conversational steps for adding an account.
@@ -328,7 +310,6 @@ async def complete_login(user_client: Client, message: Message):
 
 # --- User Dashboard ---
 
-@filters.command("my_accounts")
 async def my_accounts_handler(client: Client, message: Message):
     """Displays a list of the user's managed accounts with control buttons."""
     user_id = message.from_user.id
@@ -360,7 +341,6 @@ async def my_accounts_handler(client: Client, message: Message):
 
 # --- Dashboard Callbacks ---
 
-@filters.create(lambda _, __, query: query.data.startswith("mng_"))
 async def manage_account_callback_handler(client: Client, callback_query: CallbackQuery):
     """Main router for all management callbacks."""
     user_id = callback_query.from_user.id
@@ -415,7 +395,6 @@ async def manage_account_callback_handler(client: Client, callback_query: Callba
 
 # --- Language Selection ---
 
-@filters.command("language")
 async def language_handler(client: Client, message: Message):
     """Allows the user to select their interface language."""
     user_id = message.from_user.id
@@ -428,7 +407,6 @@ async def language_handler(client: Client, message: Message):
     await message.reply_text(_("Please choose your language:"), reply_markup=reply_markup)
 
 
-@filters.create(lambda _, __, query: query.data.startswith("set_lang_"))
 async def set_language_callback_handler(client: Client, callback_query: CallbackQuery):
     """Handles language selection callback."""
     lang_code = callback_query.data.split("_")[2]
@@ -445,17 +423,17 @@ async def set_language_callback_handler(client: Client, callback_query: Callback
 
 
 # --- Handler Registration ---
-# A list of all handlers to be registered in the main app
+# A list of tuples: (handler_function, filter, handler_type)
 user_handlers_list = [
-    subscribe_handler,
-    select_plan_callback_handler,
-    pre_checkout_handler,
-    successful_payment_handler,
-    add_account_handler,
-    cancel_handler,
-    my_accounts_handler,
-    language_handler,
-    set_language_callback_handler,
-    manage_account_callback_handler, # Handles all `mng_*` callbacks
-    conversation_handler, # Must be last to act as a fallback for non-command messages
+    (subscribe_handler, filters.command("subscribe") & filters.private, "message"),
+    (select_plan_callback_handler, filters.create(lambda _, __, q: q.data.startswith("select_plan_")), "callback"),
+    (pre_checkout_handler, filters.pre_checkout_query, "pre_checkout"),
+    (successful_payment_handler, filters.successful_payment, "message"),
+    (add_account_handler, filters.command("add_account") & filters.private, "message"),
+    (cancel_handler, filters.command("cancel") & filters.private, "message"),
+    (my_accounts_handler, filters.command("my_accounts") & filters.private, "message"),
+    (language_handler, filters.command("language") & filters.private, "message"),
+    (set_language_callback_handler, filters.create(lambda _, __, q: q.data.startswith("set_lang_")), "callback"),
+    (manage_account_callback_handler, filters.create(lambda _, __, q: q.data.startswith("mng_")), "callback"),
+    (conversation_handler, filters.private & ~filters.command, "message"),
 ]
