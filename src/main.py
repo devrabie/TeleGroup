@@ -41,7 +41,7 @@ def main() -> None:
     log.info(f"Registered {len(all_handlers)} handlers.")
 
     log.info("Starting bot polling...")
-    application.run_polling()
+    application.run_polling(drop_pending_updates=True)
     log.info("Bot stopped.")
 
 
