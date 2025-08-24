@@ -2,6 +2,7 @@ import logging
 
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler, filters
+from telegram.constants import ParseMode
 
 from src import config
 from src.database import add_plan, get_all_plans, get_all_users, get_user_details, grant_subscription
@@ -22,7 +23,8 @@ async def create_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if len(context.args) != 5:
         await update.message.reply_text(
             _("<b>Usage:</b> <code>/create_plan &lt;name&gt; &lt;price&gt; &lt;days&gt; &lt;accounts&gt; &lt;limit&gt;</code>\n\n"
-              "<b>Example:</b> <code>/create_plan Basic 100 30 2 10</code>")
+              "<b>Example:</b> <code>/create_plan Basic 100 30 2 10</code>"),
+            parse_mode=ParseMode.HTML
         )
         return
 
@@ -37,9 +39,15 @@ async def create_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     if add_plan(name, price, days, accounts, limit):
-        await update.message.reply_text(_("✅ Plan '<b>{plan_name}</b>' created successfully.").format(plan_name=name))
+        await update.message.reply_text(
+            _("✅ Plan '<b>{plan_name}</b>' created successfully.").format(plan_name=name),
+            parse_mode=ParseMode.HTML
+        )
     else:
-        await update.message.reply_text(_("❌ Failed to create plan '<b>{plan_name}</b>'. It might already exist or a database error occurred.").format(plan_name=name))
+        await update.message.reply_text(
+            _("❌ Failed to create plan '<b>{plan_name}</b>'. It might already exist or a database error occurred.").format(plan_name=name),
+            parse_mode=ParseMode.HTML
+        )
 
 
 async def list_plans_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -69,7 +77,7 @@ async def list_plans_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             )
         )
 
-    await update.message.reply_text(reply)
+    await update.message.reply_text(reply, parse_mode=ParseMode.HTML)
 
 
 async def list_users_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -86,7 +94,7 @@ async def list_users_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         admin_badge = _(" (Admin)") if user['is_admin'] else ""
         reply += f"👤 <code>{user['telegram_id']}</code>{admin_badge}\n"
 
-    await update.message.reply_text(reply)
+    await update.message.reply_text(reply, parse_mode=ParseMode.HTML)
 
 
 async def view_user_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -94,7 +102,10 @@ async def view_user_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _ = get_translation_func_for_user(update.effective_user.id)
 
     if len(context.args) != 1:
-        await update.message.reply_text(_("<b>Usage:</b> <code>/view_user &lt;telegram_id&gt;</code>"))
+        await update.message.reply_text(
+            _("<b>Usage:</b> <code>/view_user &lt;telegram_id&gt;</code>"),
+            parse_mode=ParseMode.HTML
+        )
         return
 
     try:
@@ -105,7 +116,10 @@ async def view_user_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     details = get_user_details(user_id)
     if not details:
-        await update.message.reply_text(_("No user found with ID <code>{user_id}</code>.").format(user_id=user_id))
+        await update.message.reply_text(
+            _("No user found with ID <code>{user_id}</code>.").format(user_id=user_id),
+            parse_mode=ParseMode.HTML
+        )
         return
 
     user = details['user']
@@ -137,14 +151,17 @@ async def view_user_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         reply += _("  None\n")
 
-    await update.message.reply_text(reply)
+    await update.message.reply_text(reply, parse_mode=ParseMode.HTML)
 
 async def grant_subscription_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to manually grant a subscription to a user."""
     _ = get_translation_func_for_user(update.effective_user.id)
 
     if len(context.args) != 3:
-        await update.message.reply_text(_("<b>Usage:</b> <code>/grant_subscription &lt;telegram_id&gt; &lt;plan_id&gt; &lt;duration_days&gt;</code>"))
+        await update.message.reply_text(
+            _("<b>Usage:</b> <code>/grant_subscription &lt;telegram_id&gt; &lt;plan_id&gt; &lt;duration_days&gt;</code>"),
+            parse_mode=ParseMode.HTML
+        )
         return
 
     try:

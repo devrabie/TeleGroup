@@ -473,6 +473,7 @@ def get_or_create_user(telegram_id: int):
 
 def set_user_language(telegram_id: int, lang_code: str):
     """Sets the preferred language for a user."""
+    get_or_create_user(telegram_id)  # Ensure user exists before setting language
     sql = "UPDATE users SET language_code = ? WHERE telegram_id = ?"
     try:
         with get_db_connection() as conn:

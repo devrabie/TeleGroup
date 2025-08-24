@@ -2,6 +2,7 @@ import logging
 import asyncio
 import threading
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
+from telegram.constants import ParseMode
 from telegram.ext import (
     ContextTypes,
     CommandHandler,
@@ -54,13 +55,15 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/add_account - Add a new account to manage.\n"
         "/language - Change the bot's language."
     )
-    await update.message.reply_text(welcome_text)
+    await update.message.reply_text(welcome_text, parse_mode=ParseMode.HTML)
 
 
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Provides a detailed help message."""
+    """Provides a detailed help message, showing admin commands to admins."""
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
+
+    # Base help text for all users
     help_text = _(
         "<b>Bot Help & Commands</b>\n\n"
         "Here is a list of commands you can use:\n\n"
@@ -72,7 +75,21 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "<b>/language</b> - Change the display language of the bot (English/العربية).\n\n"
         "For most features, you need an active subscription. You can get one via the /subscribe command."
     )
-    await update.message.reply_text(help_text)
+
+    # Add admin commands if the user is an admin
+    if user_id in config.ADMIN_IDS:
+        admin_help_text = _(
+            "\n\n"
+            "<b>--- Admin Commands ---</b>\n"
+            "<b>/create_plan</b> - Create a new subscription plan.\n"
+            "<b>/list_plans</b> - List all plans.\n"
+            "<b>/list_users</b> - List all bot users.\n"
+            "<b>/view_user</b> - View details for a specific user.\n"
+            "<b>/grant_subscription</b> - Manually grant a subscription."
+        )
+        help_text += admin_help_text
+
+    await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)
 
 
 async def subscribe_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -141,7 +158,10 @@ async def set_language_callback(update: Update, context: ContextTypes.DEFAULT_TY
     user_id = query.from_user.id
     set_user_language(user_id, lang_code)
     _new = get_translation_func_for_user(user_id)
-    await query.edit_message_text(_new("Language changed successfully."))
+    await query.edit_message_text(
+        _new("Language changed successfully."),
+        parse_mode=ParseMode.HTML
+    )
 
 # --- Add Account Conversation ---
 PHONE, CODE, PASSWORD = range(3)
@@ -158,7 +178,10 @@ async def add_account_start(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await update.message.reply_text(_("You have reached the maximum of {max_accounts} accounts for your '{plan_name}' plan.").format(
             max_accounts=plan['max_accounts'], plan_name=plan['name']))
         return ConversationHandler.END
-    await update.message.reply_text(_("Please send the phone number of the account you want to add.\n<i>(Must be in international format, e.g., +1234567890)</i>"))
+    await update.message.reply_text(
+        _("Please send the phone number of the account you want to add.\n<i>(Must be in international format, e.g., +1234567890)</i>"),
+        parse_mode=ParseMode.HTML
+    )
     return PHONE
 
 async def async_send_code(phone, context, user_id, _):
@@ -286,7 +309,7 @@ async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             ]
         ]
         reply_markup = InlineKeyboardMarkup(buttons)
-        await update.message.reply_text(text, reply_markup=reply_markup)
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
 async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Main router for all management callbacks."""
