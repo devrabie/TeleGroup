@@ -3,6 +3,7 @@ import logging
 import random
 from telegram.ext import ContextTypes
 from pyrogram import Client
+from pyrogram.raw.functions.channels import TogglePreHistoryHidden
 from pyrogram.errors import FloodWait
 
 from src.database import (
@@ -91,7 +92,13 @@ async def process_single_account(account_details: dict):
 
         # Convert to supergroup and send message
         await asyncio.sleep(random.uniform(2, 5)) # Small delay before next action
-        await user_client.set_chat_history_for_new_members_enabled(new_group.id, True)
+        await user_client.invoke(
+            TogglePreHistoryHidden(
+                channel=await user_client.resolve_peer(new_group.id),
+                enabled=False
+            )
+        )
+        log.info(f"Set chat history to visible for new members in group {new_group.id}")
         await asyncio.sleep(random.uniform(2, 5))
         await user_client.send_message(new_group.id, f"Hello, group {new_group_name} is ready.")
 

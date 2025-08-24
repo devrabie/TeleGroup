@@ -351,10 +351,14 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
         if action == "stats":
             log.info(f"User {user_id} requested stats for account {account_id}.")
             total_groups = get_account_stats(account_id)
-            await context.bot.answer_callback_query(
-                query.id,
-                _("This account has created {count} groups.").format(count=total_groups),
-                show_alert=True
+            # Diagnostic change: send a message instead of answering the query alert.
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=_("📊 Stats for account ID {acc_id}:\nGroups created: {count}").format(
+                    acc_id=account_id,
+                    count=total_groups
+                ),
+                parse_mode=ParseMode.HTML
             )
         elif action == "toggle":
             log.info(f"User {user_id} toggled account {account_id}.")
