@@ -15,6 +15,9 @@ logging.basicConfig(
     level=config.LOG_LEVEL,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+# Silence noisy loggers
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 log = logging.getLogger(__name__)
 
 # --- Main Application Logic ---

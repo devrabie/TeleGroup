@@ -333,39 +333,58 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    _ = get_translation_func_for_user(user_id)
+    log.info(f"User {user_id} triggered manage_account_callback with data: {query.data}")
 
-    action_parts = query.data.split("_")
-    action = action_parts[1]
+    try:
+        _ = get_translation_func_for_user(user_id)
+        action_parts = query.data.split("_")
+        action = action_parts[1]
 
-    if action == "cancel":
-        await query.message.delete()
-        await context.bot.answer_callback_query(query.id, _("Cancelled."))
-        return
+        if action == "cancel":
+            log.info(f"User {user_id} cancelled management action.")
+            await query.message.delete()
+            await context.bot.answer_callback_query(query.id, _("Cancelled."))
+            return
 
-    account_id = int(action_parts[2])
+        account_id = int(action_parts[2])
 
-    if action == "stats":
-        total_groups = get_account_stats(account_id)
-        await context.bot.answer_callback_query(query.id, _("This account has created {count} groups.").format(count=total_groups), show_alert=True)
-    elif action == "toggle":
-        new_status = toggle_account_status(account_id, user_id)
-        if new_status is not None:
-            status_text = _("activated") if new_status else _("deactivated")
-            await context.bot.answer_callback_query(query.id, _("Account has been {status}.").format(status=status_text))
-        else:
-            await context.bot.answer_callback_query(query.id, _("Could not change status."), show_alert=True)
-    elif action == "proxy":
-        success, msg = reassign_proxy(account_id, user_id)
-        await context.bot.answer_callback_query(query.id, msg, show_alert=True)
-    elif action == "delete":
-        buttons = [[InlineKeyboardButton(_("Yes, delete it"), callback_data=f"mng_deleteconfirm_{account_id}"), InlineKeyboardButton(_("No, cancel"), callback_data="mng_cancel")]]
-        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(buttons))
-    elif action == "deleteconfirm":
-        if delete_managed_account(account_id, user_id):
-            await query.edit_message_text(_("✅ Account has been deleted."))
-        else:
-            await query.edit_message_text(_("❌ Could not delete account."))
+        if action == "stats":
+            log.info(f"User {user_id} requested stats for account {account_id}.")
+            total_groups = get_account_stats(account_id)
+            await context.bot.answer_callback_query(
+                query.id,
+                _("This account has created {count} groups.").format(count=total_groups),
+                show_alert=True
+            )
+        elif action == "toggle":
+            log.info(f"User {user_id} toggled account {account_id}.")
+            new_status = toggle_account_status(account_id, user_id)
+            if new_status is not None:
+                status_text = _("activated") if new_status else _("deactivated")
+                await context.bot.answer_callback_query(query.id, _("Account has been {status}.").format(status=status_text))
+            else:
+                await context.bot.answer_callback_query(query.id, _("Could not change status."), show_alert=True)
+        elif action == "proxy":
+            log.info(f"User {user_id} reassigned proxy for account {account_id}.")
+            success, msg = reassign_proxy(account_id, user_id)
+            await context.bot.answer_callback_query(query.id, msg, show_alert=True)
+        elif action == "delete":
+            log.info(f"User {user_id} initiated delete for account {account_id}.")
+            buttons = [[InlineKeyboardButton(_("Yes, delete it"), callback_data=f"mng_deleteconfirm_{account_id}"), InlineKeyboardButton(_("No, cancel"), callback_data="mng_cancel")]]
+            await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(buttons))
+        elif action == "deleteconfirm":
+            log.info(f"User {user_id} confirmed delete for account {account_id}.")
+            if delete_managed_account(account_id, user_id):
+                await query.edit_message_text(_("✅ Account has been deleted."))
+            else:
+                await query.edit_message_text(_("❌ Could not delete account."))
+    except Exception as e:
+        log.error(f"Error in manage_account_callback for user {user_id} with data {query.data}: {e}", exc_info=True)
+        try:
+            # Try to inform the user that something went wrong
+            await context.bot.answer_callback_query(query.id, "An unexpected error occurred.", show_alert=True)
+        except Exception as inner_e:
+            log.error(f"Failed to even notify user about the error: {inner_e}")
 
 # --- Handler Registration ---
 user_handlers_list = [
