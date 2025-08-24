@@ -57,6 +57,24 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(welcome_text)
 
 
+async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Provides a detailed help message."""
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    help_text = _(
+        "<b>Bot Help & Commands</b>\n\n"
+        "Here is a list of commands you can use:\n\n"
+        "<b>/start</b> - Shows the welcome message.\n"
+        "<b>/help</b> - Shows this help message.\n"
+        "<b>/subscribe</b> - Browse and purchase a subscription plan to use the bot's features.\n"
+        "<b>/my_accounts</b> - View and manage your connected Telegram accounts.\n"
+        "<b>/add_account</b> - Start the process of adding a new Telegram account for the bot to manage.\n"
+        "<b>/language</b> - Change the display language of the bot (English/العربية).\n\n"
+        "For most features, you need an active subscription. You can get one via the /subscribe command."
+    )
+    await update.message.reply_text(help_text)
+
+
 async def subscribe_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
@@ -85,7 +103,7 @@ async def select_plan_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         accounts=plan['max_accounts'], limit=plan['daily_group_limit']
     )
     payload = f"plan_{plan_id}_user_{user_id}"
-    price = LabeledPrice(_("Subscription"), plan['price_stars'] * 100)
+    price = LabeledPrice(_("Subscription"), plan['price_stars'])
     await context.bot.send_invoice(
         chat_id=user_id, title=title, description=description, payload=payload,
         provider_token="", currency="XTR", prices=[price]
@@ -312,6 +330,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
 # --- Handler Registration ---
 user_handlers_list = [
     CommandHandler("start", start_handler),
+    CommandHandler("help", help_handler),
     CommandHandler("subscribe", subscribe_handler),
     CallbackQueryHandler(select_plan_callback, pattern="^select_plan_"),
     PreCheckoutQueryHandler(precheckout_callback),

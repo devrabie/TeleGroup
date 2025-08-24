@@ -447,6 +447,30 @@ def log_group_creation(account_id: int, group_id: int, group_name: str):
         log.error(f"Failed to log group creation for account {account_id}: {e}")
         return False
 
+def get_or_create_user(telegram_id: int):
+    """
+    Retrieves a user by their telegram_id, creating them if they don't exist.
+    Returns the user as a dict.
+    """
+    select_sql = "SELECT * FROM users WHERE telegram_id = ?"
+    # Note: Default language_code is 'en' via the table schema
+    insert_sql = "INSERT OR IGNORE INTO users (telegram_id) VALUES (?)"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            # Use INSERT OR IGNORE and then SELECT to handle race conditions gracefully
+            # and avoid a separate SELECT call first in the common case.
+            cursor.execute(insert_sql, (telegram_id,))
+            if cursor.rowcount > 0:
+                log.info(f"Created new user record for telegram_id: {telegram_id}")
+
+            cursor.execute(select_sql, (telegram_id,))
+            user = cursor.fetchone()
+            return dict(user) if user else None
+    except sqlite3.Error as e:
+        log.error(f"Database error in get_or_create_user for {telegram_id}: {e}")
+        return None
+
 def set_user_language(telegram_id: int, lang_code: str):
     """Sets the preferred language for a user."""
     sql = "UPDATE users SET language_code = ? WHERE telegram_id = ?"
@@ -461,16 +485,13 @@ def set_user_language(telegram_id: int, lang_code: str):
         return False
 
 def get_user_language(telegram_id: int):
-    """Gets the preferred language for a user."""
-    sql = "SELECT language_code FROM users WHERE telegram_id = ?"
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(sql, (telegram_id,))
-            row = cursor.fetchone()
-            return row['language_code'] if row else 'en' # Default to 'en'
-    except sqlite3.Error:
-        return 'en' # Default to 'en' on error
+    """
+    Gets the preferred language for a user, creating the user if they don't exist.
+    """
+    user = get_or_create_user(telegram_id)
+    if user and user.get('language_code'):
+        return user['language_code']
+    return 'en' # Default to 'en'
 
 
 def get_user_details(telegram_id: int):
