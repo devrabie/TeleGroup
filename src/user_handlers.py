@@ -23,7 +23,7 @@ from src import config
 from src.database import (
     get_all_plans, get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
     delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
-    set_user_language
+    set_user_language, get_random_proxy_id, get_proxy_string
 )
 from src.translation import get_translation_func_for_user
 
@@ -172,7 +172,34 @@ async def add_account_start(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     return PHONE
 
 async def async_send_code(phone, context, user_id, _):
-    client = Client(f"user_session_{phone}", api_id=config.API_ID, api_hash=config.API_HASH, in_memory=True)
+    proxy_id = get_random_proxy_id()
+    proxy_string = get_proxy_string(proxy_id) if proxy_id else None
+    proxy_dict = None
+
+    if proxy_string:
+        try:
+            hostname, port, username, password = proxy_string.split(':')
+            proxy_dict = {
+                "scheme": "http",
+                "hostname": hostname,
+                "port": int(port),
+                "username": username,
+                "password": password,
+            }
+            log.info(f"Using proxy {hostname} for login attempt for user {user_id}")
+        except (ValueError, IndexError) as e:
+            log.error(f"Invalid proxy format during login: '{proxy_string}'. Error: {e}")
+            # Continue without proxy if format is bad
+    else:
+        log.warning(f"No proxy available for login attempt for user {user_id}. Proceeding without proxy.")
+
+    client = Client(
+        f"user_session_{phone}",
+        api_id=config.API_ID,
+        api_hash=config.API_HASH,
+        in_memory=True,
+        proxy=proxy_dict
+    )
     context.user_data['pyrogram_client'] = client
     try:
         await client.connect()

@@ -29,6 +29,15 @@ async def update_proxies_from_url(context: ContextTypes.DEFAULT_TYPE):
             log.warning("Downloaded proxy list is empty.")
             return
 
+        # Save the downloaded list to the file specified in config
+        try:
+            with open(config.DATA_PROXIES_FILE, "w") as f:
+                f.write("\n".join(proxy_list))
+            log.info(f"Successfully saved {len(proxy_list)} proxies to {config.DATA_PROXIES_FILE}")
+        except IOError as e:
+            log.error(f"Failed to write proxies to file {config.DATA_PROXIES_FILE}: {e}")
+            # We can still proceed to insert into DB
+
         new_proxies_count = batch_insert_proxies(proxy_list)
         log.info(f"Proxy update complete. Added {new_proxies_count} new proxies to the database.")
 
