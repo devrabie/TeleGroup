@@ -29,19 +29,6 @@ from src.translation import get_translation_func_for_user
 
 log = logging.getLogger(__name__)
 
-# --- Helper function to run Pyrogram logic in a separate thread ---
-
-def run_pyrogram_task(target, args):
-    def thread_target():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(target(*args))
-        finally:
-            loop.close()
-    thread = threading.Thread(target=thread_target)
-    thread.start()
-
 # --- Handlers for various bot features ---
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -201,9 +188,10 @@ async def async_send_code(phone, context, user_id, _):
 async def receive_phone_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    context.user_data['phone'] = update.message.text
+    phone_number = update.message.text
+    context.user_data['phone'] = phone_number
     await update.message.reply_text(_("Processing... Please wait."))
-    run_pyrogram_task(target=async_send_code, args=(update.message.text, context, user_id, _))
+    asyncio.create_task(async_send_code(phone_number, context, user_id, _))
     return CODE
 
 async def async_sign_in(code, context, user_id, _):
@@ -228,7 +216,8 @@ async def async_sign_in(code, context, user_id, _):
 async def receive_phone_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    run_pyrogram_task(target=async_sign_in, args=(update.message.text, context, user_id, _))
+    code = update.message.text
+    asyncio.create_task(async_sign_in(code, context, user_id, _))
     await update.message.reply_text(_("Processing..."))
     # The state transition is problematic here. We'll let the user send the password if needed.
     return PASSWORD
@@ -245,7 +234,8 @@ async def async_check_password(password, context, user_id, _):
 async def receive_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    run_pyrogram_task(target=async_check_password, args=(update.message.text, context, user_id, _))
+    password = update.message.text
+    asyncio.create_task(async_check_password(password, context, user_id, _))
     return ConversationHandler.END
 
 async def async_complete_login(context, user_id, _):
