@@ -178,9 +178,10 @@ def get_all_users():
 
 def grant_subscription(telegram_id: int, plan_id: int, duration_days: int):
     """Grants a subscription to a user, deactivating any existing active ones."""
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
-    end_date = datetime.now() + timedelta(days=duration_days)
+    now_utc = datetime.now(timezone.utc)
+    end_date = now_utc + timedelta(days=duration_days)
 
     get_user_sql = "SELECT id FROM users WHERE telegram_id = ?"
     deactivate_sql = "UPDATE subscriptions SET is_active = 0 WHERE user_id = ? AND is_active = 1"
@@ -203,7 +204,7 @@ def grant_subscription(telegram_id: int, plan_id: int, duration_days: int):
             user_id = user_row['id']
 
             cursor.execute(deactivate_sql, (user_id,))
-            cursor.execute(insert_sql, (user_id, plan_id, datetime.now(), end_date))
+            cursor.execute(insert_sql, (user_id, plan_id, now_utc, end_date))
             conn.commit()
 
         log.info(f"Successfully granted plan {plan_id} to user {telegram_id} for {duration_days} days.")
@@ -405,7 +406,7 @@ def get_eligible_accounts():
         JOIN plans p ON s.plan_id = p.id
         WHERE ma.is_active = 1
           AND s.is_active = 1
-          AND date(s.end_date) >= date('now')
+          AND s.end_date >= datetime('now')
     """
     try:
         with get_db_connection() as conn:
