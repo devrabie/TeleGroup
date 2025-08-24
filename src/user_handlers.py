@@ -180,7 +180,7 @@ async def async_send_code(phone, context, user_id, _):
         try:
             hostname, port, username, password = proxy_string.split(':')
             proxy_dict = {
-                "scheme": "http",
+                "scheme": "socks5",
                 "hostname": hostname,
                 "port": int(port),
                 "username": username,

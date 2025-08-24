@@ -64,7 +64,7 @@ async def process_single_account(account_details: dict):
             # Assuming format: hostname:port:username:password
             hostname, port, username, password = proxy_string.split(':')
             proxy_dict = {
-                "scheme": "http",
+                "scheme": "socks5",
                 "hostname": hostname,
                 "port": int(port),
                 "username": username,
