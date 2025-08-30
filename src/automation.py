@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import random
+from datetime import datetime
 from telegram.ext import ContextTypes
 from pyrogram import Client
 from pyrogram.raw.functions.channels import TogglePreHistoryHidden
@@ -85,26 +86,34 @@ async def process_single_account(account_details: dict):
         log.info(f"Successfully started client for account {account_id}.")
 
         total_groups_created = get_account_stats(account_id)
-        new_group_name = str(total_groups_created + 1)
+        now = datetime.now()
+        date_str = now.strftime("%Y-%m")
+        # Name format requested by the user, e.g., "Group 1 2025-08"
+        new_group_name = f"Group {total_groups_created + 1} {date_str}"
 
         new_group = await user_client.create_group(title=new_group_name, users=[]) # Create empty group
         log.info(f"Account {account_id} created group '{new_group_name}' (ID: {new_group.id}).")
 
-        # Convert to supergroup and send message
-        await asyncio.sleep(random.uniform(2, 5)) # Small delay before next action
-        await user_client.invoke(
-            TogglePreHistoryHidden(
-                channel=await user_client.resolve_peer(new_group.id),
-                enabled=False
+        # Log the creation immediately to ensure the count is updated even if subsequent steps fail.
+        log_group_creation(account_id, new_group.id, new_group_name)
+
+        # Try to convert to supergroup and set history to visible. This may fail on some accounts.
+        try:
+            await asyncio.sleep(random.uniform(2, 5)) # Small delay before next action
+            await user_client.invoke(
+                TogglePreHistoryHidden(
+                    channel=await user_client.resolve_peer(new_group.id),
+                    enabled=False
+                )
             )
-        )
-        log.info(f"Set chat history to visible for new members in group {new_group.id}")
+            log.info(f"Set chat history to visible for new members in group {new_group.id}")
+        except Exception as e:
+            log.warning(f"Could not set chat history for group {new_group.id}. "
+                        f"This is not a critical error. Group created successfully. Error: {e}")
         await asyncio.sleep(random.uniform(2, 5))
         await user_client.send_message(new_group.id, f"Hello, group {new_group_name} is ready.")
 
-        # Log the success
-        log_group_creation(account_id, new_group.id, new_group_name)
-        log.info(f"Successfully processed and logged group creation for account {account_id}.")
+        log.info(f"Successfully processed group creation for account {account_id}.")
 
     except FloodWait as e:
         log.warning(f"Account {account_id} is flood-waited for {e.value} seconds. Skipping for now.")
