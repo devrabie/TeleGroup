@@ -26,8 +26,8 @@ from src.database import (
     set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string
 )
 from src.translation import get_translation_func_for_user
-from kurigram import Client
-from kurigram.enums import ChatType
+from pyrogram import Client
+from pyrogram.enums import ChatType
 
 log = logging.getLogger(__name__)
 
