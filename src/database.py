@@ -346,6 +346,19 @@ def reassign_proxy(account_id: int, telegram_user_id: int):
         log.error(f"Failed to reassign proxy for account {account_id}: {e}")
         return False, "Database error."
 
+def get_account_session_string(account_id: int):
+    """Retrieves the session string for a specific managed account."""
+    sql = "SELECT session_string FROM managed_accounts WHERE id = ?"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (account_id,))
+            row = cursor.fetchone()
+            return row['session_string'] if row else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to get session string for account {account_id}: {e}")
+        return None
+
 def get_account_stats(account_id: int):
     """Gets creation stats for a specific managed account."""
     sql = "SELECT COUNT(id) as total_groups FROM group_creation_log WHERE account_id = ?"

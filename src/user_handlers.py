@@ -23,9 +23,11 @@ from src import config
 from src.database import (
     get_all_plans, get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
     delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
-    set_user_language, get_random_proxy_id, get_proxy_string
+    set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string
 )
 from src.translation import get_translation_func_for_user
+from kurigram import Client
+from kurigram.enums import ChatType
 
 log = logging.getLogger(__name__)
 
@@ -357,65 +359,64 @@ add_account_conv_handler = ConversationHandler(
 # --- User Dashboard ---
 
 async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
-    """Displays a list of the user's managed accounts with control buttons."""
+    """Displays a list of the user's managed accounts to select from."""
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
     details = get_user_details(user_id)
 
-    text = _("Your managed accounts:")
-    buttons = [[InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')]]
+    text = _("Please select an account to manage:")
+    buttons = []
+
+    if not details or not details['accounts']:
+        text = _("You have not added any accounts yet. Use /add_account to get started.")
+    else:
+        for acc in details['accounts']:
+            status_icon = "🟢" if acc['is_active'] else "🔴"
+            button_text = f"{status_icon} {acc['phone']}"
+            buttons.append([InlineKeyboardButton(button_text, callback_data=f"mng_select_{acc['id']}")])
+
+    buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
     reply_markup = InlineKeyboardMarkup(buttons)
 
     if from_callback:
         query = update.callback_query
-        # For 'my_accounts', we can't just edit. We need to send a new message with the list.
-        # So we first delete the main menu, then send the account list.
-        await query.message.delete()
-        await context.bot.send_message(user_id, text, reply_markup=reply_markup)
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
     else:
-        await update.message.reply_text(text, reply_markup=reply_markup)
-
-    if not details or not details['accounts']:
-        await context.bot.send_message(user_id, _("You have not added any accounts yet. Use /add_account to get started."))
-        return
-
-    for acc in details['accounts']:
-        acc_id = acc['id']
-        status = _("🟢 Active") if acc['is_active'] else _("🔴 Inactive")
-        text = _("<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}").format(phone=acc['phone'], status=status)
-
-        buttons = [
-            [
-                InlineKeyboardButton(_("📊 Stats"), callback_data=f"mng_stats_{acc_id}"),
-                InlineKeyboardButton(_("Toggle On") if not acc['is_active'] else _("Toggle Off"), callback_data=f"mng_toggle_{acc_id}")
-            ],
-            [
-                InlineKeyboardButton(_("🔄 Change Proxy"), callback_data=f"mng_proxy_{acc_id}"),
-                InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc_id}")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(buttons)
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
-async def my_groups_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Displays a list of the user's managed accounts to view their created groups."""
+async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id: int, message_id: int):
+    """Displays the management menu for a single account."""
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    details = get_user_details(user_id)
 
-    if not details or not details['accounts']:
-        await update.message.reply_text(_("You have not added any accounts yet. Use /add_account to get started."))
+    # We need to get the account details from the DB
+    # This is a bit inefficient, a better way would be to get all accounts once
+    # in my_accounts_handler and pass them around, but for now this is fine.
+    details = get_user_details(user_id)
+    acc = next((acc for acc in details['accounts'] if acc['id'] == account_id), None)
+
+    if not acc:
+        await context.bot.edit_message_text(chat_id=user_id, message_id=message_id, text=_("Error: Account not found."))
         return
 
-    await update.message.reply_text(_("Select an account to view its created groups:"))
-    for acc in details['accounts']:
-        acc_id = acc['id']
-        text = _("<b>Account:</b> <code>{phone}</code>").format(phone=acc['phone'])
-        buttons = [[
-            InlineKeyboardButton(_("📂 View Groups"), callback_data=f"mng_viewgroups_{acc_id}")
-        ]]
-        reply_markup = InlineKeyboardMarkup(buttons)
-        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    status = _("🟢 Active") if acc['is_active'] else _("🔴 Inactive")
+    text = _("<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}").format(phone=acc['phone'], status=status)
+
+    buttons = [
+        [
+            InlineKeyboardButton(_("📊 Stats"), callback_data=f"mng_stats_{acc['id']}"),
+            InlineKeyboardButton(_("Toggle On") if not acc['is_active'] else _("Toggle Off"), callback_data=f"mng_toggle_{acc['id']}"),
+        ],
+        [
+            InlineKeyboardButton(_("🔄 Change Proxy"), callback_data=f"mng_proxy_{acc['id']}"),
+            InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc['id']}"),
+        ],
+        [InlineKeyboardButton(_("📂 View Groups"), callback_data=f"mng_viewgroups_{acc['id']}")],
+        [InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")]
+    ]
+    reply_markup = InlineKeyboardMarkup(buttons)
+    await context.bot.edit_message_text(chat_id=user_id, message_id=message_id, text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
 
 async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Main router for all management callbacks."""
@@ -435,36 +436,101 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             await context.bot.answer_callback_query(query.id, _("Cancelled."))
             return
 
+        if action == "back":
+            await my_accounts_handler(update, context, from_callback=True)
+            return
+
+        if action == "select":
+            account_id = int(action_parts[2])
+            await account_detail_menu(update, context, account_id, query.message.message_id)
+            return
+
         if action == "stats":
             account_id = int(action_parts[2])
             log.info(f"User {user_id} requested stats for account {account_id}.")
             total_groups = get_account_stats(account_id)
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=_("📊 Stats for account ID {acc_id}:\nGroups created: {count}").format(
-                    acc_id=account_id,
-                    count=total_groups
-                ),
-                parse_mode=ParseMode.HTML
-            )
+
+            # Re-get account details to display them again
+            details = get_user_details(user_id)
+            acc = next((acc for acc in details['accounts'] if acc['id'] == account_id), None)
+            status = _("🟢 Active") if acc['is_active'] else _("🔴 Inactive")
+            text = _("<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}\n\n📊 <b>Stats:</b> {count} groups created.").format(
+                phone=acc['phone'], status=status, count=total_groups)
+
+            # Re-create the same buttons
+            buttons = [
+                [
+                    InlineKeyboardButton(_("📊 Stats"), callback_data=f"mng_stats_{acc['id']}"),
+                    InlineKeyboardButton(_("Toggle On") if not acc['is_active'] else _("Toggle Off"), callback_data=f"mng_toggle_{acc['id']}"),
+                ],
+                [
+                    InlineKeyboardButton(_("🔄 Change Proxy"), callback_data=f"mng_proxy_{acc['id']}"),
+                    InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc['id']}"),
+                ],
+                [InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")]
+            ]
+            reply_markup = InlineKeyboardMarkup(buttons)
+            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
         elif action == "viewgroups":
             account_id = int(action_parts[2])
-            log.info(f"User {user_id} requested to view groups for account {account_id}.")
-            groups = get_groups_for_account(account_id)
-            if not groups:
-                await context.bot.send_message(user_id, _("No groups found for this account."))
+            page = int(action_parts[3]) if len(action_parts) > 3 else 0
+            log.info(f"User {user_id} requested to view groups for account {account_id} on page {page}.")
+
+            await query.edit_message_text(_("Fetching groups... Please wait."))
+
+            session_string = get_account_session_string(account_id)
+            if not session_string:
+                await query.edit_message_text(_("Error: Could not retrieve session for this account."))
                 return
 
-            await context.bot.send_message(user_id, _("Groups for Account ID {acc_id}:").format(acc_id=account_id))
+            client = Client(f"user_session_reader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
 
-            for group in groups:
-                group_log_id = group['id']
-                text = f"• {group['group_name']}"
-                buttons = [[
-                    InlineKeyboardButton(_("📊 Stats"), callback_data=f"mng_groupstats_{group_log_id}")
-                ]]
-                reply_markup = InlineKeyboardMarkup(buttons)
-                await context.bot.send_message(user_id, text, reply_markup=reply_markup)
+            try:
+                await client.connect()
+
+                all_groups = []
+                async for dialog in client.get_dialogs():
+                    if dialog.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+                        all_groups.append(dialog.chat.title)
+
+                await client.disconnect()
+
+                if not all_groups:
+                    text = _("This account is not a member of any groups.")
+                    buttons = [[InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")]]
+                    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+                    return
+
+                # Pagination
+                items_per_page = 10
+                start_index = page * items_per_page
+                end_index = start_index + items_per_page
+
+                paginated_groups = all_groups[start_index:end_index]
+
+                text = _("<b>Groups for Account (Page {page_num}/{total_pages}):</b>\n\n").format(
+                    page_num=page + 1,
+                    total_pages=(len(all_groups) + items_per_page - 1) // items_per_page
+                )
+                text += "\n".join([f"• <code>{group_name}</code>" for group_name in paginated_groups])
+
+                pagination_buttons = []
+                if page > 0:
+                    pagination_buttons.append(InlineKeyboardButton(_("⬅️ Previous"), callback_data=f"mng_viewgroups_{account_id}_{page-1}"))
+                if end_index < len(all_groups):
+                    pagination_buttons.append(InlineKeyboardButton(_("Next ➡️"), callback_data=f"mng_viewgroups_{account_id}_{page+1}"))
+
+                buttons = [pagination_buttons] if pagination_buttons else []
+                buttons.append([InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")])
+
+                await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode=ParseMode.HTML)
+
+            except Exception as e:
+                log.error(f"Error fetching groups for user {user_id}, account {account_id}: {e}")
+                await query.edit_message_text(_("An error occurred while fetching groups. The session might be invalid or revoked."))
+                if client.is_connected:
+                    await client.disconnect()
         elif action == "groupstats":
             group_log_id = int(action_parts[2])
             log.info(f"User {user_id} requested stats for group log ID {group_log_id}.")
@@ -484,6 +550,8 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             if new_status is not None:
                 status_text = _("activated") if new_status else _("deactivated")
                 await context.bot.answer_callback_query(query.id, _("Account has been {status}.").format(status=status_text))
+                # Refresh the menu
+                await account_detail_menu(update, context, account_id, query.message.message_id)
             else:
                 await context.bot.answer_callback_query(query.id, _("Could not change status."), show_alert=True)
         elif action == "proxy":
@@ -491,16 +559,26 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             log.info(f"User {user_id} reassigned proxy for account {account_id}.")
             success, msg = reassign_proxy(account_id, user_id)
             await context.bot.answer_callback_query(query.id, msg, show_alert=True)
+            # Refresh the menu
+            await account_detail_menu(update, context, account_id, query.message.message_id)
         elif action == "delete":
             account_id = int(action_parts[2])
             log.info(f"User {user_id} initiated delete for account {account_id}.")
-            buttons = [[InlineKeyboardButton(_("Yes, delete it"), callback_data=f"mng_deleteconfirm_{account_id}"), InlineKeyboardButton(_("No, cancel"), callback_data="mng_cancel")]]
-            await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(buttons))
+            buttons = [
+                [InlineKeyboardButton(_("Yes, delete it"), callback_data=f"mng_deleteconfirm_{account_id}")],
+                [InlineKeyboardButton(_("No, cancel"), callback_data=f"mng_select_{account_id}")]
+            ]
+            await query.edit_message_text(
+                _("Are you sure you want to delete this account? This action cannot be undone."),
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
         elif action == "deleteconfirm":
             account_id = int(action_parts[2])
             log.info(f"User {user_id} confirmed delete for account {account_id}.")
             if delete_managed_account(account_id, user_id):
-                await query.edit_message_text(_("✅ Account has been deleted."))
+                await context.bot.answer_callback_query(query.id, _("✅ Account has been deleted."))
+                # Go back to the account list
+                await my_accounts_handler(update, context, from_callback=True)
             else:
                 await query.edit_message_text(_("❌ Could not delete account."))
     except Exception as e:
@@ -522,7 +600,6 @@ user_handlers_list = [
     CommandHandler("language", language_handler),
     CallbackQueryHandler(set_language_callback, pattern="^set_lang_"),
     CommandHandler("my_accounts", my_accounts_handler),
-    CommandHandler("my_groups", my_groups_handler),
     CallbackQueryHandler(manage_account_callback, pattern="^mng_"),
     CallbackQueryHandler(main_menu_callback, pattern="^main_"),
     add_account_conv_handler,
