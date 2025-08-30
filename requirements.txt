@@ -8,7 +8,7 @@ httpcore==1.0.9
 httpx==0.28.1
 idna==3.10
 pyaes==1.6.1
-Pyrogram==2.0.106
+Kurigram==2.2.7
 PySocks==1.7.1
 python-dotenv==1.1.1
 python-telegram-bot==22.3

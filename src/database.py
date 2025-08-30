@@ -359,6 +359,32 @@ def get_account_stats(account_id: int):
         log.error(f"Failed to get stats for account {account_id}: {e}")
         return 0
 
+def get_groups_for_account(account_id: int):
+    """Retrieves all groups created by a specific managed account."""
+    sql = "SELECT id, group_id, group_name, creation_timestamp FROM group_creation_log WHERE account_id = ? ORDER BY creation_timestamp DESC"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (account_id,))
+            groups = cursor.fetchall()
+            return [dict(group) for group in groups]
+    except sqlite3.Error as e:
+        log.error(f"Failed to get groups for account {account_id}: {e}")
+        return []
+
+def get_group_log_details(group_log_id: int):
+    """Retrieves the details of a single group from the creation log."""
+    sql = "SELECT group_name, creation_timestamp FROM group_creation_log WHERE id = ?"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (group_log_id,))
+            group_details = cursor.fetchone()
+            return dict(group_details) if group_details else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to get group log details for log {group_log_id}: {e}")
+        return None
+
 def mark_proxy_as_bad(proxy_id: int):
     """Marks a proxy as not working."""
     if proxy_id is None:

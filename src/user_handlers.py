@@ -13,8 +13,8 @@ from telegram.ext import (
     PreCheckoutQueryHandler,
 )
 
-from pyrogram import Client
-from pyrogram.errors import (
+from kurigram import Client
+from kurigram.errors import (
     SessionPasswordNeeded,
     PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired
 )
@@ -23,6 +23,7 @@ from src import config
 from src.database import (
     get_all_plans, get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
     delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
+    get_groups_for_account, get_group_log_details,
     set_user_language, get_random_proxy_id, get_proxy_string
 )
 from src.translation import get_translation_func_for_user
@@ -43,6 +44,27 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/language - Change the bot's language."
     )
     await update.message.reply_text(welcome_text, parse_mode=ParseMode.HTML)
+
+
+async def my_groups_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Displays a list of the user's managed accounts to view their created groups."""
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    details = get_user_details(user_id)
+
+    if not details or not details['accounts']:
+        await update.message.reply_text(_("You have not added any accounts yet. Use /add_account to get started."))
+        return
+
+    await update.message.reply_text(_("Select an account to view its created groups:"))
+    for acc in details['accounts']:
+        acc_id = acc['id']
+        text = _("<b>Account:</b> <code>{phone}</code>").format(phone=acc['phone'])
+        buttons = [[
+            InlineKeyboardButton(_("📂 View Groups"), callback_data=f"mng_viewgroups_{acc_id}")
+        ]]
+        reply_markup = InlineKeyboardMarkup(buttons)
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
 
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -200,7 +222,7 @@ async def async_send_code(phone, context, user_id, _):
         in_memory=True,
         proxy=proxy_dict
     )
-    context.user_data['pyrogram_client'] = client
+    context.user_data['kurigram_client'] = client
     try:
         await client.connect()
         sent_code = await client.send_code(phone)
@@ -222,7 +244,7 @@ async def receive_phone_number(update: Update, context: ContextTypes.DEFAULT_TYP
     return CODE
 
 async def async_sign_in(code, context, user_id, _):
-    client = context.user_data['pyrogram_client']
+    client = context.user_data['kurigram_client']
     phone = context.user_data['phone']
     phone_code_hash = context.user_data['phone_code_hash']
     next_state = ConversationHandler.END
@@ -250,7 +272,7 @@ async def receive_phone_code(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return PASSWORD
 
 async def async_check_password(password, context, user_id, _):
-    client = context.user_data['pyrogram_client']
+    client = context.user_data['kurigram_client']
     try:
         await client.check_password(password)
         await async_complete_login(context, user_id, _)
@@ -266,7 +288,7 @@ async def receive_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     return ConversationHandler.END
 
 async def async_complete_login(context, user_id, _):
-    client = context.user_data['pyrogram_client']
+    client = context.user_data['kurigram_client']
     phone = context.user_data['phone']
     session_string = await client.export_session_string()
     await client.disconnect()
@@ -278,8 +300,8 @@ async def async_complete_login(context, user_id, _):
 
 async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     _ = get_translation_func_for_user(update.effective_user.id)
-    if 'pyrogram_client' in context.user_data:
-        client = context.user_data['pyrogram_client']
+    if 'kurigram_client' in context.user_data:
+        client = context.user_data['kurigram_client']
         if client.is_connected:
             await client.disconnect()
     context.user_data.clear()
@@ -346,12 +368,10 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             await context.bot.answer_callback_query(query.id, _("Cancelled."))
             return
 
-        account_id = int(action_parts[2])
-
         if action == "stats":
+            account_id = int(action_parts[2])
             log.info(f"User {user_id} requested stats for account {account_id}.")
             total_groups = get_account_stats(account_id)
-            # Diagnostic change: send a message instead of answering the query alert.
             await context.bot.send_message(
                 chat_id=user_id,
                 text=_("📊 Stats for account ID {acc_id}:\nGroups created: {count}").format(
@@ -360,7 +380,38 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                 ),
                 parse_mode=ParseMode.HTML
             )
+        elif action == "viewgroups":
+            account_id = int(action_parts[2])
+            log.info(f"User {user_id} requested to view groups for account {account_id}.")
+            groups = get_groups_for_account(account_id)
+            if not groups:
+                await context.bot.send_message(user_id, _("No groups found for this account."))
+                return
+
+            await context.bot.send_message(user_id, _("Groups for Account ID {acc_id}:").format(acc_id=account_id))
+
+            for group in groups:
+                group_log_id = group['id']
+                text = f"• {group['group_name']}"
+                buttons = [[
+                    InlineKeyboardButton(_("📊 Stats"), callback_data=f"mng_groupstats_{group_log_id}")
+                ]]
+                reply_markup = InlineKeyboardMarkup(buttons)
+                await context.bot.send_message(user_id, text, reply_markup=reply_markup)
+        elif action == "groupstats":
+            group_log_id = int(action_parts[2])
+            log.info(f"User {user_id} requested stats for group log ID {group_log_id}.")
+            details = get_group_log_details(group_log_id)
+            if details:
+                text = _("<b>Group Stats:</b>\n\n<b>Name:</b> {name}\n<b>Created:</b> {date}").format(
+                    name=details['group_name'],
+                    date=details['creation_timestamp']
+                )
+                await context.bot.send_message(user_id, text, parse_mode=ParseMode.HTML)
+            else:
+                await context.bot.send_message(user_id, _("Could not retrieve group stats."))
         elif action == "toggle":
+            account_id = int(action_parts[2])
             log.info(f"User {user_id} toggled account {account_id}.")
             new_status = toggle_account_status(account_id, user_id)
             if new_status is not None:
@@ -369,14 +420,17 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             else:
                 await context.bot.answer_callback_query(query.id, _("Could not change status."), show_alert=True)
         elif action == "proxy":
+            account_id = int(action_parts[2])
             log.info(f"User {user_id} reassigned proxy for account {account_id}.")
             success, msg = reassign_proxy(account_id, user_id)
             await context.bot.answer_callback_query(query.id, msg, show_alert=True)
         elif action == "delete":
+            account_id = int(action_parts[2])
             log.info(f"User {user_id} initiated delete for account {account_id}.")
             buttons = [[InlineKeyboardButton(_("Yes, delete it"), callback_data=f"mng_deleteconfirm_{account_id}"), InlineKeyboardButton(_("No, cancel"), callback_data="mng_cancel")]]
             await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(buttons))
         elif action == "deleteconfirm":
+            account_id = int(action_parts[2])
             log.info(f"User {user_id} confirmed delete for account {account_id}.")
             if delete_managed_account(account_id, user_id):
                 await query.edit_message_text(_("✅ Account has been deleted."))
@@ -401,6 +455,7 @@ user_handlers_list = [
     CommandHandler("language", language_handler),
     CallbackQueryHandler(set_language_callback, pattern="^set_lang_"),
     CommandHandler("my_accounts", my_accounts_handler),
+    CommandHandler("my_groups", my_groups_handler),
     CallbackQueryHandler(manage_account_callback, pattern="^mng_"),
     add_account_conv_handler,
 ]

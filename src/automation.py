@@ -3,9 +3,8 @@ import logging
 import random
 from datetime import datetime
 from telegram.ext import ContextTypes
-from pyrogram import Client
-from pyrogram.raw.functions.channels import TogglePreHistoryHidden
-from pyrogram.errors import FloodWait
+from kurigram import Client
+from kurigram.errors import FloodWait
 
 from src.database import (
     get_eligible_accounts,
@@ -91,25 +90,12 @@ async def process_single_account(account_details: dict):
         # Name format requested by the user, e.g., "Group 1 2025-08"
         new_group_name = f"Group {total_groups_created + 1} {date_str}"
 
-        new_group = await user_client.create_group(title=new_group_name, users=[]) # Create empty group
-        log.info(f"Account {account_id} created group '{new_group_name}' (ID: {new_group.id}).")
+        # Create a new supergroup directly using the new method.
+        new_group = await user_client.create_supergroup(title=new_group_name, description="")
+        log.info(f"Account {account_id} created supergroup '{new_group_name}' (ID: {new_group.id}).")
 
-        # Log the creation immediately to ensure the count is updated even if subsequent steps fail.
+        # Log the creation immediately to ensure the count is updated.
         log_group_creation(account_id, new_group.id, new_group_name)
-
-        # Try to convert to supergroup and set history to visible. This may fail on some accounts.
-        try:
-            await asyncio.sleep(random.uniform(2, 5)) # Small delay before next action
-            await user_client.invoke(
-                TogglePreHistoryHidden(
-                    channel=await user_client.resolve_peer(new_group.id),
-                    enabled=False
-                )
-            )
-            log.info(f"Set chat history to visible for new members in group {new_group.id}")
-        except Exception as e:
-            log.warning(f"Could not set chat history for group {new_group.id}. "
-                        f"This is not a critical error. Group created successfully. Error: {e}")
         await asyncio.sleep(random.uniform(2, 5))
         await user_client.send_message(new_group.id, f"Hello, group {new_group_name} is ready.")
 
