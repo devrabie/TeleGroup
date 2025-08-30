@@ -23,7 +23,8 @@ from src import config
 from src.database import (
     get_all_plans, get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
     delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
-    set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string
+    set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
+    get_or_create_user
 )
 from src.translation import get_translation_func_for_user
 from pyrogram import Client
@@ -55,26 +56,40 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, message_
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Greets the user and shows the main menu."""
+    """Greets the user, ensures they are in the DB, and shows the main menu."""
+    user_id = update.effective_user.id
+    get_or_create_user(user_id) # Ensure user is in the database
     await main_menu(update, context)
 
 async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    action = query.data.split('_')[1]
 
-    if action == 'subscribe':
-        await subscribe_handler(update, context, from_callback=True)
-    elif action == 'my_accounts':
-        await my_accounts_handler(update, context, from_callback=True)
-    elif action == 'add_account':
-        await add_account_start(update, context)
-    elif action == 'language':
-        await language_handler(update, context, from_callback=True)
-    elif action == 'help':
-        await help_handler(update, context, from_callback=True)
-    elif action == 'back':
-        await main_menu(update, context, message_id=query.message.message_id)
+    try:
+        action = query.data.split('_')[1]
+
+        if action == 'subscribe':
+            await subscribe_handler(update, context, from_callback=True)
+        elif action == 'my_accounts':
+            await my_accounts_handler(update, context, from_callback=True)
+        elif action == 'add_account':
+            # Add account is a conversation, it needs a message handler, not a callback query.
+            # We will send a message to the user and let them reply.
+            _ = get_translation_func_for_user(query.from_user.id)
+            await query.message.reply_text(_("To add an account, please use the /add_account command."))
+        elif action == 'language':
+            await language_handler(update, context, from_callback=True)
+        elif action == 'help':
+            await help_handler(update, context, from_callback=True)
+        elif action == 'back':
+            await main_menu(update, context, message_id=query.message.message_id)
+    except Exception as e:
+        log.error(f"Error in main_menu_callback: {e}", exc_info=True)
+        try:
+            _ = get_translation_func_for_user(query.from_user.id)
+            await query.message.reply_text(_("An error occurred. Please try again later."))
+        except Exception as inner_e:
+            log.error(f"Failed to even notify user about the main_menu_callback error: {inner_e}")
 
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
     """Provides a detailed help message, showing admin commands to admins."""
@@ -577,8 +592,21 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             log.info(f"User {user_id} confirmed delete for account {account_id}.")
             if delete_managed_account(account_id, user_id):
                 await context.bot.answer_callback_query(query.id, _("✅ Account has been deleted."))
-                # Go back to the account list
-                await my_accounts_handler(update, context, from_callback=True)
+                # This is a bit of code duplication, but it's safer than calling the handler
+                # and avoids state-related issues with the update object.
+                details = get_user_details(user_id)
+                text = _("Please select an account to manage:")
+                buttons = []
+                if not details or not details['accounts']:
+                    text = _("You have not added any accounts yet. Use /add_account to get started.")
+                else:
+                    for acc in details['accounts']:
+                        status_icon = "🟢" if acc['is_active'] else "🔴"
+                        button_text = f"{status_icon} {acc['phone']}"
+                        buttons.append([InlineKeyboardButton(button_text, callback_data=f"mng_select_{acc['id']}")])
+                buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
+                reply_markup = InlineKeyboardMarkup(buttons)
+                await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
             else:
                 await query.edit_message_text(_("❌ Could not delete account."))
     except Exception as e:
