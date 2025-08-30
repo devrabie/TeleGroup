@@ -31,21 +31,50 @@ log = logging.getLogger(__name__)
 
 # --- Handlers for various bot features ---
 
-async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Greets the user and shows available commands."""
+async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, message_id=None):
+    """Displays the main menu with inline buttons."""
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    welcome_text = _(
-        "Welcome to the bot! Here are the available commands:\n"
-        "/subscribe - View and purchase subscription plans.\n"
-        "/my_accounts - Manage your connected accounts.\n"
-        "/add_account - Add a new account to manage.\n"
-        "/language - Change the bot's language."
-    )
-    await update.message.reply_text(welcome_text, parse_mode=ParseMode.HTML)
 
+    keyboard = [
+        [InlineKeyboardButton(_("🚀 Subscribe"), callback_data='main_subscribe'),
+         InlineKeyboardButton(_("👤 My Accounts"), callback_data='main_my_accounts')],
+        [InlineKeyboardButton(_("➕ Add Account"), callback_data='main_add_account'),
+         InlineKeyboardButton(_("🌐 Language"), callback_data='main_language')],
+        [InlineKeyboardButton(_("❓ Help"), callback_data='main_help')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = _("Welcome to the main menu. Please choose an option:")
+
+    if message_id:
+        await context.bot.edit_message_text(chat_id=user_id, message_id=message_id, text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    else:
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Greets the user and shows the main menu."""
+    await main_menu(update, context)
+
+async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    action = query.data.split('_')[1]
+
+    if action == 'subscribe':
+        await subscribe_handler(update, context, from_callback=True)
+    elif action == 'my_accounts':
+        await my_accounts_handler(update, context, from_callback=True)
+    elif action == 'add_account':
+        await add_account_start(update, context)
+    elif action == 'language':
+        await language_handler(update, context, from_callback=True)
+    elif action == 'help':
+        await help_handler(update, context, from_callback=True)
+    elif action == 'back':
+        await main_menu(update, context, message_id=query.message.message_id)
+
+async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
     """Provides a detailed help message, showing admin commands to admins."""
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
@@ -76,24 +105,40 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         help_text += admin_help_text
 
-    await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)
+    buttons = [[InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')]]
+    reply_markup = InlineKeyboardMarkup(buttons)
+
+    if from_callback:
+        query = update.callback_query
+        await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    else:
+        await update.message.reply_text(help_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
 
-async def subscribe_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def subscribe_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
     plans = get_all_plans(active_only=True)
+
+    text = _("Please select a subscription plan from the list below:")
+
     if not plans:
-        await update.message.reply_text(_("There are currently no subscription plans available. Please check back later."))
-        return
-    buttons = [[InlineKeyboardButton(
-        _("{plan_name} - {price} Stars").format(plan_name=p['name'], price=p['price_stars']),
-        callback_data=f"select_plan_{p['id']}"
-    )] for p in plans]
-    await update.message.reply_text(
-        _("Please select a subscription plan from the list below:"),
-        reply_markup=InlineKeyboardMarkup(buttons)
-    )
+        text = _("There are currently no subscription plans available. Please check back later.")
+        buttons = []
+    else:
+        buttons = [[InlineKeyboardButton(
+            _("{plan_name} - {price} Stars").format(plan_name=p['name'], price=p['price_stars']),
+            callback_data=f"select_plan_{p['id']}"
+        )] for p in plans]
+
+    buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
+    reply_markup = InlineKeyboardMarkup(buttons)
+
+    if from_callback:
+        query = update.callback_query
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    else:
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
 async def select_plan_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -133,10 +178,22 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
             payload=payload)
     await update.message.reply_text(reply_text)
 
-async def language_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    _ = get_translation_func_for_user(update.effective_user.id)
-    buttons = [[InlineKeyboardButton("English 🇬🇧", callback_data="set_lang_en")], [InlineKeyboardButton("العربية 🇸🇦", callback_data="set_lang_ar")]]
-    await update.message.reply_text(_("Please choose your language:"), reply_markup=InlineKeyboardMarkup(buttons))
+async def language_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    buttons = [
+        [InlineKeyboardButton("English 🇬🇧", callback_data="set_lang_en"),
+         InlineKeyboardButton("العربية 🇸🇦", callback_data="set_lang_ar")],
+        [InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')]
+    ]
+    reply_markup = InlineKeyboardMarkup(buttons)
+    text = _("Please choose your language:")
+
+    if from_callback:
+        query = update.callback_query
+        await query.edit_message_text(text, reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(text, reply_markup=reply_markup)
 
 async def set_language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -299,17 +356,29 @@ add_account_conv_handler = ConversationHandler(
 
 # --- User Dashboard ---
 
-async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
     """Displays a list of the user's managed accounts with control buttons."""
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
     details = get_user_details(user_id)
 
+    text = _("Your managed accounts:")
+    buttons = [[InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')]]
+    reply_markup = InlineKeyboardMarkup(buttons)
+
+    if from_callback:
+        query = update.callback_query
+        # For 'my_accounts', we can't just edit. We need to send a new message with the list.
+        # So we first delete the main menu, then send the account list.
+        await query.message.delete()
+        await context.bot.send_message(user_id, text, reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(text, reply_markup=reply_markup)
+
     if not details or not details['accounts']:
-        await update.message.reply_text(_("You have not added any accounts yet. Use /add_account to get started."))
+        await context.bot.send_message(user_id, _("You have not added any accounts yet. Use /add_account to get started."))
         return
 
-    await update.message.reply_text(_("Your managed accounts:"))
     for acc in details['accounts']:
         acc_id = acc['id']
         status = _("🟢 Active") if acc['is_active'] else _("🔴 Inactive")
@@ -455,5 +524,6 @@ user_handlers_list = [
     CommandHandler("my_accounts", my_accounts_handler),
     CommandHandler("my_groups", my_groups_handler),
     CallbackQueryHandler(manage_account_callback, pattern="^mng_"),
+    CallbackQueryHandler(main_menu_callback, pattern="^main_"),
     add_account_conv_handler,
 ]

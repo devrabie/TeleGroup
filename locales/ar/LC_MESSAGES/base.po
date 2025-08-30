@@ -181,7 +181,35 @@ msgstr ""
 msgid "Invalid number format in arguments."
 msgstr "صيغة الأرقام في المعاملات غير صالحة."
 
-#: src/user_handlers.py:24
+#: src/user_handlers.py:46
+msgid "Welcome to the main menu. Please choose an option:"
+msgstr "أهلاً بك في القائمة الرئيسية. الرجاء اختيار أحد الخيارات:"
+
+#: src/user_handlers.py:53
+msgid "🚀 Subscribe"
+msgstr "🚀 اشتراك"
+
+#: src/user_handlers.py:54
+msgid "👤 My Accounts"
+msgstr "👤 حساباتي"
+
+#: src/user_handlers.py:55
+msgid "➕ Add Account"
+msgstr "➕ إضافة حساب"
+
+#: src/user_handlers.py:56
+msgid "🌐 Language"
+msgstr "🌐 اللغة"
+
+#: src/user_handlers.py:57
+msgid "❓ Help"
+msgstr "❓ مساعدة"
+
+#: src/user_handlers.py:129
+msgid "🔙 Back"
+msgstr "🔙 رجوع"
+
+#: src/user_handlers.py:121
 msgid ""
 "There are currently no subscription plans available. Please check back "
 "later."
@@ -199,6 +227,40 @@ msgstr "لا توجد باقات نشطة لعرضها."
 #: src/user_handlers.py:39
 msgid "Please select a subscription plan from the list below:"
 msgstr "الرجاء اختيار باقة اشتراك من القائمة أدناه:"
+
+#: src/user_handlers.py:105
+#, python-brace-format
+msgid ""
+"<b>Bot Help & Commands</b>\n"
+"\n"
+"Here is a list of commands you can use:\n"
+"\n"
+"<b>/start</b> - Shows the welcome message.\n"
+"<b>/help</b> - Shows this help message.\n"
+"<b>/subscribe</b> - Browse and purchase a subscription plan to use the "
+"bot's features.\n"
+"<b>/my_accounts</b> - View and manage your connected Telegram accounts.\n"
+"<b>/add_account</b> - Start the process of adding a new Telegram account "
+"for the bot to manage.\n"
+"<b>/language</b> - Change the display language of the bot (English/العربية).\n"
+"\n"
+"For most features, you need an active subscription. You can get one via "
+"the /subscribe command."
+msgstr ""
+"<b>مساعدة البوت والأوامر</b>\n"
+"\n"
+"قائمة الأوامر المتاحة:\n"
+"\n"
+"<b>/start</b> - عرض القائمة الرئيسية.\n"
+"<b>/help</b> - عرض رسالة المساعدة هذه.\n"
+"<b>/subscribe</b> - تصفح وشراء باقة اشتراك لاستخدام ميزات البوت.\n"
+"<b>/my_accounts</b> - عرض وإدارة حساباتك المتصلة.\n"
+"<b>/add_account</b> - بدء عملية إضافة حساب تليجرام جديد لإدارته عبر "
+"البوت.\n"
+"<b>/language</b> - تغيير لغة عرض البوت (English/العربية).\n"
+"\n"
+"لاستخدام معظم الميزات، تحتاج إلى اشتراك نشط. يمكنك الحصول عليه عبر الأمر "
+"/subscribe."
 
 #: src/user_handlers.py:73
 msgid "This plan is no longer available."
