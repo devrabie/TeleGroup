@@ -3,8 +3,8 @@ import logging
 import random
 from datetime import datetime
 from telegram.ext import ContextTypes
-from kurigram import Client
-from kurigram.errors import FloodWait
+from pyrogram import Client
+from pyrogram.errors import FloodWait
 
 from src.database import (
     get_eligible_accounts,
@@ -87,15 +87,15 @@ async def process_single_account(account_details: dict):
         total_groups_created = get_account_stats(account_id)
         now = datetime.now()
         date_str = now.strftime("%Y-%m")
-        # Name format requested by the user, e.g., "Group 1 2025-08"
         new_group_name = f"Group {total_groups_created + 1} {date_str}"
 
-        # Create a new supergroup directly using the new method.
+        # Create a new supergroup directly.
         new_group = await user_client.create_supergroup(title=new_group_name, description="")
         log.info(f"Account {account_id} created supergroup '{new_group_name}' (ID: {new_group.id}).")
 
         # Log the creation immediately to ensure the count is updated.
         log_group_creation(account_id, new_group.id, new_group_name)
+
         await asyncio.sleep(random.uniform(2, 5))
         await user_client.send_message(new_group.id, f"Hello, group {new_group_name} is ready.")
 

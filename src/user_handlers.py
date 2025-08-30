@@ -13,8 +13,8 @@ from telegram.ext import (
     PreCheckoutQueryHandler,
 )
 
-from kurigram import Client
-from kurigram.errors import (
+from pyrogram import Client
+from pyrogram.errors import (
     SessionPasswordNeeded,
     PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired
 )
@@ -23,7 +23,6 @@ from src import config
 from src.database import (
     get_all_plans, get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
     delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
-    get_groups_for_account, get_group_log_details,
     set_user_language, get_random_proxy_id, get_proxy_string
 )
 from src.translation import get_translation_func_for_user
@@ -44,27 +43,6 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/language - Change the bot's language."
     )
     await update.message.reply_text(welcome_text, parse_mode=ParseMode.HTML)
-
-
-async def my_groups_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Displays a list of the user's managed accounts to view their created groups."""
-    user_id = update.effective_user.id
-    _ = get_translation_func_for_user(user_id)
-    details = get_user_details(user_id)
-
-    if not details or not details['accounts']:
-        await update.message.reply_text(_("You have not added any accounts yet. Use /add_account to get started."))
-        return
-
-    await update.message.reply_text(_("Select an account to view its created groups:"))
-    for acc in details['accounts']:
-        acc_id = acc['id']
-        text = _("<b>Account:</b> <code>{phone}</code>").format(phone=acc['phone'])
-        buttons = [[
-            InlineKeyboardButton(_("📂 View Groups"), callback_data=f"mng_viewgroups_{acc_id}")
-        ]]
-        reply_markup = InlineKeyboardMarkup(buttons)
-        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
 
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -222,7 +200,7 @@ async def async_send_code(phone, context, user_id, _):
         in_memory=True,
         proxy=proxy_dict
     )
-    context.user_data['kurigram_client'] = client
+    context.user_data['pyrogram_client'] = client
     try:
         await client.connect()
         sent_code = await client.send_code(phone)
@@ -244,7 +222,7 @@ async def receive_phone_number(update: Update, context: ContextTypes.DEFAULT_TYP
     return CODE
 
 async def async_sign_in(code, context, user_id, _):
-    client = context.user_data['kurigram_client']
+    client = context.user_data['pyrogram_client']
     phone = context.user_data['phone']
     phone_code_hash = context.user_data['phone_code_hash']
     next_state = ConversationHandler.END
@@ -272,7 +250,7 @@ async def receive_phone_code(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return PASSWORD
 
 async def async_check_password(password, context, user_id, _):
-    client = context.user_data['kurigram_client']
+    client = context.user_data['pyrogram_client']
     try:
         await client.check_password(password)
         await async_complete_login(context, user_id, _)
@@ -288,7 +266,7 @@ async def receive_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     return ConversationHandler.END
 
 async def async_complete_login(context, user_id, _):
-    client = context.user_data['kurigram_client']
+    client = context.user_data['pyrogram_client']
     phone = context.user_data['phone']
     session_string = await client.export_session_string()
     await client.disconnect()
@@ -300,8 +278,8 @@ async def async_complete_login(context, user_id, _):
 
 async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     _ = get_translation_func_for_user(update.effective_user.id)
-    if 'kurigram_client' in context.user_data:
-        client = context.user_data['kurigram_client']
+    if 'pyrogram_client' in context.user_data:
+        client = context.user_data['pyrogram_client']
         if client.is_connected:
             await client.disconnect()
     context.user_data.clear()
@@ -347,6 +325,26 @@ async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc_id}")
             ]
         ]
+        reply_markup = InlineKeyboardMarkup(buttons)
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+async def my_groups_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Displays a list of the user's managed accounts to view their created groups."""
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    details = get_user_details(user_id)
+
+    if not details or not details['accounts']:
+        await update.message.reply_text(_("You have not added any accounts yet. Use /add_account to get started."))
+        return
+
+    await update.message.reply_text(_("Select an account to view its created groups:"))
+    for acc in details['accounts']:
+        acc_id = acc['id']
+        text = _("<b>Account:</b> <code>{phone}</code>").format(phone=acc['phone'])
+        buttons = [[
+            InlineKeyboardButton(_("📂 View Groups"), callback_data=f"mng_viewgroups_{acc_id}")
+        ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
