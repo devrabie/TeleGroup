@@ -432,7 +432,16 @@ async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     query = update.callback_query
     if query:
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        try:
+            await query.answer()  # Answer the callback query
+            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        except Exception as e:
+            log.error(f"Error editing message in my_accounts_handler: {e}", exc_info=True)
+            try:
+                # As a fallback, try to send a new message with the error
+                await context.bot.send_message(chat_id=user_id, text=f"An error occurred: {e}")
+            except Exception as inner_e:
+                log.error(f"Failed to send error message to user: {inner_e}")
     else:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
@@ -489,7 +498,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             return
 
         if action == "back":
-            await my_accounts_handler(update, context, from_callback=True)
+            await my_accounts_handler(update, context)
             return
 
         if action == "select":
