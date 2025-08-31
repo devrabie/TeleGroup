@@ -71,11 +71,11 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if action == 'subscribe':
             await subscribe_handler(update, context, from_callback=True)
         elif action == 'my_accounts':
-            await my_accounts_handler(update, context, from_callback=True)
+            await my_accounts_handler(update, context)
         elif action == 'language':
-            await language_handler(update, context, from_callback=True)
+            await language_handler(update, context)
         elif action == 'help':
-            await help_handler(update, context, from_callback=True)
+            await help_handler(update, context)
         elif action == 'back':
             await main_menu(update, context, message_id=query.message.message_id)
     except Exception as e:
@@ -86,7 +86,7 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except Exception as inner_e:
             log.error(f"Failed to even notify user about the main_menu_callback error: {inner_e}")
 
-async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
+async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Provides a detailed help message, showing admin commands to admins."""
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
@@ -120,14 +120,14 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_
     buttons = [[InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')]]
     reply_markup = InlineKeyboardMarkup(buttons)
 
-    if from_callback:
-        query = update.callback_query
+    query = update.callback_query
+    if query:
         await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
     else:
         await update.message.reply_text(help_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
 
-async def subscribe_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
+async def subscribe_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
     plans = get_all_plans(active_only=True)
@@ -146,8 +146,9 @@ async def subscribe_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
     reply_markup = InlineKeyboardMarkup(buttons)
 
-    if from_callback:
-        query = update.callback_query
+    query = update.callback_query
+    if query:
+        # This handler is only ever called from a callback in the new flow, but we keep the check for robustness
         await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
     else:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
@@ -190,7 +191,7 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
             payload=payload)
     await update.message.reply_text(reply_text)
 
-async def language_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
+async def language_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
     buttons = [
@@ -201,8 +202,8 @@ async def language_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, f
     reply_markup = InlineKeyboardMarkup(buttons)
     text = _("Please choose your language:")
 
-    if from_callback:
-        query = update.callback_query
+    query = update.callback_query
+    if query:
         await query.edit_message_text(text, reply_markup=reply_markup)
     else:
         await update.message.reply_text(text, reply_markup=reply_markup)
@@ -250,15 +251,18 @@ async def add_account_start(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             max_accounts=plan['max_accounts'], plan_name=plan['name']), **reply_kwargs)
         return ConversationHandler.END
 
+    text = _("Please send the phone number of the account you want to add.\n<i>(Must be in international format, e.g., +1234567890)</i>")
     if query:
-        # If started from a button, it's good UX to remove the button menu
-        await message.delete()
-
-    await reply_func(
-        text=_("Please send the phone number of the account you want to add.\n<i>(Must be in international format, e.g., +1234567890)</i>"),
-        parse_mode=ParseMode.HTML,
-        **reply_kwargs
-    )
+        # If started from a button, edit the message and add a cancel button
+        keyboard = [[InlineKeyboardButton(_("❌ Cancel"), callback_data='cancel_conv')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    else:
+        await reply_func(
+            text=text,
+            parse_mode=ParseMode.HTML,
+            **reply_kwargs
+        )
     return PHONE
 
 async def async_send_code(phone, context, user_id, _):
@@ -367,13 +371,23 @@ async def async_complete_login(context, user_id, _):
     context.user_data.clear()
 
 async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Generic conversation cancellation function."""
     _ = get_translation_func_for_user(update.effective_user.id)
     if 'pyrogram_client' in context.user_data:
         client = context.user_data['pyrogram_client']
         if client.is_connected:
             await client.disconnect()
     context.user_data.clear()
-    await update.message.reply_text(_("Operation cancelled."))
+
+    query = update.callback_query
+    if query:
+        # If cancelled from a button, answer the callback and show the main menu
+        await query.answer()
+        await main_menu(update, context, message_id=query.message.message_id)
+    else:
+        # If cancelled from a /cancel command, just send a reply
+        await update.message.reply_text(_("Operation cancelled."))
+
     return ConversationHandler.END
 
 add_account_conv_handler = ConversationHandler(
@@ -386,13 +400,16 @@ add_account_conv_handler = ConversationHandler(
         CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_phone_code)],
         PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_password)],
     },
-    fallbacks=[CommandHandler("cancel", cancel_conversation)],
+    fallbacks=[
+        CommandHandler("cancel", cancel_conversation),
+        CallbackQueryHandler(cancel_conversation, pattern="^cancel_conv$")
+    ],
     conversation_timeout=300
 )
 
 # --- User Dashboard ---
 
-async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
+async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Displays a list of the user's managed accounts to select from."""
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
@@ -412,8 +429,8 @@ async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
     reply_markup = InlineKeyboardMarkup(buttons)
 
-    if from_callback:
-        query = update.callback_query
+    query = update.callback_query
+    if query:
         await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
     else:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
