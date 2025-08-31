@@ -590,6 +590,31 @@ def get_user_details(telegram_id: int):
         log.error(f"Failed to get details for user {telegram_id}: {e}")
         return None
 
+
+def get_system_stats():
+    """Retrieves system-wide statistics."""
+    stats = {}
+    sql_queries = {
+        "total_users": "SELECT COUNT(id) FROM users",
+        "active_subscriptions": "SELECT COUNT(id) FROM subscriptions WHERE is_active = 1 AND end_date >= datetime('now')",
+        "total_managed_accounts": "SELECT COUNT(id) FROM managed_accounts",
+        "groups_created_total": "SELECT COUNT(id) FROM group_creation_log",
+        "groups_created_today": "SELECT COUNT(id) FROM group_creation_log WHERE creation_timestamp >= datetime('now', '-24 hours')",
+    }
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            for key, sql in sql_queries.items():
+                cursor.execute(sql)
+                result = cursor.fetchone()
+                stats[key] = result[0] if result else 0
+        return stats
+    except sqlite3.Error as e:
+        log.error(f"Failed to retrieve system stats: {e}")
+        return None
+
+
 if __name__ == '__main__':
     # This allows running the script directly to create the DB
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
