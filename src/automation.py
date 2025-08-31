@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from telegram.ext import ContextTypes
 from pyrogram import Client
 from pyrogram.errors import FloodWait
@@ -14,6 +14,7 @@ from src.database import (
     log_group_creation,
     mark_proxy_as_bad,
     reassign_proxy,
+    set_account_flood_wait,
 )
 
 log = logging.getLogger(__name__)
@@ -102,8 +103,9 @@ async def process_single_account(account_details: dict):
         log.info(f"Successfully processed group creation for account {account_id}.")
 
     except FloodWait as e:
-        log.warning(f"Account {account_id} is flood-waited for {e.value} seconds. Skipping for now.")
-        # A more advanced system could mark the account as "resting" in the DB.
+        log.warning(f"Account {account_id} is flood-waited for {e.value} seconds. Storing wait time in DB.")
+        wait_until = datetime.now() + timedelta(seconds=e.value)
+        set_account_flood_wait(account_id, wait_until)
     except Exception as e:
         log.error(f"An unexpected error occurred while processing account {account_id}: {e}", exc_info=True)
 

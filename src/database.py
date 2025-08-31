@@ -1,6 +1,7 @@
 import sqlite3
 import logging
 from pathlib import Path
+from datetime import datetime
 
 # --- Configuration ---
 DB_FILE = Path(__file__).parent.parent / "data" / "bot.db"
@@ -61,6 +62,7 @@ TABLE_DEFINITIONS = {
             proxy_id INTEGER,
             is_active BOOLEAN NOT NULL DEFAULT 1, -- User-controlled activation
             is_running BOOLEAN NOT NULL DEFAULT 0, -- System-controlled running state
+            flood_wait_until TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
             FOREIGN KEY (proxy_id) REFERENCES proxies (id)
@@ -412,6 +414,22 @@ def mark_proxy_as_bad(proxy_id: int):
     except sqlite3.Error as e:
         log.error(f"Failed to mark proxy {proxy_id} as bad: {e}")
 
+
+def set_account_flood_wait(account_id: int, wait_until_timestamp: datetime):
+    """Sets the flood wait time for a managed account."""
+    sql = "UPDATE managed_accounts SET flood_wait_until = ? WHERE id = ?"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (wait_until_timestamp, account_id))
+            conn.commit()
+        log.info(f"Account {account_id} is flood-waited until {wait_until_timestamp}.")
+        return True
+    except sqlite3.Error as e:
+        log.error(f"Failed to set flood wait for account {account_id}: {e}")
+        return False
+
+
 def get_proxy_string(proxy_id: int):
     """Gets the proxy string for a given proxy ID."""
     if proxy_id is None:
@@ -446,6 +464,7 @@ def get_eligible_accounts():
         WHERE ma.is_active = 1
           AND s.is_active = 1
           AND s.end_date >= datetime('now')
+          AND (ma.flood_wait_until IS NULL OR ma.flood_wait_until < datetime('now'))
     """
     try:
         with get_db_connection() as conn:

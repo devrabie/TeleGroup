@@ -42,7 +42,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, message_
     keyboard = [
         [InlineKeyboardButton(_("🚀 Subscribe"), callback_data='main_subscribe'),
          InlineKeyboardButton(_("👤 My Accounts"), callback_data='main_my_accounts')],
-        [InlineKeyboardButton(_("➕ Add Account"), callback_data='main_add_account'),
+        [InlineKeyboardButton(_("➕ Add Account"), callback_data='start_add_account'),
          InlineKeyboardButton(_("🌐 Language"), callback_data='main_language')],
         [InlineKeyboardButton(_("❓ Help"), callback_data='main_help')]
     ]
@@ -72,11 +72,6 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await subscribe_handler(update, context, from_callback=True)
         elif action == 'my_accounts':
             await my_accounts_handler(update, context, from_callback=True)
-        elif action == 'add_account':
-            # Add account is a conversation, it needs a message handler, not a callback query.
-            # We will send a message to the user and let them reply.
-            _ = get_translation_func_for_user(query.from_user.id)
-            await query.message.reply_text(_("To add an account, please use the /add_account command."))
         elif action == 'language':
             await language_handler(update, context, from_callback=True)
         elif action == 'help':
@@ -231,17 +226,38 @@ async def add_account_start(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
     details = get_user_details(user_id)
+
+    # Determine the message object and how to reply/edit
+    query = update.callback_query
+    if query:
+        await query.answer()
+        message = query.message
+        # We will send a new message instead of editing, to make it clear we expect a reply.
+        reply_func = context.bot.send_message
+        reply_kwargs = {'chat_id': user_id}
+    else:
+        message = update.message
+        reply_func = message.reply_text
+        reply_kwargs = {}
+
     if not (details and details.get('subscription')):
-        await update.message.reply_text(_("You need an active subscription to add accounts. Use /subscribe to get one."))
+        await reply_func(_("You need an active subscription to add accounts. Use /subscribe to get one."), **reply_kwargs)
         return ConversationHandler.END
+
     plan = get_plan_by_id(details['subscription']['plan_id'])
     if len(details['accounts']) >= plan['max_accounts']:
-        await update.message.reply_text(_("You have reached the maximum of {max_accounts} accounts for your '{plan_name}' plan.").format(
-            max_accounts=plan['max_accounts'], plan_name=plan['name']))
+        await reply_func(_("You have reached the maximum of {max_accounts} accounts for your '{plan_name}' plan.").format(
+            max_accounts=plan['max_accounts'], plan_name=plan['name']), **reply_kwargs)
         return ConversationHandler.END
-    await update.message.reply_text(
+
+    if query:
+        # If started from a button, it's good UX to remove the button menu
+        await message.delete()
+
+    await reply_func(
         _("Please send the phone number of the account you want to add.\n<i>(Must be in international format, e.g., +1234567890)</i>"),
-        parse_mode=ParseMode.HTML
+        parse_mode=ParseMode.HTML,
+        **reply_kwargs
     )
     return PHONE
 
@@ -361,7 +377,10 @@ async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
     return ConversationHandler.END
 
 add_account_conv_handler = ConversationHandler(
-    entry_points=[CommandHandler("add_account", add_account_start)],
+    entry_points=[
+        CommandHandler("add_account", add_account_start),
+        CallbackQueryHandler(add_account_start, pattern="^start_add_account$")
+    ],
     states={
         PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_phone_number)],
         CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_phone_code)],
