@@ -69,7 +69,7 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         action = query.data.split('_')[1]
 
         if action == 'subscribe':
-            await subscribe_handler(update, context, from_callback=True)
+            await subscribe_handler(update, context)
         elif action == 'my_accounts':
             await my_accounts_handler(update, context)
         elif action == 'language':
@@ -404,7 +404,8 @@ add_account_conv_handler = ConversationHandler(
         CommandHandler("cancel", cancel_conversation),
         CallbackQueryHandler(cancel_conversation, pattern="^cancel_conv$")
     ],
-    conversation_timeout=300
+    conversation_timeout=300,
+    per_message=False,
 )
 
 # --- User Dashboard ---

@@ -292,7 +292,6 @@ grant_sub_conv_handler = ConversationHandler(
     states={
         GRANT_CHOOSE_PLAN: [
             CallbackQueryHandler(grant_sub_receive_plan, pattern='^admin_grant_selectplan_'),
-            CallbackQueryHandler(grant_sub_cancel, pattern='^admin_grant_cancel$')
         ],
         GRANT_DURATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, grant_sub_receive_duration)],
     },
@@ -301,6 +300,7 @@ grant_sub_conv_handler = ConversationHandler(
         CallbackQueryHandler(grant_sub_cancel, pattern='^admin_grant_cancel$')
     ],
     block=False,
+    per_message=False,
 )
 
 
@@ -511,12 +511,15 @@ create_plan_conv_handler = ConversationHandler(
         PLAN_LIMIT: [MessageHandler(filters.TEXT & ~filters.COMMAND, plan_create_receive_limit)],
         PLAN_CONFIRM: [
             CallbackQueryHandler(plan_create_save, pattern='^admin_plan_create_save$'),
-            CallbackQueryHandler(plan_create_cancel, pattern='^admin_plan_create_cancel$')
         ]
     },
-    fallbacks=[CommandHandler('cancel', conv_cancel)],
+    fallbacks=[
+        CommandHandler('cancel', conv_cancel),
+        CallbackQueryHandler(plan_create_cancel, pattern='^admin_plan_create_cancel$')
+        ],
     # Allow other handlers to be used while the conversation is active
-    block=False
+    block=False,
+    per_message=False,
 )
 
 
@@ -549,7 +552,9 @@ async def admin_callback_router(update: Update, context: ContextTypes.DEFAULT_TY
 admin_handlers_list = [
     # New Admin Panel
     CommandHandler("admin", admin_panel_handler, filters=admin_filter),
-    CallbackQueryHandler(admin_callback_router, pattern="^admin_"),
+    # Conversation handlers must come before the generic callback router to catch their entry points
     create_plan_conv_handler,
     grant_sub_conv_handler,
+    # Generic callback router for menus
+    CallbackQueryHandler(admin_callback_router, pattern="^admin_"),
 ]
