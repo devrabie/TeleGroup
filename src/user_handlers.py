@@ -241,12 +241,12 @@ async def add_account_start(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         reply_kwargs = {}
 
     if not (details and details.get('subscription')):
-        await reply_func(_("You need an active subscription to add accounts. Use /subscribe to get one."), **reply_kwargs)
+        await reply_func(text=_("You need an active subscription to add accounts. Use /subscribe to get one."), **reply_kwargs)
         return ConversationHandler.END
 
     plan = get_plan_by_id(details['subscription']['plan_id'])
     if len(details['accounts']) >= plan['max_accounts']:
-        await reply_func(_("You have reached the maximum of {max_accounts} accounts for your '{plan_name}' plan.").format(
+        await reply_func(text=_("You have reached the maximum of {max_accounts} accounts for your '{plan_name}' plan.").format(
             max_accounts=plan['max_accounts'], plan_name=plan['name']), **reply_kwargs)
         return ConversationHandler.END
 
@@ -255,7 +255,7 @@ async def add_account_start(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await message.delete()
 
     await reply_func(
-        _("Please send the phone number of the account you want to add.\n<i>(Must be in international format, e.g., +1234567890)</i>"),
+        text=_("Please send the phone number of the account you want to add.\n<i>(Must be in international format, e.g., +1234567890)</i>"),
         parse_mode=ParseMode.HTML,
         **reply_kwargs
     )

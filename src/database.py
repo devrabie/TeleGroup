@@ -84,7 +84,7 @@ TABLE_DEFINITIONS = {
 
 def initialize_database():
     """
-    Initializes the database by creating all necessary tables if they don't exist.
+    Initializes the database by creating all necessary tables and performing migrations.
     """
     log.info(f"Initializing database at: {DB_FILE.resolve()}")
     try:
@@ -96,6 +96,14 @@ def initialize_database():
             for table_name, table_sql in TABLE_DEFINITIONS.items():
                 log.debug(f"Creating table: {table_name}")
                 cursor.execute(table_sql)
+
+            # --- Simple Migration: Add flood_wait_until column if it doesn't exist ---
+            cursor.execute("PRAGMA table_info(managed_accounts)")
+            columns = [info[1] for info in cursor.fetchall()]
+            if 'flood_wait_until' not in columns:
+                log.info("Running migration: Adding 'flood_wait_until' column to 'managed_accounts' table.")
+                cursor.execute("ALTER TABLE managed_accounts ADD COLUMN flood_wait_until TIMESTAMP")
+            # --- End Migration ---
 
             conn.commit()
         log.info("Database initialized successfully.")

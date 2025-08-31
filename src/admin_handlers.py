@@ -184,6 +184,22 @@ async def user_view_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(reply, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
 
+async def conv_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """A generic cancellation command for conversations."""
+    _ = get_translation_func_for_user(update.effective_user.id)
+
+    # Clean up any potential data stored in user_data
+    context.user_data.pop('new_plan', None)
+    context.user_data.pop('grant_sub_user_id', None)
+    context.user_data.pop('grant_sub_plan_id', None)
+
+    await update.message.reply_text(_("Operation cancelled."))
+
+    # We don't know which menu to return to, so we just end.
+    # A more advanced setup could store the "return menu" in user_data.
+    return ConversationHandler.END
+
+
 # --- Grant Subscription Conversation Handlers ---
 
 (GRANT_CHOOSE_PLAN, GRANT_DURATION) = range(20, 22)
@@ -482,20 +498,6 @@ async def plan_create_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.edit_message_text(_("Plan creation cancelled."))
 
     await plans_menu_handler(update, context)
-    return ConversationHandler.END
-
-
-async def conv_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """A generic cancellation command for conversations."""
-    _ = get_translation_func_for_user(update.effective_user.id)
-
-    # Clean up any potential data stored in user_data
-    context.user_data.pop('new_plan', None)
-
-    await update.message.reply_text(_("Operation cancelled."))
-
-    # We don't know which menu to return to, so we just end.
-    # A more advanced setup could store the "return menu" in user_data.
     return ConversationHandler.END
 
 
