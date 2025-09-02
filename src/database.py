@@ -723,7 +723,10 @@ def get_account_details(account_id: int):
             ma.last_error,
             (SELECT MAX(gcl.creation_timestamp)
              FROM group_creation_log gcl
-             WHERE gcl.account_id = ma.id) as last_creation_time
+             WHERE gcl.account_id = ma.id) as last_creation_time,
+            (SELECT COUNT(gcl.id)
+             FROM group_creation_log gcl
+             WHERE gcl.account_id = ma.id) as total_groups
         FROM managed_accounts ma
         WHERE ma.id = ?
     """

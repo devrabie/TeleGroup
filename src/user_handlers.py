@@ -535,16 +535,17 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     if acc['last_error']:
         text += _("\n<b>Last Error:</b> <pre>{error}</pre>").format(error=acc['last_error'])
 
+    text += _("\n\n📊 <b>Total Groups Created:</b> {count}").format(count=acc['total_groups'])
+
     buttons = [
         [
-            InlineKeyboardButton(_("📊 Stats"), callback_data=f"mng_stats_{acc['id']}"),
             InlineKeyboardButton(_("Toggle On") if not acc['is_active'] else _("Toggle Off"), callback_data=f"mng_toggle_{acc['id']}"),
+            InlineKeyboardButton(_("🔄 Change Proxy"), callback_data=f"mng_proxy_{acc['id']}"),
         ],
         [
-            InlineKeyboardButton(_("🔄 Change Proxy"), callback_data=f"mng_proxy_{acc['id']}"),
+            InlineKeyboardButton(_("📂 View Groups"), callback_data=f"mng_viewgroups_{acc['id']}"),
             InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc['id']}"),
         ],
-        [InlineKeyboardButton(_("📂 View Groups"), callback_data=f"mng_viewgroups_{acc['id']}")],
         [InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")]
     ]
     reply_markup = InlineKeyboardMarkup(buttons)
@@ -578,34 +579,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             await account_detail_menu(update, context, account_id, query.message.message_id)
             return
 
-        if action == "stats":
-            account_id = int(action_parts[2])
-            log.info(f"User {user_id} requested stats for account {account_id}.")
-            total_groups = get_account_stats(account_id)
-
-            # Re-get account details to display them again
-            details = get_user_details(user_id)
-            acc = next((acc for acc in details['accounts'] if acc['id'] == account_id), None)
-            status = _("🟢 Active") if acc['is_active'] else _("🔴 Inactive")
-            text = _("<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}\n\n📊 <b>Stats:</b> {count} groups created.").format(
-                phone=acc['phone'], status=status, count=total_groups)
-
-            # Re-create the same buttons
-            buttons = [
-                [
-                    InlineKeyboardButton(_("📊 Stats"), callback_data=f"mng_stats_{acc['id']}"),
-                    InlineKeyboardButton(_("Toggle On") if not acc['is_active'] else _("Toggle Off"), callback_data=f"mng_toggle_{acc['id']}"),
-                ],
-                [
-                    InlineKeyboardButton(_("🔄 Change Proxy"), callback_data=f"mng_proxy_{acc['id']}"),
-                    InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc['id']}"),
-                ],
-                [InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")]
-            ]
-            reply_markup = InlineKeyboardMarkup(buttons)
-            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
-
-        elif action == "viewgroups":
+        if action == "viewgroups":
             account_id = int(action_parts[2])
             page = int(action_parts[3]) if len(action_parts) > 3 else 0
             log.info(f"User {user_id} requested to view groups for account {account_id} on page {page}.")
