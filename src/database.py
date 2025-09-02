@@ -327,23 +327,44 @@ def delete_managed_account(account_id: int, telegram_user_id: int):
         return False
 
 def toggle_account_status(account_id: int, telegram_user_id: int):
-    """Toggles the is_active status of a managed account."""
-    sql = """
-        UPDATE managed_accounts
-        SET is_active = NOT is_active
-        WHERE id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
     """
-    get_status_sql = "SELECT is_active FROM managed_accounts WHERE id = ?"
+    Toggles the is_active status of a managed account.
+    If toggled ON, it also resets the account's schedule and error state.
+    """
+    get_status_sql = "SELECT is_active FROM managed_accounts WHERE id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)"
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (account_id, telegram_user_id))
+            cursor.execute(get_status_sql, (account_id, telegram_user_id))
+            row = cursor.fetchone()
+            if not row:
+                log.warning(f"User {telegram_user_id} tried to toggle non-existent or unowned account {account_id}.")
+                return None
+
+            current_status = row['is_active']
+            new_status = not current_status
+
+            if new_status:  # If we are turning the account ON
+                # Reset the schedule and errors to make it eligible for the next run
+                sql = """
+                    UPDATE managed_accounts
+                    SET is_active = 1,
+                        next_creation_time = NULL,
+                        backoff_level = 0,
+                        last_error = NULL
+                    WHERE id = ?
+                """
+                cursor.execute(sql, (account_id,))
+                log.info(f"Account {account_id} toggled ON and schedule has been reset.")
+            else:  # If we are turning the account OFF
+                sql = "UPDATE managed_accounts SET is_active = 0 WHERE id = ?"
+                cursor.execute(sql, (account_id,))
+                log.info(f"Account {account_id} toggled OFF.")
+
             conn.commit()
-            if cursor.rowcount > 0:
-                cursor.execute(get_status_sql, (account_id,))
-                new_status = cursor.fetchone()
-                return new_status['is_active'] if new_status else None
-            return None
+            return new_status
+
     except sqlite3.Error as e:
         log.error(f"Failed to toggle status for account {account_id}: {e}")
         return None
