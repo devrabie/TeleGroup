@@ -17,7 +17,7 @@ from pyrogram import Client
 from pyrogram.errors import (
     SessionPasswordNeeded,
     PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired,
-    Timeout, ProxyConnectionError
+    Timeout
 )
 
 from src import config
@@ -314,8 +314,8 @@ async def async_send_code(phone, context, user_id, _):
             await context.bot.send_message(user_id, _("A login code has been sent. Please send it here."))
             return  # Success
 
-        except (Timeout, ProxyConnectionError) as e:
-            log.warning(f"Proxy connection failed for user {user_id} on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. Proxy ID: {proxy_id}. Error: {e}")
+        except (Timeout, ConnectionError) as e:
+            log.warning(f"Proxy/Connection failed for user {user_id} on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. Proxy ID: {proxy_id}. Error: {e}")
             if proxy_id:
                 mark_proxy_as_bad(proxy_id)
             if client and client.is_connected:

@@ -4,7 +4,7 @@ import random
 from datetime import datetime, timedelta
 from telegram.ext import ContextTypes
 from pyrogram import Client
-from pyrogram.errors import FloodWait, Timeout, ProxyConnectionError
+from pyrogram.errors import FloodWait, Timeout
 
 from src.database import (
     get_eligible_accounts,
@@ -102,8 +102,8 @@ async def process_single_account(account_details: dict):
 
         log.info(f"Successfully processed group creation for account {account_id}.")
 
-    except (Timeout, ProxyConnectionError) as e:
-        log.warning(f"Connection failed for account {account_id} due to a proxy error. Marking proxy as bad. Error: {e}")
+    except (Timeout, ConnectionError) as e:
+        log.warning(f"Connection failed for account {account_id} due to a proxy/network error. Marking proxy as bad. Error: {e}")
         if proxy_id:
             mark_proxy_as_bad(proxy_id)
             # Also reassign a new one immediately for the next cycle
