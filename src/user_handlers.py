@@ -16,7 +16,8 @@ from telegram.ext import (
 from pyrogram import Client
 from pyrogram.errors import (
     SessionPasswordNeeded,
-    PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired
+    PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired,
+    Timeout, ProxyConnectionError
 )
 
 from src import config
@@ -24,7 +25,7 @@ from src.database import (
     get_all_plans, get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
     delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
     set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
-    get_or_create_user
+    get_or_create_user, mark_proxy_as_bad
 )
 from src.translation import get_translation_func_for_user
 from pyrogram import Client
@@ -265,46 +266,77 @@ async def add_account_start(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
     return PHONE
 
+MAX_PROXY_RETRIES = 3
+
 async def async_send_code(phone, context, user_id, _):
-    proxy_id = get_random_proxy_id()
-    proxy_string = get_proxy_string(proxy_id) if proxy_id else None
-    proxy_dict = None
+    """
+    Tries to connect to Telegram and send a login code.
+    Retries with a new proxy if the connection fails.
+    """
+    for attempt in range(MAX_PROXY_RETRIES):
+        proxy_id = get_random_proxy_id()
+        proxy_string = get_proxy_string(proxy_id) if proxy_id else None
+        proxy_dict = None
+        client = None
 
-    if proxy_string:
+        if proxy_string:
+            try:
+                hostname, port, username, password = proxy_string.split(':')
+                proxy_dict = {
+                    "scheme": "socks5",
+                    "hostname": hostname,
+                    "port": int(port),
+                    "username": username,
+                    "password": password,
+                }
+                log.info(f"Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: Using proxy {hostname} for user {user_id}")
+            except (ValueError, IndexError) as e:
+                log.error(f"Invalid proxy format: '{proxy_string}'. Error: {e}")
+                if proxy_id:
+                    mark_proxy_as_bad(proxy_id)
+                continue  # Try with another proxy
+        else:
+            log.warning(f"Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: No proxy available for user {user_id}. Proceeding without proxy.")
+
         try:
-            hostname, port, username, password = proxy_string.split(':')
-            proxy_dict = {
-                "scheme": "socks5",
-                "hostname": hostname,
-                "port": int(port),
-                "username": username,
-                "password": password,
-            }
-            log.info(f"Using proxy {hostname} for login attempt for user {user_id}")
-        except (ValueError, IndexError) as e:
-            log.error(f"Invalid proxy format during login: '{proxy_string}'. Error: {e}")
-            # Continue without proxy if format is bad
-    else:
-        log.warning(f"No proxy available for login attempt for user {user_id}. Proceeding without proxy.")
+            client = Client(
+                f"user_session_{phone}_{attempt}",
+                api_id=config.API_ID,
+                api_hash=config.API_HASH,
+                in_memory=True,
+                proxy=proxy_dict
+            )
+            context.user_data['pyrogram_client'] = client
 
-    client = Client(
-        f"user_session_{phone}",
-        api_id=config.API_ID,
-        api_hash=config.API_HASH,
-        in_memory=True,
-        proxy=proxy_dict
-    )
-    context.user_data['pyrogram_client'] = client
-    try:
-        await client.connect()
-        sent_code = await client.send_code(phone)
-        context.user_data['phone_code_hash'] = sent_code.phone_code_hash
-        await context.bot.send_message(user_id, _("A login code has been sent. Please send it here."))
-    except PhoneNumberInvalid:
-        await context.bot.send_message(user_id, _("The phone number is invalid. Please try again."))
-    except Exception as e:
-        log.error(f"Error sending code for user {user_id}: {e}")
-        await context.bot.send_message(user_id, _("An unexpected error occurred."))
+            await client.connect()
+            sent_code = await client.send_code(phone)
+            context.user_data['phone_code_hash'] = sent_code.phone_code_hash
+            await context.bot.send_message(user_id, _("A login code has been sent. Please send it here."))
+            return  # Success
+
+        except (Timeout, ProxyConnectionError) as e:
+            log.warning(f"Proxy connection failed for user {user_id} on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. Proxy ID: {proxy_id}. Error: {e}")
+            if proxy_id:
+                mark_proxy_as_bad(proxy_id)
+            if client and client.is_connected:
+                await client.disconnect()
+            if attempt < MAX_PROXY_RETRIES - 1:
+                await asyncio.sleep(1)  # Wait a bit before retrying
+            else:
+                await context.bot.send_message(user_id, _("Failed to connect to Telegram after multiple attempts. Please check proxy settings and try again later."))
+
+        except PhoneNumberInvalid:
+            await context.bot.send_message(user_id, _("The phone number is invalid. Please try again."))
+            if client and client.is_connected:
+                await client.disconnect()
+            return
+
+        except Exception as e:
+            log.error(f"An unexpected error occurred while sending code for user {user_id}: {e}", exc_info=True)
+            await context.bot.send_message(user_id, _("An unexpected error occurred. Please try again."))
+            if client and client.is_connected:
+                await client.disconnect()
+            return
 
 async def receive_phone_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
