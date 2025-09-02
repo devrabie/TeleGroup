@@ -2,7 +2,7 @@ import sqlite3
 import logging
 import random
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # --- Configuration ---
 DB_FILE = Path(__file__).parent.parent / "data" / "bot.db"
@@ -201,8 +201,6 @@ def get_all_users():
 
 def grant_subscription(telegram_id: int, plan_id: int, duration_days: int):
     """Grants a subscription to a user, deactivating any existing active ones."""
-    from datetime import datetime, timedelta, timezone
-
     now_utc = datetime.now(timezone.utc)
     end_date = now_utc + timedelta(days=duration_days)
 
@@ -555,7 +553,7 @@ def update_account_schedule(account_id: int, daily_group_limit: int):
     Calculates and updates the next creation time for an account after a successful creation.
     Resets backoff level and error message.
     """
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     if daily_group_limit <= 0:
         # Avoid division by zero and handle plans with no creation allowed
         # Set next_creation_time very far in the future
@@ -609,7 +607,7 @@ def apply_error_backoff(account_id: int, error_message: str, wait_seconds: int |
             current_level = row['backoff_level']
             new_level = current_level + 1
 
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
 
             if wait_seconds is not None:
                 # Use the wait time from Telegram, add a small random buffer (1-5 mins)

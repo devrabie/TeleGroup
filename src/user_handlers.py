@@ -1,7 +1,7 @@
 import logging
 import asyncio
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -464,7 +464,7 @@ async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             elif acc['next_creation_time']:
                 try:
                     next_time = datetime.fromisoformat(acc['next_creation_time'])
-                    if next_time > datetime.now():
+                    if next_time > datetime.now(timezone.utc):
                         status_icon = "🕒"  # Waiting for next scheduled run
                 except (ValueError, TypeError):
                     # Handle case where timestamp is invalid or None
@@ -511,7 +511,7 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     elif acc['next_creation_time']:
         try:
             next_time = datetime.fromisoformat(acc['next_creation_time'])
-            if next_time > datetime.now():
+            if next_time > datetime.now(timezone.utc):
                 status_str = "🕒 Waiting"
         except (ValueError, TypeError):
             pass
