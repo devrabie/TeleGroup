@@ -11,6 +11,7 @@ from src.database import (
     get_groups_created_today,
     get_account_stats,
     get_proxy_string,
+    get_random_proxy_id,
     log_group_creation,
     mark_proxy_as_bad,
     reassign_proxy,
