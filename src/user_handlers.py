@@ -2,6 +2,7 @@ import logging
 import asyncio
 import threading
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -33,6 +34,26 @@ from pyrogram import Client
 from pyrogram.enums import ChatType
 
 log = logging.getLogger(__name__)
+
+def _format_datetime(dt_string: str | None) -> str:
+    """Safely formats a UTC datetime string into the user's local timezone."""
+    if not dt_string:
+        return "N/A"
+
+    try:
+        display_tz = ZoneInfo(config.DISPLAY_TIMEZONE)
+    except (ZoneInfoNotFoundError, AttributeError):
+        display_tz = timezone.utc
+
+    try:
+        utc_time = datetime.fromisoformat(dt_string)
+        if utc_time.tzinfo is None:
+            utc_time = utc_time.replace(tzinfo=timezone.utc)
+
+        local_time = utc_time.astimezone(display_tz)
+        return local_time.strftime('%Y-%m-%d %H:%M')
+    except (ValueError, TypeError):
+        return "Invalid Date"
 
 # --- Handlers for various bot features ---
 
@@ -510,7 +531,10 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         status_str = "🔴 Inactive"
     elif acc['next_creation_time']:
         try:
+            # We still need to parse it to see if it's in the future for the status
             next_time = datetime.fromisoformat(acc['next_creation_time'])
+            if next_time.tzinfo is None:
+                next_time = next_time.replace(tzinfo=timezone.utc)
             if next_time > datetime.now(timezone.utc):
                 status_str = "🕒 Waiting"
         except (ValueError, TypeError):
@@ -518,19 +542,8 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     text = _("<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}").format(phone=acc['phone'], status=status_str)
 
-    if acc['last_creation_time']:
-        try:
-            last_time_str = datetime.fromisoformat(acc['last_creation_time']).strftime('%Y-%m-%d %H:%M')
-            text += _("\n<b>Last Group:</b> {time}").format(time=last_time_str)
-        except (ValueError, TypeError):
-            pass
-
-    if acc['next_creation_time']:
-        try:
-            next_time_str = datetime.fromisoformat(acc['next_creation_time']).strftime('%Y-%m-%d %H:%M')
-            text += _("\n<b>Next Group:</b> {time}").format(time=next_time_str)
-        except (ValueError, TypeError):
-            pass
+    text += _("\n<b>Last Group:</b> {time}").format(time=_format_datetime(acc['last_creation_time']))
+    text += _("\n<b>Next Group:</b> {time}").format(time=_format_datetime(acc['next_creation_time']))
 
     if acc['last_error']:
         text += _("\n<b>Last Error:</b> <pre>{error}</pre>").format(error=acc['last_error'])

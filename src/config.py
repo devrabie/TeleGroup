@@ -35,5 +35,12 @@ WEBSHARE_PROXY_API_URL = os.getenv(
 # --- Data Files ---
 DATA_PROXIES_FILE = "data/proxies.txt"
 
+# --- Display Timezone ---
+# The timezone to use for displaying dates and times to the user.
+# Should be a valid IANA timezone name (e.g., "Asia/Riyadh", "Europe/London").
+# Defaults to "UTC" if not set.
+DISPLAY_TIMEZONE = os.getenv("DISPLAY_TIMEZONE", "UTC")
+
+
 # --- Logging ---
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
