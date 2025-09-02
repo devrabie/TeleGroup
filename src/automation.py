@@ -80,7 +80,7 @@ async def process_single_account(account_details: dict):
             client_name = f"auto_session_{account_id}_{random.randint(1000, 9999)}"
             user_client = Client(client_name, session_string=session_string, in_memory=True, proxy=proxy_dict)
 
-            await user_client.start()
+            await asyncio.wait_for(user_client.start(), timeout=30.0)
             log.info(f"Successfully started client for account {account_id}.")
 
             total_groups_created = get_account_stats(account_id)
@@ -88,25 +88,27 @@ async def process_single_account(account_details: dict):
             date_str = now.strftime("%Y-%m")
             new_group_name = f"Group {total_groups_created + 1} {date_str}"
 
-            new_group = await user_client.create_supergroup(title=new_group_name, description="")
+            new_group = await asyncio.wait_for(
+                user_client.create_supergroup(title=new_group_name, description=""),
+                timeout=30.0
+            )
             log.info(f"Account {account_id} created supergroup '{new_group_name}' (ID: {new_group.id}).")
 
             # Log the creation and immediately update the schedule for the next run
             log_group_creation(account_id, new_group.id, new_group_name)
             update_account_schedule(account_id, account_details['daily_group_limit'])
 
-            await asyncio.sleep(random.uniform(2, 5))
             await user_client.send_message(new_group.id, f"Hello, group {new_group_name} is ready.")
-
             log.info(f"Successfully processed group creation for account {account_id}.")
             return  # Exit the loop on success
 
-        except (Timeout, ConnectionError) as e:
-            log.warning(f"Connection failed for account {account_id} on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. Proxy ID: {proxy_id}. Error: {e}")
-            if proxy_id: mark_proxy_as_bad(proxy_id)
+        except (asyncio.TimeoutError, Timeout, ConnectionError) as e:
+            log.warning(f"Connection/Timeout error for account {account_id} on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. Proxy ID: {proxy_id}. Error: {type(e).__name__}")
+            if proxy_id:
+                mark_proxy_as_bad(proxy_id)
             if attempt >= MAX_PROXY_RETRIES - 1:
                 log.error(f"Account {account_id} failed to connect after {MAX_PROXY_RETRIES} attempts. Applying backoff.")
-                apply_error_backoff(account_id, f"Connection failed after {MAX_PROXY_RETRIES} attempts: {e}")
+                apply_error_backoff(account_id, f"Connection/Timeout failed after {MAX_PROXY_RETRIES} attempts: {e}")
                 break
             await asyncio.sleep(1)
 
