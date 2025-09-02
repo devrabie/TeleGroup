@@ -53,80 +53,75 @@ async def run_group_creation_cycle(context: ContextTypes.DEFAULT_TYPE):
     log.info("Automation cycle finished.")
 
 
+MAX_PROXY_RETRIES = 3
+
 async def process_single_account(account_details: dict):
-    """Handles the group creation for a single managed account."""
+    """
+    Handles the group creation for a single managed account.
+    Retries with a new proxy if the connection fails.
+    """
     account_id = account_details['account_id']
     session_string = account_details['session_string']
-    proxy_id = account_details['proxy_id']
 
-    proxy_string = get_proxy_string(proxy_id)
-    proxy_dict = None
-    if proxy_string:
+    for attempt in range(MAX_PROXY_RETRIES):
+        user_client = None
+        proxy_id = get_random_proxy_id()  # Get a new random proxy for each attempt
+        proxy_string = get_proxy_string(proxy_id) if proxy_id else None
+        proxy_dict = None
+
+        if proxy_string:
+            try:
+                hostname, port, username, password = proxy_string.split(':')
+                proxy_dict = {"scheme": "socks5", "hostname": hostname, "port": int(port), "username": username, "password": password}
+                log.info(f"Account {account_id} | Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: Using proxy {hostname}")
+            except (ValueError, IndexError) as e:
+                log.error(f"Invalid proxy format for account {account_id}: '{proxy_string}'. Error: {e}")
+                if proxy_id: mark_proxy_as_bad(proxy_id)
+                continue  # Try with another proxy
+        else:
+            log.warning(f"Account {account_id} | Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: No proxy available. Proceeding without proxy.")
+
         try:
-            # Assuming format: hostname:port:username:password
-            hostname, port, username, password = proxy_string.split(':')
-            proxy_dict = {
-                "scheme": "socks5",
-                "hostname": hostname,
-                "port": int(port),
-                "username": username,
-                "password": password,
-            }
-        except (ValueError, IndexError) as e:
-            log.error(f"Invalid proxy format for account {account_id}: '{proxy_string}'. Error: {e}")
-            # Optionally, mark proxy as bad here
-            return
+            client_name = f"auto_session_{account_id}_{random.randint(1000, 9999)}"
+            user_client = Client(client_name, session_string=session_string, in_memory=True, proxy=proxy_dict)
 
-    # Use a unique name for the client to avoid conflicts
-    client_name = f"auto_session_{account_id}_{random.randint(1000, 9999)}"
-    user_client = Client(client_name, session_string=session_string, in_memory=True, proxy=proxy_dict)
+            await user_client.start()
+            log.info(f"Successfully started client for account {account_id}.")
 
-    try:
-        await user_client.start()
-        log.info(f"Successfully started client for account {account_id}.")
+            total_groups_created = get_account_stats(account_id)
+            now = datetime.now()
+            date_str = now.strftime("%Y-%m")
+            new_group_name = f"Group {total_groups_created + 1} {date_str}"
 
-        total_groups_created = get_account_stats(account_id)
-        now = datetime.now()
-        date_str = now.strftime("%Y-%m")
-        new_group_name = f"Group {total_groups_created + 1} {date_str}"
+            new_group = await user_client.create_supergroup(title=new_group_name, description="")
+            log.info(f"Account {account_id} created supergroup '{new_group_name}' (ID: {new_group.id}).")
+            log_group_creation(account_id, new_group.id, new_group_name)
 
-        # Create a new supergroup directly.
-        new_group = await user_client.create_supergroup(title=new_group_name, description="")
-        log.info(f"Account {account_id} created supergroup '{new_group_name}' (ID: {new_group.id}).")
+            await asyncio.sleep(random.uniform(2, 5))
+            await user_client.send_message(new_group.id, f"Hello, group {new_group_name} is ready.")
 
-        # Log the creation immediately to ensure the count is updated.
-        log_group_creation(account_id, new_group.id, new_group_name)
+            log.info(f"Successfully processed group creation for account {account_id}.")
+            return  # Exit the loop on success
 
-        await asyncio.sleep(random.uniform(2, 5))
-        await user_client.send_message(new_group.id, f"Hello, group {new_group_name} is ready.")
+        except (Timeout, ConnectionError) as e:
+            log.warning(f"Connection failed for account {account_id} on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. Proxy ID: {proxy_id}. Error: {e}")
+            if proxy_id: mark_proxy_as_bad(proxy_id)
+            if attempt >= MAX_PROXY_RETRIES - 1:
+                log.error(f"Account {account_id} failed to connect after {MAX_PROXY_RETRIES} attempts. Skipping for this cycle.")
+                break # Break loop after final attempt
+            await asyncio.sleep(1) # Wait before next attempt
 
-        log.info(f"Successfully processed group creation for account {account_id}.")
+        except FloodWait as e:
+            log.warning(f"Account {account_id} is flood-waited for {e.value} seconds. Storing wait time in DB.")
+            wait_until = datetime.now() + timedelta(seconds=e.value)
+            set_account_flood_wait(account_id, wait_until)
+            break  # Don't retry on FloodWait, just wait for the next cycle
 
-    except (Timeout, ConnectionError) as e:
-        log.warning(f"Connection failed for account {account_id} due to a proxy/network error. Marking proxy as bad. Error: {e}")
-        if proxy_id:
-            mark_proxy_as_bad(proxy_id)
-            # Also reassign a new one immediately for the next cycle
-            owner_telegram_id = account_details['telegram_id']
-            reassign_proxy(account_id, owner_telegram_id)
-    except FloodWait as e:
-        log.warning(f"Account {account_id} is flood-waited for {e.value} seconds. Storing wait time in DB.")
-        wait_until = datetime.now() + timedelta(seconds=e.value)
-        set_account_flood_wait(account_id, wait_until)
-    except Exception as e:
-        log.error(f"An unexpected error occurred while processing account {account_id}: {e}", exc_info=True)
+        except Exception as e:
+            log.error(f"An unexpected error occurred while processing account {account_id}: {e}", exc_info=True)
+            break # Break loop on other unexpected errors
 
-        # Assume the error might be proxy-related. Mark old proxy as bad and assign a new one.
-        if proxy_id:
-            log.warning(f"Attempting to rotate proxy for account {account_id} due to error.")
-            mark_proxy_as_bad(proxy_id)
-            owner_telegram_id = account_details['telegram_id']
-            success, msg = reassign_proxy(account_id, owner_telegram_id)
-            if success:
-                log.info(f"Successfully reassigned a new proxy to account {account_id}.")
-            else:
-                log.error(f"Failed to reassign proxy for account {account_id}: {msg}")
-    finally:
-        if user_client.is_connected:
-            await user_client.stop()
-        log.debug(f"Client for account {account_id} stopped.")
+        finally:
+            if user_client and user_client.is_connected:
+                await user_client.stop()
+            log.debug(f"Client for account {account_id} stopped for attempt {attempt + 1}.")
