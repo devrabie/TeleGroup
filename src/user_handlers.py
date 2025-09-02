@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import threading
+from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -25,7 +26,7 @@ from src.database import (
     get_all_plans, get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
     delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
     set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
-    get_or_create_user, mark_proxy_as_bad
+    get_or_create_user, mark_proxy_as_bad, get_account_details
 )
 from src.translation import get_translation_func_for_user
 from pyrogram import Client
@@ -67,7 +68,7 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
 
     try:
-        action = query.data.split('_')[1]
+        action = '_'.join(query.data.split('_')[1:])
 
         if action == 'subscribe':
             await subscribe_handler(update, context)
@@ -455,7 +456,20 @@ async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         text = _("You have not added any accounts yet. Use /add_account to get started.")
     else:
         for acc in details['accounts']:
-            status_icon = "🟢" if acc['is_active'] else "🔴"
+            status_icon = "🟢"  # Default: Ready to work
+            if acc['last_error']:
+                status_icon = "⚠️"  # Error state
+            elif not acc['is_active']:
+                status_icon = "🔴"  # Deactivated by user
+            elif acc['next_creation_time']:
+                try:
+                    next_time = datetime.fromisoformat(acc['next_creation_time'])
+                    if next_time > datetime.now():
+                        status_icon = "🕒"  # Waiting for next scheduled run
+                except (ValueError, TypeError):
+                    # Handle case where timestamp is invalid or None
+                    pass # Keep default icon
+
             button_text = f"{status_icon} {acc['phone']}"
             buttons.append([InlineKeyboardButton(button_text, callback_data=f"mng_select_{acc['id']}")])
 
@@ -482,18 +496,44 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
 
-    # We need to get the account details from the DB
-    # This is a bit inefficient, a better way would be to get all accounts once
-    # in my_accounts_handler and pass them around, but for now this is fine.
-    details = get_user_details(user_id)
-    acc = next((acc for acc in details['accounts'] if acc['id'] == account_id), None)
+    acc = get_account_details(account_id)
 
     if not acc:
-        await context.bot.edit_message_text(chat_id=user_id, message_id=message_id, text=_("Error: Account not found."))
+        await context.bot.edit_message_text(chat_id=user_id, message_id=message_id, text=_("Error: Account not found or you don't have permission."))
         return
 
-    status = _("🟢 Active") if acc['is_active'] else _("🔴 Inactive")
-    text = _("<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}").format(phone=acc['phone'], status=status)
+    # Determine status string
+    status_str = "🟢 Ready"
+    if acc['last_error']:
+        status_str = f"⚠️ Error"
+    elif not acc['is_active']:
+        status_str = "🔴 Inactive"
+    elif acc['next_creation_time']:
+        try:
+            next_time = datetime.fromisoformat(acc['next_creation_time'])
+            if next_time > datetime.now():
+                status_str = "🕒 Waiting"
+        except (ValueError, TypeError):
+            pass
+
+    text = _("<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}").format(phone=acc['phone'], status=status_str)
+
+    if acc['last_creation_time']:
+        try:
+            last_time_str = datetime.fromisoformat(acc['last_creation_time']).strftime('%Y-%m-%d %H:%M')
+            text += _("\n<b>Last Group:</b> {time}").format(time=last_time_str)
+        except (ValueError, TypeError):
+            pass
+
+    if acc['next_creation_time']:
+        try:
+            next_time_str = datetime.fromisoformat(acc['next_creation_time']).strftime('%Y-%m-%d %H:%M')
+            text += _("\n<b>Next Group:</b> {time}").format(time=next_time_str)
+        except (ValueError, TypeError):
+            pass
+
+    if acc['last_error']:
+        text += _("\n<b>Last Error:</b> <pre>{error}</pre>").format(error=acc['last_error'])
 
     buttons = [
         [

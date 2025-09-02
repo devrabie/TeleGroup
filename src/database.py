@@ -1,7 +1,8 @@
 import sqlite3
 import logging
+import random
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # --- Configuration ---
 DB_FILE = Path(__file__).parent.parent / "data" / "bot.db"
@@ -63,6 +64,9 @@ TABLE_DEFINITIONS = {
             is_active BOOLEAN NOT NULL DEFAULT 1, -- User-controlled activation
             is_running BOOLEAN NOT NULL DEFAULT 0, -- System-controlled running state
             flood_wait_until TIMESTAMP,
+            next_creation_time TIMESTAMP,
+            backoff_level INTEGER NOT NULL DEFAULT 0,
+            last_error TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
             FOREIGN KEY (proxy_id) REFERENCES proxies (id)
@@ -97,13 +101,22 @@ def initialize_database():
                 log.debug(f"Creating table: {table_name}")
                 cursor.execute(table_sql)
 
-            # --- Simple Migration: Add flood_wait_until column if it doesn't exist ---
+            # --- Migrations ---
             cursor.execute("PRAGMA table_info(managed_accounts)")
             columns = [info[1] for info in cursor.fetchall()]
             if 'flood_wait_until' not in columns:
                 log.info("Running migration: Adding 'flood_wait_until' column to 'managed_accounts' table.")
                 cursor.execute("ALTER TABLE managed_accounts ADD COLUMN flood_wait_until TIMESTAMP")
-            # --- End Migration ---
+            if 'next_creation_time' not in columns:
+                log.info("Running migration: Adding 'next_creation_time' column to 'managed_accounts' table.")
+                cursor.execute("ALTER TABLE managed_accounts ADD COLUMN next_creation_time TIMESTAMP")
+            if 'backoff_level' not in columns:
+                log.info("Running migration: Adding 'backoff_level' column to 'managed_accounts' table.")
+                cursor.execute("ALTER TABLE managed_accounts ADD COLUMN backoff_level INTEGER NOT NULL DEFAULT 0")
+            if 'last_error' not in columns:
+                log.info("Running migration: Adding 'last_error' column to 'managed_accounts' table.")
+                cursor.execute("ALTER TABLE managed_accounts ADD COLUMN last_error TEXT")
+            # --- End Migrations ---
 
             conn.commit()
         log.info("Database initialized successfully.")
@@ -473,6 +486,7 @@ def get_eligible_accounts():
           AND s.is_active = 1
           AND s.end_date >= datetime('now')
           AND (ma.flood_wait_until IS NULL OR ma.flood_wait_until < datetime('now'))
+          AND (ma.next_creation_time IS NULL OR ma.next_creation_time < datetime('now'))
     """
     try:
         with get_db_connection() as conn:
@@ -513,6 +527,101 @@ def log_group_creation(account_id: int, group_id: int, group_name: str):
     except sqlite3.Error as e:
         log.error(f"Failed to log group creation for account {account_id}: {e}")
         return False
+
+
+def update_account_schedule(account_id: int, daily_group_limit: int):
+    """
+    Calculates and updates the next creation time for an account after a successful creation.
+    Resets backoff level and error message.
+    """
+    now = datetime.now()
+    if daily_group_limit <= 0:
+        # Avoid division by zero and handle plans with no creation allowed
+        # Set next_creation_time very far in the future
+        next_time = now + timedelta(days=999)
+    else:
+        # Calculate the base interval in minutes, ensuring it's at least 1 minute.
+        interval_minutes = max(1, (24 * 60) / daily_group_limit)
+
+        # Add random variation (e.g., +/- 2-5 minutes, which is 120-300 seconds)
+        variation_seconds = random.uniform(120, 300)
+        if random.choice([True, False]):
+            variation_seconds *= -1 # Make it possible to subtract time as well
+
+        next_time = now + timedelta(minutes=interval_minutes, seconds=variation_seconds)
+
+    sql = """
+        UPDATE managed_accounts
+        SET
+            next_creation_time = ?,
+            backoff_level = 0,
+            last_error = NULL
+        WHERE id = ?
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (next_time, account_id))
+            conn.commit()
+        log.info(f"Scheduled next group creation for account {account_id} at {next_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        return True
+    except sqlite3.Error as e:
+        log.error(f"Failed to update schedule for account {account_id}: {e}")
+        return False
+
+
+def apply_error_backoff(account_id: int, error_message: str, wait_seconds: int | None = None):
+    """
+    Applies backoff to an account after an error.
+    Uses provided wait_seconds (e.g., from FloodWait) or calculates an exponential backoff.
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT backoff_level FROM managed_accounts WHERE id = ?", (account_id,))
+            row = cursor.fetchone()
+            if not row:
+                log.error(f"Cannot apply backoff for non-existent account_id: {account_id}")
+                return False
+
+            current_level = row['backoff_level']
+            new_level = current_level + 1
+
+            now = datetime.now()
+
+            if wait_seconds is not None:
+                # Use the wait time from Telegram, add a small random buffer (1-5 mins)
+                buffer_minutes = random.uniform(1, 5)
+                next_time = now + timedelta(seconds=wait_seconds, minutes=buffer_minutes)
+                log.info(f"Applying FloodWait backoff for account {account_id}. Wait: {wait_seconds}s, Buffer: {buffer_minutes:.2f}m.")
+            else:
+                # Apply exponential backoff for other errors
+                base_delay_minutes = 30
+                delay_minutes = base_delay_minutes * (2 ** current_level)
+                random_minutes = random.uniform(0, 10)
+
+                max_delay_minutes = 3 * 24 * 60 # 3 days
+                total_delay_minutes = min(delay_minutes + random_minutes, max_delay_minutes)
+                next_time = now + timedelta(minutes=total_delay_minutes)
+                log.info(f"Applying exponential backoff for account {account_id}. Level: {current_level} -> {new_level}.")
+
+            sql = """
+                UPDATE managed_accounts
+                SET
+                    next_creation_time = ?,
+                    backoff_level = ?,
+                    last_error = ?
+                WHERE id = ?
+            """
+            cursor.execute(sql, (next_time, new_level, str(error_message), account_id))
+            conn.commit()
+            log.warning(f"Account {account_id} encountered error: '{error_message}'. Backoff level is now {new_level}. Next attempt at {next_time.strftime('%Y-%m-%d %H:%M:%S')}.")
+            return True
+    except sqlite3.Error as e:
+        log.error(f"Failed to apply backoff for account {account_id}: {e}")
+        return False
+
 
 def get_or_create_user(telegram_id: int):
     """
@@ -572,7 +681,7 @@ def get_user_details(telegram_id: int):
         WHERE s.user_id = ? AND s.is_active = 1
         ORDER BY s.end_date DESC LIMIT 1
     """
-    accounts_sql = "SELECT id, phone, is_active FROM managed_accounts WHERE user_id = ?"
+    accounts_sql = "SELECT id, phone, is_active, last_error, next_creation_time FROM managed_accounts WHERE user_id = ?"
 
     try:
         with get_db_connection() as conn:
@@ -596,6 +705,36 @@ def get_user_details(telegram_id: int):
             return details
     except sqlite3.Error as e:
         log.error(f"Failed to get details for user {telegram_id}: {e}")
+        return None
+
+
+def get_account_details(account_id: int):
+    """
+    Retrieves detailed information for a single managed account,
+    including the timestamp of the last group created.
+    """
+    sql = """
+        SELECT
+            ma.id,
+            ma.phone,
+            ma.is_active,
+            ma.next_creation_time,
+            ma.backoff_level,
+            ma.last_error,
+            (SELECT MAX(gcl.creation_timestamp)
+             FROM group_creation_log gcl
+             WHERE gcl.account_id = ma.id) as last_creation_time
+        FROM managed_accounts ma
+        WHERE ma.id = ?
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (account_id,))
+            details = cursor.fetchone()
+            return dict(details) if details else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to get details for account {account_id}: {e}")
         return None
 
 

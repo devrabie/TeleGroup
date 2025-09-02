@@ -8,14 +8,14 @@ from pyrogram.errors import FloodWait, Timeout
 
 from src.database import (
     get_eligible_accounts,
-    get_groups_created_today,
     get_account_stats,
     get_proxy_string,
     get_random_proxy_id,
     log_group_creation,
     mark_proxy_as_bad,
     reassign_proxy,
-    set_account_flood_wait,
+    update_account_schedule,
+    apply_error_backoff,
 )
 
 log = logging.getLogger(__name__)
@@ -34,15 +34,9 @@ async def run_group_creation_cycle(context: ContextTypes.DEFAULT_TYPE):
     for account in eligible_accounts:
         account_id = account['account_id']
 
-        # Check daily limit
-        created_today = get_groups_created_today(account_id)
-        if created_today >= account['daily_group_limit']:
-            log.info(f"Account {account_id} has reached its daily limit of {account['daily_group_limit']} groups.")
-            continue
-
         try:
             # Add a random delay to avoid all accounts acting at once
-            delay = random.uniform(10, 60)
+            delay = random.uniform(5, 20)
             log.debug(f"Waiting for {delay:.2f}s before processing account {account_id}.")
             await asyncio.sleep(delay)
 
@@ -96,7 +90,10 @@ async def process_single_account(account_details: dict):
 
             new_group = await user_client.create_supergroup(title=new_group_name, description="")
             log.info(f"Account {account_id} created supergroup '{new_group_name}' (ID: {new_group.id}).")
+
+            # Log the creation and immediately update the schedule for the next run
             log_group_creation(account_id, new_group.id, new_group_name)
+            update_account_schedule(account_id, account_details['daily_group_limit'])
 
             await asyncio.sleep(random.uniform(2, 5))
             await user_client.send_message(new_group.id, f"Hello, group {new_group_name} is ready.")
@@ -108,19 +105,20 @@ async def process_single_account(account_details: dict):
             log.warning(f"Connection failed for account {account_id} on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. Proxy ID: {proxy_id}. Error: {e}")
             if proxy_id: mark_proxy_as_bad(proxy_id)
             if attempt >= MAX_PROXY_RETRIES - 1:
-                log.error(f"Account {account_id} failed to connect after {MAX_PROXY_RETRIES} attempts. Skipping for this cycle.")
-                break # Break loop after final attempt
-            await asyncio.sleep(1) # Wait before next attempt
+                log.error(f"Account {account_id} failed to connect after {MAX_PROXY_RETRIES} attempts. Applying backoff.")
+                apply_error_backoff(account_id, f"Connection failed after {MAX_PROXY_RETRIES} attempts: {e}")
+                break
+            await asyncio.sleep(1)
 
         except FloodWait as e:
-            log.warning(f"Account {account_id} is flood-waited for {e.value} seconds. Storing wait time in DB.")
-            wait_until = datetime.now() + timedelta(seconds=e.value)
-            set_account_flood_wait(account_id, wait_until)
-            break  # Don't retry on FloodWait, just wait for the next cycle
+            log.warning(f"Account {account_id} is flood-waited for {e.value} seconds. Applying backoff.")
+            apply_error_backoff(account_id, str(e), e.value)
+            break
 
         except Exception as e:
             log.error(f"An unexpected error occurred while processing account {account_id}: {e}", exc_info=True)
-            break # Break loop on other unexpected errors
+            apply_error_backoff(account_id, str(e))
+            break
 
         finally:
             if user_client and user_client.is_connected:
