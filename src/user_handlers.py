@@ -303,7 +303,13 @@ async def async_send_code(phone, context, user_id, _):
 
         if proxy_string:
             try:
-                hostname, port, username, password = proxy_string.split(':')
+                parts = proxy_string.split(':')
+                hostname, port = parts[0], parts[1]
+
+                # Use credentials from env vars if they exist, otherwise use from proxy string
+                username = config.PROXY_USERNAME or parts[2]
+                password = config.PROXY_PASSWORD or parts[3]
+
                 proxy_dict = {
                     "scheme": "socks5",
                     "hostname": hostname,
@@ -316,7 +322,7 @@ async def async_send_code(phone, context, user_id, _):
                 log.error(f"Invalid proxy format: '{proxy_string}'. Error: {e}")
                 if proxy_id:
                     mark_proxy_as_bad(proxy_id)
-                continue  # Try with another proxy
+                continue
         else:
             log.warning(f"Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: No proxy available for user {user_id}. Proceeding without proxy.")
 

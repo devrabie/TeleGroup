@@ -31,6 +31,9 @@ WEBSHARE_PROXY_API_URL = os.getenv(
     "WEBSHARE_PROXY_API_URL",
     "https://proxy.webshare.io/api/v2/proxy/list/download/uaykgtjmscislovqzscyrzsooiglcnagpsovmqjy/-/any/username/direct/-/"
 )
+# Optional override for proxy credentials. If set, these will be used for all proxies.
+PROXY_USERNAME = os.getenv("PROXY_USERNAME")
+PROXY_PASSWORD = os.getenv("PROXY_PASSWORD")
 
 # --- Data Files ---
 DATA_PROXIES_FILE = "data/proxies.txt"

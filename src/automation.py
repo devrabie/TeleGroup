@@ -66,13 +66,25 @@ async def process_single_account(account_details: dict):
 
         if proxy_string:
             try:
-                hostname, port, username, password = proxy_string.split(':')
-                proxy_dict = {"scheme": "socks5", "hostname": hostname, "port": int(port), "username": username, "password": password}
+                parts = proxy_string.split(':')
+                hostname, port = parts[0], parts[1]
+
+                # Use credentials from env vars if they exist, otherwise use from proxy string
+                username = config.PROXY_USERNAME or parts[2]
+                password = config.PROXY_PASSWORD or parts[3]
+
+                proxy_dict = {
+                    "scheme": "socks5",
+                    "hostname": hostname,
+                    "port": int(port),
+                    "username": username,
+                    "password": password
+                }
                 log.info(f"Account {account_id} | Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: Using proxy {hostname}")
             except (ValueError, IndexError) as e:
                 log.error(f"Invalid proxy format for account {account_id}: '{proxy_string}'. Error: {e}")
                 if proxy_id: mark_proxy_as_bad(proxy_id)
-                continue  # Try with another proxy
+                continue
         else:
             log.warning(f"Account {account_id} | Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: No proxy available. Proceeding without proxy.")
 
