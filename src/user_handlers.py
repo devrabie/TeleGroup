@@ -902,10 +902,25 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                     )
                 )
 
-                # Invalidate the cache for this account so the next report is fresh
+                # Smartly update the cache instead of invalidating it
                 cache_key = f"group_report_cache_{account_id}"
-                if context.bot_data.pop(cache_key, None):
-                    log.info(f"Invalidated group report cache for account {account_id}.")
+                cached_report = context.bot_data.get(cache_key)
+                if cached_report:
+                    # Find and remove the upgraded group from the list
+                    upgraded_group_found = False
+                    for i, group in enumerate(cached_report['upgradable_groups']):
+                        if group['id'] == chat_id:
+                            cached_report['upgradable_groups'].pop(i)
+                            upgraded_group_found = True
+                            break
+
+                    # Update the counts
+                    if upgraded_group_found:
+                        cached_report['normal_groups_count'] -= 1
+                        cached_report['supergroups_count'] += 1
+                        # Save the updated cache back
+                        context.bot_data[cache_key] = cached_report
+                        log.info(f"Updated group report cache for account {account_id} after upgrade.")
 
                 await client.disconnect()
 
