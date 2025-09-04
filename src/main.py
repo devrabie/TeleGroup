@@ -73,7 +73,7 @@ async def crypto_webhook_handler(request: web.Request):
 
                 if success:
                     log.info(f"Subscription granted via crypto webhook for user {user_id}, plan {plan_id}.")
-                    bot = request.app['bot']
+                    bot = request.app['ptb_app'].bot
                     await bot.send_message(user_id, f"✅ Your payment was successful! Your '{plan['name']}' subscription is now active for {duration} days.")
                 else:
                     log.error(f"Failed to grant subscription via crypto webhook for user {user_id}: {msg}")
@@ -93,69 +93,96 @@ async def main() -> None:
     """
     The main entry point for the bot.
     """
+    log.info("--- RUNNING JULES'S LATEST VERSION OF MAIN.PY ---")
     log.info("Initializing database...")
     initialize_database()
 
     log.info("Building bot application...")
     application = Application.builder().token(config.BOT_TOKEN).build()
 
-    # --- Scheduler Setup ---
-    job_queue = application.job_queue
-    job_queue.run_repeating(update_proxies_from_url, interval=86400, first=10) # Daily
-    job_queue.run_repeating(run_group_creation_cycle, interval=300, first=20) # Every 5 mins
-    log.info("Scheduled background jobs.")
-
     # --- Handler Registration ---
     all_handlers = admin_handlers_list + user_handlers_list
     application.add_handlers(all_handlers)
     log.info(f"Registered {len(all_handlers)} handlers.")
+
+    # --- Initialize the application ---
+    await application.initialize()
 
     # --- Webhook or Polling ---
     if config.WEBHOOK_ENABLED:
         if not all([config.WEBHOOK_URL, config.WEBHOOK_SECRET, config.CRYPTO_PAY_API_TOKEN]):
             raise ValueError("WEBHOOK_URL, WEBHOOK_SECRET, and CRYPTO_PAY_API_TOKEN must be set when WEBHOOK_ENABLED is true.")
 
-        # The URL path for the bot's webhook
+        # --- Configure webhooks and paths ---
         bot_webhook_path = f"/{config.BOT_TOKEN.split(':')[-1]}"
-        # The URL path for the Crypto Pay webhook
         crypto_webhook_path = f"/webhooks/cryptopay/{config.CRYPTO_PAY_API_TOKEN[:10]}"
+        full_bot_webhook_url = f"{config.WEBHOOK_URL.rstrip('/')}{bot_webhook_path}"
 
-        log.info(f"Starting bot in webhook mode. URL: {config.WEBHOOK_URL}, Port: {config.WEBHOOK_PORT}")
-        log.info(f"Bot webhook path: {bot_webhook_path}")
-        log.info(f"Crypto Pay webhook path: {crypto_webhook_path}")
-        log.warning("Ensure your Crypto Pay app is configured to send webhooks to: "
-                    f"{config.WEBHOOK_URL.rstrip('/')}{crypto_webhook_path}")
+        await application.bot.set_webhook(
+            url=full_bot_webhook_url,
+            secret_token=config.WEBHOOK_SECRET,
+            drop_pending_updates=True
+        )
+        log.info(f"Bot webhook set to: {full_bot_webhook_url}")
+        log.warning(f"Ensure your Crypto Pay app is configured to send webhooks to: {config.WEBHOOK_URL.rstrip('/')}{crypto_webhook_path}")
 
-        # Set up the web server for webhooks
+        # --- Define aiohttp handlers ---
+        async def telegram_handler(request: web.Request):
+            """Handles incoming updates from Telegram by passing them to PTB."""
+            if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != config.WEBHOOK_SECRET:
+                return web.Response(status=403)
+            try:
+                update = Update.de_json(await request.json(), application.bot)
+                await application.process_update(update)
+                return web.Response()
+            except (json.JSONDecodeError, TypeError):
+                return web.Response(status=400, text="Bad Request")
+
+        # --- Set up aiohttp server ---
         webapp = web.Application()
-        webapp['bot'] = application.bot # Make bot object accessible in handlers
+        webapp['ptb_app'] = application # Make PTB app accessible in handlers
+        webapp.router.add_post(bot_webhook_path, telegram_handler)
         webapp.router.add_post(crypto_webhook_path, crypto_webhook_handler)
 
         runner = web.AppRunner(webapp)
         await runner.setup()
         site = web.TCPSite(runner, config.WEBHOOK_LISTEN_ADDRESS, config.WEBHOOK_PORT)
+
+        log.info(f"Starting aiohttp server on {config.WEBHOOK_LISTEN_ADDRESS}:{config.WEBHOOK_PORT}")
         await site.start()
 
-        # Start the bot application
-        await application.run_webhook(
-            listen=config.WEBHOOK_LISTEN_ADDRESS,
-            port=config.WEBHOOK_PORT,
-            url_path=bot_webhook_path,
-            webhook_url=f"{config.WEBHOOK_URL.rstrip('/')}{bot_webhook_path}",
-            secret_token=config.WEBHOOK_SECRET,
-            drop_pending_updates=True
-        )
+        # Start background jobs
+        application.job_queue.run_repeating(update_proxies_from_url, interval=86400, first=10)
+        application.job_queue.run_repeating(run_group_creation_cycle, interval=300, first=20)
+        await application.start()
+        log.info("Bot and job queue started in webhook mode.")
 
         # Keep the script running
         await asyncio.Event().wait()
 
     else:
+        # --- Start in Polling Mode ---
         log.info("Starting bot in polling mode...")
-        await application.initialize() # Inits bot, etc.
-        await application.updater.start_polling(drop_pending_updates=True)
+
+        # Add jobs to the queue. They will start when application.start() is called.
+        application.job_queue.run_repeating(update_proxies_from_url, interval=86400, first=10)
+        application.job_queue.run_repeating(run_group_creation_cycle, interval=300, first=20)
+
+        # Start the job queue
         await application.start()
-        log.info("Bot started.")
-        await asyncio.Event().wait()
+        # Start the updater to begin polling for updates
+        await application.updater.start_polling(drop_pending_updates=True)
+        log.info("Bot started successfully in polling mode.")
+
+        # Block the script until a signal is received
+        await application.updater.idle()
+
+        # Gracefully stop the bot
+        log.info("Shutting down bot...")
+        await application.updater.stop()
+        await application.stop()
+        await application.shutdown()
+        log.info("Bot shut down gracefully.")
 
 
 if __name__ == "__main__":
