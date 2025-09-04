@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-09-04 20:00+0000\n"
-"PO-Revision-Date: 2025-09-04 13:00+0000\n"
+"POT-Creation-Date: 2025-09-04 20:42+0000\n"
+"PO-Revision-Date: 2025-09-04 13:41+0000\n"
 "Last-Translator: Jules <jules@example.com>\n"
 "Language: ar\n"
 "Language-Team: ar <LL@li.org>\n"
@@ -45,7 +45,14 @@ msgid ""
 "<b>Managed Accounts:</b> {total_managed_accounts}\n"
 "<b>Groups Created (Today):</b> {groups_created_today}\n"
 "<b>Groups Created (Total):</b> {groups_created_total}\n"
-msgstr "<b>📊 إحصائيات النظام</b>\n\n<b>إجمالي المستخدمين:</b> {total_users}\n<b>الاشتراكات النشطة:</b> {active_subscriptions}\n<b>الحسابات المدارة:</b> {total_managed_accounts}\n<b>المجموعات المنشأة (اليوم):</b> {groups_created_today}\n<b>المجموعات المنشأة (الإجمالي):</b> {groups_created_total}\n"
+msgstr ""
+"<b>📊 إحصائيات النظام</b>\n"
+"\n"
+"<b>إجمالي المستخدمين:</b> {total_users}\n"
+"<b>الاشتراكات النشطة:</b> {active_subscriptions}\n"
+"<b>الحسابات المدارة:</b> {total_managed_accounts}\n"
+"<b>المجموعات المنشأة (اليوم):</b> {groups_created_today}\n"
+"<b>المجموعات المنشأة (الإجمالي):</b> {groups_created_total}\n"
 
 #: src/admin_handlers.py:61
 msgid "Could not retrieve statistics."
@@ -92,7 +99,18 @@ msgid ""
 "<b>Max Accounts:</b> {max_accounts}\n"
 "<b>Daily Limit:</b> {limit} groups/day\n"
 "<b>Status:</b> {status}"
-msgstr "<b>تعديل الخطة:</b> {name} (المعرف: <code>{id}</code>)\n\nاختر حقلاً لتعديله:\n\n<b>الاسم:</b> {name}\n<b>السعر (نجوم):</b> {price_stars}\n<b>السعر (USD):</b> {price_usd}\n<b>المدة:</b> {duration} أيام\n<b>أقصى عدد للحسابات:</b> {max_accounts}\n<b>الحد اليومي:</b> {limit} مجموعات/يوم\n<b>الحالة:</b> {status}"
+msgstr ""
+"<b>تعديل الخطة:</b> {name} (المعرف: <code>{id}</code>)\n"
+"\n"
+"اختر حقلاً لتعديله:\n"
+"\n"
+"<b>الاسم:</b> {name}\n"
+"<b>السعر (نجوم):</b> {price_stars}\n"
+"<b>السعر (USD):</b> {price_usd}\n"
+"<b>المدة:</b> {duration} أيام\n"
+"<b>أقصى عدد للحسابات:</b> {max_accounts}\n"
+"<b>الحد اليومي:</b> {limit} مجموعات/يوم\n"
+"<b>الحالة:</b> {status}"
 
 #: src/admin_handlers.py:125
 msgid "✏️ Name"
@@ -128,8 +146,14 @@ msgstr "🔙 رجوع إلى قائمة الخطط"
 
 #: src/admin_handlers.py:191
 #, python-brace-format
-msgid "Please send the new value for <b>{field_name}</b>.\n\nSend /cancel to abort."
-msgstr "الرجاء إرسال القيمة الجديدة لـ <b>{field_name}</b>.\n\nأرسل /cancel للإلغاء."
+msgid ""
+"Please send the new value for <b>{field_name}</b>.\n"
+"\n"
+"Send /cancel to abort."
+msgstr ""
+"الرجاء إرسال القيمة الجديدة لـ <b>{field_name}</b>.\n"
+"\n"
+"أرسل /cancel للإلغاء."
 
 #: src/admin_handlers.py:206 src/admin_handlers.py:262
 msgid "An error occurred (missing context). Please start over."
@@ -152,8 +176,14 @@ msgid "Edit operation cancelled. Returning to the main admin panel."
 msgstr "تم إلغاء عملية التعديل. العودة إلى لوحة التحكم الرئيسية."
 
 #: src/admin_handlers.py:315
-msgid "<b>Manage Users</b>\n\nSelect an option from below."
-msgstr "<b>إدارة المستخدمين</b>\n\nاختر خيارًا من الأسفل."
+msgid ""
+"<b>Manage Users</b>\n"
+"\n"
+"Select an option from below."
+msgstr ""
+"<b>إدارة المستخدمين</b>\n"
+"\n"
+"اختر خيارًا من الأسفل."
 
 #: src/admin_handlers.py:317
 msgid "📜 List All Users"
@@ -165,8 +195,12 @@ msgstr "لم يتم العثور على مستخدمين."
 
 #: src/admin_handlers.py:349
 #, python-brace-format
-msgid "<b>Bot Users (Page {page_num}):</b>\n\n"
-msgstr "<b>مستخدمو البوت (صفحة {page_num}):</b>\n\n"
+msgid ""
+"<b>Bot Users (Page {page_num}):</b>\n"
+"\n"
+msgstr ""
+"<b>مستخدمو البوت (صفحة {page_num}):</b>\n"
+"\n"
 
 #: src/admin_handlers.py:387
 #, python-brace-format
@@ -203,8 +237,12 @@ msgstr "<b>تاريخ الانضمام:</b> {join_date}\n"
 
 #: src/admin_handlers.py:414
 #, python-brace-format
-msgid "<b>Subscription:</b> {plan_name} (Plan ID: {plan_id})\n<b>Expires:</b> {end_date}\n"
-msgstr "<b>الاشتراك:</b> {plan_name} (معرف الباقة: {plan_id})\n<b>ينتهي في:</b> {end_date}\n"
+msgid ""
+"<b>Subscription:</b> {plan_name} (Plan ID: {plan_id})\n"
+"<b>Expires:</b> {end_date}\n"
+msgstr ""
+"<b>الاشتراك:</b> {plan_name} (معرف الباقة: {plan_id})\n"
+"<b>ينتهي في:</b> {end_date}\n"
 
 #: src/admin_handlers.py:420
 msgid "<b>Subscription:</b> None\n"
@@ -255,8 +293,14 @@ msgid "Please choose a plan to grant to user <code>{user_id}</code>:"
 msgstr "الرجاء اختيار خطة لمنحها للمستخدم <code>{user_id}</code>:"
 
 #: src/admin_handlers.py:499
-msgid "Please enter the duration for this subscription in days (e.g., 30).\n\nOr send /cancel to abort."
-msgstr "الرجاء إدخال مدة هذا الاشتراك بالأيام (مثال: 30).\n\nأو أرسل /cancel للإلغاء."
+msgid ""
+"Please enter the duration for this subscription in days (e.g., 30).\n"
+"\n"
+"Or send /cancel to abort."
+msgstr ""
+"الرجاء إدخال مدة هذا الاشتراك بالأيام (مثال: 30).\n"
+"\n"
+"أو أرسل /cancel للإلغاء."
 
 #: src/admin_handlers.py:521
 msgid "An error occurred. Please try again."
@@ -267,8 +311,14 @@ msgid "Grant subscription cancelled."
 msgstr "تم إلغاء منح الاشتراك."
 
 #: src/admin_handlers.py:567
-msgid "<b>Manage Subscription Plans</b>\n\nSelect an option from below."
-msgstr "<b>إدارة خطط الاشتراك</b>\n\nاختر خيارًا من الأسفل."
+msgid ""
+"<b>Manage Subscription Plans</b>\n"
+"\n"
+"Select an option from below."
+msgstr ""
+"<b>إدارة خطط الاشتراك</b>\n"
+"\n"
+"اختر خيارًا من الأسفل."
 
 #: src/admin_handlers.py:569
 msgid "📜 List All Plans"
@@ -287,18 +337,28 @@ msgid "No subscription plans found."
 msgstr "لم يتم العثور على باقات اشتراك."
 
 #: src/admin_handlers.py:593
-msgid "<b>Existing Subscription Plans:</b>\n\n"
-msgstr "<b>باقات الاشتراك الحالية:</b>\n\n"
+msgid ""
+"<b>Existing Subscription Plans:</b>\n"
+"\n"
+msgstr ""
+"<b>باقات الاشتراك الحالية:</b>\n"
+"\n"
 
 #: src/admin_handlers.py:598
 #, python-brace-format
 msgid ""
 "<b>ID:</b> <code>{id}</code>, <b>Name:</b> {name}\n"
-"<b>Price (Stars):</b> {price}{price_usd_text}, <b>Duration:</b> {days} days\n"
+"<b>Price (Stars):</b> {price}{price_usd_text}, <b>Duration:</b> {days} "
+"days\n"
 "<b>Accounts:</b> {accounts}, <b>Limit:</b> {limit} groups/day\n"
 "<b>Status:</b> {status}\n"
 "--------------------\n"
-msgstr "<b>المعرف:</b> <code>{id}</code>, <b>الاسم:</b> {name}\n<b>السعر (نجوم):</b> {price}{price_usd_text}, <b>المدة:</b> {days} أيام\n<b>الحسابات:</b> {accounts}, <b>الحد:</b> {limit} مجموعات/يوم\n<b>الحالة:</b> {status}\n--------------------\n"
+msgstr ""
+"<b>المعرف:</b> <code>{id}</code>, <b>الاسم:</b> {name}\n"
+"<b>السعر (نجوم):</b> {price}{price_usd_text}, <b>المدة:</b> {days} أيام\n"
+"<b>الحسابات:</b> {accounts}, <b>الحد:</b> {limit} مجموعات/يوم\n"
+"<b>الحالة:</b> {status}\n"
+"--------------------\n"
 
 #: src/admin_handlers.py:623
 msgid "No subscription plans found to edit."
@@ -309,8 +369,18 @@ msgid "Please select a plan to edit:"
 msgstr "الرجاء اختيار خطة لتعديلها:"
 
 #: src/admin_handlers.py:654
-msgid "Let's create a new plan.\n\nFirst, what is the name of the plan? (e.g., 'Premium')\n\nYou can send /cancel at any time to stop."
-msgstr "لنقم بإنشاء خطة جديدة.\n\nأولاً، ما هو اسم الخطة؟ (مثال: 'بريميوم')\n\nيمكنك إرسال /cancel في أي وقت للإيقاف."
+msgid ""
+"Let's create a new plan.\n"
+"\n"
+"First, what is the name of the plan? (e.g., 'Premium')\n"
+"\n"
+"You can send /cancel at any time to stop."
+msgstr ""
+"لنقم بإنشاء خطة جديدة.\n"
+"\n"
+"أولاً، ما هو اسم الخطة؟ (مثال: 'بريميوم')\n"
+"\n"
+"يمكنك إرسال /cancel في أي وقت للإيقاف."
 
 #: src/admin_handlers.py:665
 msgid "Great. Now, what is the price in Telegram Stars? (e.g., 100)"
@@ -341,7 +411,9 @@ msgid "That's not a valid number. Please enter the duration in days again."
 msgstr "هذا ليس رقماً صالحاً. الرجاء إدخال المدة بالأيام مرة أخرى."
 
 #: src/admin_handlers.py:714
-msgid "Almost done. What is the daily group creation limit for each account? (e.g., 20)"
+msgid ""
+"Almost done. What is the daily group creation limit for each account? "
+"(e.g., 20)"
 msgstr "أوشكنا على الانتهاء. ما هو حد إنشاء المجموعات اليومي لكل حساب؟ (مثال: 20)"
 
 #: src/admin_handlers.py:717
@@ -351,14 +423,23 @@ msgstr "هذا ليس رقماً صالحاً. الرجاء إدخال الحد 
 #: src/admin_handlers.py:730
 #, python-brace-format
 msgid ""
-"<b>Please confirm the new plan details:</b>\n\n"
+"<b>Please confirm the new plan details:</b>\n"
+"\n"
 "<b>Name:</b> {name}\n"
 "<b>Price (Stars):</b> {price}\n"
 "<b>Price (USD):</b> {price_usd:.2f}\n"
 "<b>Duration:</b> {duration} days\n"
 "<b>Max Accounts:</b> {accounts}\n"
 "<b>Daily Limit:</b> {limit} groups/day"
-msgstr "<b>الرجاء تأكيد تفاصيل الخطة الجديدة:</b>\n\n<b>الاسم:</b> {name}\n<b>السعر (نجوم):</b> {price}\n<b>السعر (USD):</b> {price_usd:.2f}\n<b>المدة:</b> {duration} أيام\n<b>أقصى عدد للحسابات:</b> {accounts}\n<b>الحد اليومي:</b> {limit} مجموعات/يوم"
+msgstr ""
+"<b>الرجاء تأكيد تفاصيل الخطة الجديدة:</b>\n"
+"\n"
+"<b>الاسم:</b> {name}\n"
+"<b>السعر (نجوم):</b> {price}\n"
+"<b>السعر (USD):</b> {price_usd:.2f}\n"
+"<b>المدة:</b> {duration} أيام\n"
+"<b>أقصى عدد للحسابات:</b> {accounts}\n"
+"<b>الحد اليومي:</b> {limit} مجموعات/يوم"
 
 #: src/admin_handlers.py:747
 msgid "✅ Save Plan"
@@ -428,7 +509,21 @@ msgid ""
 "\n"
 "For most features, you need an active subscription. You can get one via "
 "the /subscribe command."
-msgstr "<b>مساعدة البوت والأوامر</b>\n\nقائمة الأوامر المتاحة:\n\n<b>/start</b> - عرض القائمة الرئيسية.\n<b>/help</b> - عرض رسالة المساعدة هذه.\n<b>/subscribe</b> - تصفح وشراء باقة اشتراك لاستخدام ميزات البوت.\n<b>/my_accounts</b> - عرض وإدارة حساباتك المتصلة.\n<b>/add_account</b> - بدء عملية إضافة حساب تليجرام جديد لإدارته عبر البوت.\n<b>/language</b> - تغيير لغة عرض البوت (English/العربية).\n\nلاستخدام معظم الميزات، تحتاج إلى اشتراك نشط. يمكنك الحصول عليه عبر الأمر /subscribe."
+msgstr ""
+"<b>مساعدة البوت والأوامر</b>\n"
+"\n"
+"قائمة الأوامر المتاحة:\n"
+"\n"
+"<b>/start</b> - عرض القائمة الرئيسية.\n"
+"<b>/help</b> - عرض رسالة المساعدة هذه.\n"
+"<b>/subscribe</b> - تصفح وشراء باقة اشتراك لاستخدام ميزات البوت.\n"
+"<b>/my_accounts</b> - عرض وإدارة حساباتك المتصلة.\n"
+"<b>/add_account</b> - بدء عملية إضافة حساب تليجرام جديد لإدارته عبر "
+"البوت.\n"
+"<b>/language</b> - تغيير لغة عرض البوت (English/العربية).\n"
+"\n"
+"لاستخدام معظم الميزات، تحتاج إلى اشتراك نشط. يمكنك الحصول عليه عبر الأمر "
+"/subscribe."
 
 #: src/user_handlers.py:133
 msgid ""
@@ -440,14 +535,24 @@ msgid ""
 "<b>/list_users</b> - List all bot users.\n"
 "<b>/view_user</b> - View details for a specific user.\n"
 "<b>/grant_subscription</b> - Manually grant a subscription."
-msgstr "\n\n<b>--- أوامر الأدمن ---</b>\n<b>/create_plan</b> - إنشاء خطة اشتراك جديدة.\n<b>/list_plans</b> - عرض كل الخطط.\n<b>/list_users</b> - عرض كل مستخدمي البوت.\n<b>/view_user</b> - عرض تفاصيل مستخدم معين.\n<b>/grant_subscription</b> - منح اشتراك يدوياً."
+msgstr ""
+"\n"
+"\n"
+"<b>--- أوامر الأدمن ---</b>\n"
+"<b>/create_plan</b> - إنشاء خطة اشتراك جديدة.\n"
+"<b>/list_plans</b> - عرض كل الخطط.\n"
+"<b>/list_users</b> - عرض كل مستخدمي البوت.\n"
+"<b>/view_user</b> - عرض تفاصيل مستخدم معين.\n"
+"<b>/grant_subscription</b> - منح اشتراك يدوياً."
 
 #: src/user_handlers.py:158
 msgid "Please select a subscription plan from the list below:"
 msgstr "الرجاء اختيار باقة اشتراك من القائمة أدناه:"
 
 #: src/user_handlers.py:161
-msgid "There are currently no subscription plans available. Please check back later."
+msgid ""
+"There are currently no subscription plans available. Please check back "
+"later."
 msgstr "لا توجد باقات اشتراك متاحة حاليًا. يرجى المراجعة لاحقًا."
 
 #: src/user_handlers.py:168
@@ -466,8 +571,14 @@ msgstr "هذه الخطة لم تعد متاحة. الرجاء اختيار وا
 
 #: src/user_handlers.py:202
 #, python-brace-format
-msgid "You have selected the '<b>{plan_name}</b>' plan.\n\nPlease choose your payment method:"
-msgstr "لقد اخترت خطة '<b>{plan_name}</b>'.\n\nالرجاء اختيار طريقة الدفع:"
+msgid ""
+"You have selected the '<b>{plan_name}</b>' plan.\n"
+"\n"
+"Please choose your payment method:"
+msgstr ""
+"لقد اخترت خطة '<b>{plan_name}</b>'.\n"
+"\n"
+"الرجاء اختيار طريقة الدفع:"
 
 #: src/user_handlers.py:204
 msgid "Pay with Stars ✨"
@@ -512,43 +623,65 @@ msgid "Pay Invoice"
 msgstr "دفع الفاتورة"
 
 #: src/user_handlers.py:274
-msgid "Sorry, we could not create a crypto invoice at this moment. Please try again later or contact support."
-msgstr "عذراً، لم نتمكن من إنشاء فاتورة عملات مشفرة في الوقت الحالي. يرجى المحاولة مرة أخرى لاحقاً أو الاتصال بالدعم."
+msgid ""
+"Sorry, we could not create a crypto invoice at this moment. Please try "
+"again later or contact support."
+msgstr ""
+"عذراً، لم نتمكن من إنشاء فاتورة عملات مشفرة في الوقت الحالي. يرجى "
+"المحاولة مرة أخرى لاحقاً أو الاتصال بالدعم."
 
 #: src/user_handlers.py:292
 #, python-brace-format
-msgid "✅ Thank you! Your '{plan_name}' subscription is now active for {days} days."
+msgid ""
+"✅ Thank you! Your '{plan_name}' subscription is now active for {days} "
+"days."
 msgstr "✅ شكرًا لك! اشتراكك في '{plan_name}' نشط الآن لمدة {days} أيام."
 
 #: src/user_handlers.py:295
 #, python-brace-format
-msgid "There was a database error activating your subscription. Please contact support with payload: `{payload}`"
-msgstr "حدث خطأ في قاعدة البيانات أثناء تفعيل اشتراكك. يرجى التواصل مع الدعم وإرسال الحمولة التالية: `{payload}`"
+msgid ""
+"There was a database error activating your subscription. Please contact "
+"support with payload: `{payload}`"
+msgstr ""
+"حدث خطأ في قاعدة البيانات أثناء تفعيل اشتراكك. يرجى التواصل مع الدعم "
+"وإرسال الحمولة التالية: `{payload}`"
 
 #: src/user_handlers.py:308
 msgid "Please choose your language:"
 msgstr "الرجاء اختيار لغتك:"
 
 #: src/user_handlers.py:350
-msgid "You need an active subscription to add accounts. Use /subscribe to get one."
+msgid ""
+"You need an active subscription to add accounts. Use /subscribe to get "
+"one."
 msgstr "تحتاج إلى اشتراك نشط لإضافة حسابات. استخدم /subscribe للحصول على واحد."
 
 #: src/user_handlers.py:355
 #, python-brace-format
-msgid "You have reached the maximum of {max_accounts} accounts for your '{plan_name}' plan."
+msgid ""
+"You have reached the maximum of {max_accounts} accounts for your "
+"'{plan_name}' plan."
 msgstr "لقد وصلت إلى الحد الأقصى وهو {max_accounts} حسابات لباقتك '{plan_name}'."
 
 #: src/user_handlers.py:359
-msgid "Please send the phone number of the account you want to add.\n<i>(Must be in international format, e.g., +1234567890)</i>"
-msgstr "الرجاء إرسال رقم هاتف الحساب الذي تريد إضافته.\n<i>(يجب أن يكون بالصيغة الدولية، مثال: +1234567890)</i>"
+msgid ""
+"Please send the phone number of the account you want to add.\n"
+"<i>(Must be in international format, e.g., +1234567890)</i>"
+msgstr ""
+"الرجاء إرسال رقم هاتف الحساب الذي تريد إضافته.\n"
+"<i>(يجب أن يكون بالصيغة الدولية، مثال: +1234567890)</i>"
 
 #: src/user_handlers.py:424
 msgid "A login code has been sent. Please send it here."
 msgstr "تم إرسال رمز تسجيل الدخول. الرجاء إرساله هنا."
 
 #: src/user_handlers.py:436
-msgid "Failed to connect to Telegram after multiple attempts. Please check proxy settings and try again later."
-msgstr "فشل الاتصال بتليجرام بعد عدة محاولات. يرجى التحقق من إعدادات البروكسي والمحاولة مرة أخرى لاحقاً."
+msgid ""
+"Failed to connect to Telegram after multiple attempts. Please check proxy"
+" settings and try again later."
+msgstr ""
+"فشل الاتصال بتليجرام بعد عدة محاولات. يرجى التحقق من إعدادات البروكسي "
+"والمحاولة مرة أخرى لاحقاً."
 
 #: src/user_handlers.py:439
 msgid "The phone number is invalid. Please try again."
@@ -563,7 +696,9 @@ msgid "Processing... Please wait."
 msgstr "قيد المعالجة... يرجى الانتظار."
 
 #: src/user_handlers.py:469
-msgid "This account has Two-Factor Authentication enabled. Please send your password."
+msgid ""
+"This account has Two-Factor Authentication enabled. Please send your "
+"password."
 msgstr "هذا الحساب لديه مصادقة ثنائية مفعلة. الرجاء إرسال كلمة المرور الخاصة بك."
 
 #: src/user_handlers.py:472
@@ -587,7 +722,9 @@ msgid "✅ Account added successfully!"
 msgstr "✅ تمت إضافة الحساب بنجاح!"
 
 #: src/user_handlers.py:512
-msgid "❌ Could not save your account to the database. It might already be registered."
+msgid ""
+"❌ Could not save your account to the database. It might already be "
+"registered."
 msgstr "❌ تعذر حفظ حسابك في قاعدة البيانات. قد يكون مسجلاً بالفعل."
 
 #: src/user_handlers.py:561 src/user_handlers.py:791
@@ -604,28 +741,50 @@ msgstr "خطأ: الحساب غير موجود أو ليس لديك إذن."
 
 #: src/user_handlers.py:631
 #, python-brace-format
-msgid "<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}"
-msgstr "<b>الحساب:</b> <code>{phone}</code>\n<b>الحالة:</b> {status}"
+msgid ""
+"<b>Account:</b> <code>{phone}</code>\n"
+"<b>Status:</b> {status}"
+msgstr ""
+"<b>الحساب:</b> <code>{phone}</code>\n"
+"<b>الحالة:</b> {status}"
 
 #: src/user_handlers.py:633
 #, python-brace-format
-msgid "\n<b>Last Group:</b> {time}"
-msgstr "\n<b>آخر مجموعة:</b> {time}"
+msgid ""
+"\n"
+"<b>Last Group:</b> {time}"
+msgstr ""
+"\n"
+"<b>آخر مجموعة:</b> {time}"
 
 #: src/user_handlers.py:634
 #, python-brace-format
-msgid "\n<b>Next Group:</b> {time}"
-msgstr "\n<b>المجموعة التالية:</b> {time}"
+msgid ""
+"\n"
+"<b>Next Group:</b> {time}"
+msgstr ""
+"\n"
+"<b>المجموعة التالية:</b> {time}"
 
 #: src/user_handlers.py:637
 #, python-brace-format
-msgid "\n<b>Last Error:</b> <pre>{error}</pre>"
-msgstr "\n<b>آخر خطأ:</b> <pre>{error}</pre>"
+msgid ""
+"\n"
+"<b>Last Error:</b> <pre>{error}</pre>"
+msgstr ""
+"\n"
+"<b>آخر خطأ:</b> <pre>{error}</pre>"
 
 #: src/user_handlers.py:639
 #, python-brace-format
-msgid "\n\n📊 <b>Total Groups Created:</b> {count}"
-msgstr "\n\n📊 <b>إجمالي المجموعات المنشأة:</b> {count}"
+msgid ""
+"\n"
+"\n"
+"📊 <b>Total Groups Created:</b> {count}"
+msgstr ""
+"\n"
+"\n"
+"📊 <b>إجمالي المجموعات المنشأة:</b> {count}"
 
 #: src/user_handlers.py:643
 msgid "Toggle On"
@@ -673,8 +832,12 @@ msgstr "🔙 رجوع إلى الحساب"
 
 #: src/user_handlers.py:720
 #, python-brace-format
-msgid "<b>Groups for Account (Page {page_num}/{total_pages}):</b>\n\n"
-msgstr "<b>مجموعات الحساب (صفحة {page_num}/{total_pages}):</b>\n\n"
+msgid ""
+"<b>Groups for Account (Page {page_num}/{total_pages}):</b>\n"
+"\n"
+msgstr ""
+"<b>قائمة المجموعات (صفحة {page_num}/{total_pages}):</b>\n"
+"\n"
 
 #: src/user_handlers.py:728
 msgid "⬅️ Previous"
@@ -685,13 +848,23 @@ msgid "Next ➡️"
 msgstr "التالي ➡️"
 
 #: src/user_handlers.py:739
-msgid "An error occurred while fetching groups. The session might be invalid or revoked."
+msgid ""
+"An error occurred while fetching groups. The session might be invalid or "
+"revoked."
 msgstr "حدث خطأ أثناء جلب المجموعات. قد تكون الجلسة غير صالحة أو تم إلغاؤها."
 
 #: src/user_handlers.py:747
 #, python-brace-format
-msgid "<b>Group Stats:</b>\n\n<b>Name:</b> {name}\n<b>Created:</b> {date}"
-msgstr "<b>إحصائيات المجموعة:</b>\n\n<b>الاسم:</b> {name}\n<b>تاريخ الإنشاء:</b> {date}"
+msgid ""
+"<b>Group Stats:</b>\n"
+"\n"
+"<b>Name:</b> {name}\n"
+"<b>Created:</b> {date}"
+msgstr ""
+"<b>إحصائيات المجموعة:</b>\n"
+"\n"
+"<b>الاسم:</b> {name}\n"
+"<b>تاريخ الإنشاء:</b> {date}"
 
 #: src/user_handlers.py:753
 msgid "Could not retrieve group stats."
@@ -723,7 +896,9 @@ msgid "No, cancel"
 msgstr "لا، إلغاء"
 
 #: src/user_handlers.py:780
-msgid "Are you sure you want to delete this account? This action cannot be undone."
+msgid ""
+"Are you sure you want to delete this account? This action cannot be "
+"undone."
 msgstr "هل أنت متأكد من أنك تريد حذف هذا الحساب؟ لا يمكن التراجع عن هذا الإجراء."
 
 #: src/user_handlers.py:787
