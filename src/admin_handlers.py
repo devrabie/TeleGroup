@@ -340,13 +340,15 @@ async def plans_list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         text = _("<b>Existing Subscription Plans:</b>\n\n")
         for plan in plans:
             status = _("Active") if plan['is_active'] else _("Inactive")
+            price_usd_text = f", <b>Price (USD):</b> ${plan['price_usd']:.2f}" if plan.get('price_usd') else ""
             text += (
                 _("<b>ID:</b> <code>{id}</code>, <b>Name:</b> {name}\n"
-                  "<b>Price:</b> {price} Stars, <b>Duration:</b> {days} days\n"
+                  "<b>Price (Stars):</b> {price}{price_usd}, <b>Duration:</b> {days} days\n"
                   "<b>Accounts:</b> {accounts}, <b>Limit:</b> {limit} groups/day\n"
                   "<b>Status:</b> {status}\n"
                   "--------------------\n").format(
                     id=plan['id'], name=plan['name'], price=plan['price_stars'],
+                    price_usd=price_usd_text,
                     days=plan['duration_days'], accounts=plan['max_accounts'],
                     limit=plan['daily_group_limit'], status=status
                 )
@@ -359,7 +361,7 @@ async def plans_list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # --- Create Plan Conversation Handlers ---
 
-(PLAN_NAME, PLAN_PRICE, PLAN_DURATION, PLAN_ACCOUNTS, PLAN_LIMIT, PLAN_CONFIRM) = range(10, 16)
+(PLAN_NAME, PLAN_PRICE, PLAN_PRICE_USD, PLAN_DURATION, PLAN_ACCOUNTS, PLAN_LIMIT, PLAN_CONFIRM) = range(10, 17)
 
 
 async def plan_create_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -386,16 +388,29 @@ async def plan_create_receive_name(update: Update, context: ContextTypes.DEFAULT
 
 
 async def plan_create_receive_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receives the price and asks for the duration."""
+    """Receives the price and asks for the price in USD."""
     _ = get_translation_func_for_user(update.effective_user.id)
     try:
         price = int(update.message.text)
         context.user_data['new_plan']['price'] = price
-        await update.message.reply_text(_("Perfect. How many days will the subscription last? (e.g., 30)"))
-        return PLAN_DURATION
+        await update.message.reply_text(_("Next, what is the price in USD for crypto payments? (e.g., 5.99)"))
+        return PLAN_PRICE_USD
     except ValueError:
         await update.message.reply_text(_("That's not a valid number. Please enter the price in Stars again."))
         return PLAN_PRICE
+
+
+async def plan_create_receive_price_usd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the USD price and asks for the duration."""
+    _ = get_translation_func_for_user(update.effective_user.id)
+    try:
+        price_usd = float(update.message.text)
+        context.user_data['new_plan']['price_usd'] = price_usd
+        await update.message.reply_text(_("Perfect. How many days will the subscription last? (e.g., 30)"))
+        return PLAN_DURATION
+    except ValueError:
+        await update.message.reply_text(_("That's not a valid number. Please enter the price in USD again."))
+        return PLAN_PRICE_USD
 
 
 async def plan_create_receive_duration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -435,13 +450,15 @@ async def plan_create_receive_limit(update: Update, context: ContextTypes.DEFAUL
         text = _(
             "<b>Please confirm the new plan details:</b>\n\n"
             "<b>Name:</b> {name}\n"
-            "<b>Price:</b> {price} Stars\n"
+            "<b>Price (Stars):</b> {price}\n"
+            "<b>Price (USD):</b> {price_usd:.2f}\n"
             "<b>Duration:</b> {duration} days\n"
             "<b>Max Accounts:</b> {accounts}\n"
             "<b>Daily Limit:</b> {limit} groups/day"
         ).format(
             name=plan_data['name'],
             price=plan_data['price'],
+            price_usd=plan_data['price_usd'],
             duration=plan_data['duration'],
             accounts=plan_data['accounts'],
             limit=plan_data['limit']
@@ -471,6 +488,7 @@ async def plan_create_save(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     success = add_plan(
         name=plan_data['name'],
         price_stars=plan_data['price'],
+        price_usd=plan_data['price_usd'],
         duration_days=plan_data['duration'],
         max_accounts=plan_data['accounts'],
         daily_group_limit=plan_data['limit']
@@ -506,6 +524,7 @@ create_plan_conv_handler = ConversationHandler(
     states={
         PLAN_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, plan_create_receive_name)],
         PLAN_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, plan_create_receive_price)],
+        PLAN_PRICE_USD: [MessageHandler(filters.TEXT & ~filters.COMMAND, plan_create_receive_price_usd)],
         PLAN_DURATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, plan_create_receive_duration)],
         PLAN_ACCOUNTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, plan_create_receive_accounts)],
         PLAN_LIMIT: [MessageHandler(filters.TEXT & ~filters.COMMAND, plan_create_receive_limit)],

@@ -18,6 +18,18 @@ if not all([API_ID, API_HASH]):
 # This is now optional. It's only required for non-Star payments.
 PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN")
 
+# --- Crypto Pay API Configuration ---
+CRYPTO_PAY_API_TOKEN = os.getenv("CRYPTO_PAY_API_TOKEN")
+
+# --- Webhook Configuration (Optional) ---
+# Required for receiving Crypto Pay updates.
+WEBHOOK_ENABLED = os.getenv("WEBHOOK_ENABLED", "false").lower() in ('true', '1', 't')
+WEBHOOK_URL = os.getenv("WEBHOOK_URL") # e.g., https://your-domain.com
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET") # A random secret string
+WEBHOOK_LISTEN_ADDRESS = os.getenv("WEBHOOK_LISTEN_ADDRESS", "0.0.0.0")
+WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8443"))
+
+
 # --- Bot Administration ---
 # The Telegram user ID of the bot administrator.
 # Can be a comma-separated list of IDs for multiple admins.

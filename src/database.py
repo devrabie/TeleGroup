@@ -28,6 +28,7 @@ TABLE_DEFINITIONS = {
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
             price_stars INTEGER NOT NULL,
+            price_usd REAL NOT NULL,
             duration_days INTEGER NOT NULL DEFAULT 30,
             max_accounts INTEGER NOT NULL,
             daily_group_limit INTEGER NOT NULL,
@@ -116,6 +117,13 @@ def initialize_database():
             if 'last_error' not in columns:
                 log.info("Running migration: Adding 'last_error' column to 'managed_accounts' table.")
                 cursor.execute("ALTER TABLE managed_accounts ADD COLUMN last_error TEXT")
+
+            cursor.execute("PRAGMA table_info(plans)")
+            plan_columns = [info[1] for info in cursor.fetchall()]
+            if 'price_usd' not in plan_columns:
+                log.info("Running migration: Adding 'price_usd' column to 'plans' table.")
+                # Setting a default of 0 for existing plans. Admins should update them.
+                cursor.execute("ALTER TABLE plans ADD COLUMN price_usd REAL NOT NULL DEFAULT 0")
             # --- End Migrations ---
 
             conn.commit()
@@ -135,16 +143,16 @@ def get_db_connection():
 
 # --- Plan Management Functions ---
 
-def add_plan(name: str, price_stars: int, duration_days: int, max_accounts: int, daily_group_limit: int):
+def add_plan(name: str, price_stars: int, price_usd: float, duration_days: int, max_accounts: int, daily_group_limit: int):
     """Adds a new subscription plan to the database."""
     sql = """
-        INSERT INTO plans (name, price_stars, duration_days, max_accounts, daily_group_limit)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO plans (name, price_stars, price_usd, duration_days, max_accounts, daily_group_limit)
+        VALUES (?, ?, ?, ?, ?, ?)
     """
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (name, price_stars, duration_days, max_accounts, daily_group_limit))
+            cursor.execute(sql, (name, price_stars, price_usd, duration_days, max_accounts, daily_group_limit))
             conn.commit()
         log.info(f"Successfully added new plan: {name}")
         return True

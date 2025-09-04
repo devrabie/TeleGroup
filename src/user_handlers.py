@@ -161,10 +161,18 @@ async def subscribe_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = _("There are currently no subscription plans available. Please check back later.")
         buttons = []
     else:
-        buttons = [[InlineKeyboardButton(
-            _("{plan_name} - {price} Stars").format(plan_name=p['name'], price=p['price_stars']),
-            callback_data=f"select_plan_{p['id']}"
-        )] for p in plans]
+        buttons = []
+        for p in plans:
+            # Show both prices if USD price is set
+            if p.get('price_usd') and p['price_usd'] > 0:
+                button_text = _("{plan_name} - {price} Stars / ${price_usd:.2f}").format(
+                    plan_name=p['name'], price=p['price_stars'], price_usd=p['price_usd']
+                )
+            else:
+                button_text = _("{plan_name} - {price} Stars").format(
+                    plan_name=p['name'], price=p['price_stars']
+                )
+            buttons.append([InlineKeyboardButton(button_text, callback_data=f"select_plan_{p['id']}")])
 
     buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
     reply_markup = InlineKeyboardMarkup(buttons)
@@ -176,7 +184,37 @@ async def subscribe_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
-async def select_plan_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+from src.cryptopay import cryptopay_client
+
+async def select_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Shows payment method options after a plan is selected."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+    plan_id = int(query.data.split("_")[2])
+    plan = get_plan_by_id(plan_id)
+
+    if not plan:
+        await query.edit_message_text(_("This plan is no longer available. Please choose another one."))
+        return
+
+    text = _("You have selected the '<b>{plan_name}</b>' plan.\n\nPlease choose your payment method:").format(plan_name=plan['name'])
+    buttons = [
+        [InlineKeyboardButton(_("Pay with Stars ✨"), callback_data=f"pay_stars_{plan_id}")]
+    ]
+    # Only show the crypto button if the price is set
+    if plan.get('price_usd') and plan['price_usd'] > 0:
+        buttons.append([InlineKeyboardButton(_("Pay with Crypto 💳"), callback_data=f"pay_crypto_{plan_id}")])
+
+    buttons.append([InlineKeyboardButton(_("🔙 Back to Plans"), callback_data='main_subscribe')])
+
+    reply_markup = InlineKeyboardMarkup(buttons)
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+
+async def pay_with_stars_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles the 'Pay with Stars' button, creating a Telegram Stars invoice."""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -189,10 +227,54 @@ async def select_plan_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     )
     payload = f"plan_{plan_id}_user_{user_id}"
     price = LabeledPrice(_("Subscription"), plan['price_stars'])
+
+    # Note: provider_token for Stars is an empty string
     await context.bot.send_invoice(
         chat_id=user_id, title=title, description=description, payload=payload,
         provider_token="", currency="XTR", prices=[price]
     )
+
+
+async def pay_with_crypto_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles the 'Pay with Crypto' button, creating a Crypto Pay invoice."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+    plan_id = int(query.data.split("_")[2])
+    plan = get_plan_by_id(plan_id)
+
+    if not cryptopay_client:
+        await query.edit_message_text(_("Crypto payments are not configured by the admin yet."))
+        return
+
+    # Create a unique payload for the invoice so we can identify the user and plan later
+    invoice_payload = f"plan_{plan_id}_user_{user_id}"
+
+    await query.edit_message_text(_("Creating your crypto invoice, please wait..."))
+
+    # The documentation specifies these parameters
+    invoice = await cryptopay_client.create_invoice(
+        amount=plan['price_usd'],
+        payload=invoice_payload,
+        paid_btn_name="callback",
+        paid_btn_url=f"https://t.me/{context.bot.username}?start=start"
+    )
+
+    if invoice and invoice.get('bot_invoice_url'):
+        text = _("Your invoice has been created. Please use the button below to pay.")
+        buttons = [
+            [InlineKeyboardButton(_("Pay Invoice"), url=invoice['bot_invoice_url'])],
+            [InlineKeyboardButton(_("🔙 Back"), callback_data=f"select_plan_{plan_id}")]
+        ]
+        reply_markup = InlineKeyboardMarkup(buttons)
+        await query.edit_message_text(text, reply_markup=reply_markup)
+    else:
+        log.error(f"Failed to create Crypto Pay invoice for user {user_id}, plan {plan_id}. Response: {invoice}")
+        text = _("Sorry, we could not create a crypto invoice at this moment. Please try again later or contact support.")
+        buttons = [[InlineKeyboardButton(_("🔙 Back"), callback_data=f"select_plan_{plan_id}")]]
+        reply_markup = InlineKeyboardMarkup(buttons)
+        await query.edit_message_text(text, reply_markup=reply_markup)
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
@@ -733,7 +815,9 @@ user_handlers_list = [
     CommandHandler("start", start_handler),
     CommandHandler("help", help_handler),
     CommandHandler("subscribe", subscribe_handler),
-    CallbackQueryHandler(select_plan_callback, pattern="^select_plan_"),
+    CallbackQueryHandler(select_plan_handler, pattern="^select_plan_"),
+    CallbackQueryHandler(pay_with_stars_callback, pattern="^pay_stars_"),
+    CallbackQueryHandler(pay_with_crypto_callback, pattern="^pay_crypto_"),
     PreCheckoutQueryHandler(precheckout_callback),
     MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback),
     CommandHandler("language", language_handler),
