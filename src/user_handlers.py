@@ -31,7 +31,7 @@ from src.database import (
 )
 from src.translation import get_translation_func_for_user
 from pyrogram.enums import ChatType, ChatMemberStatus
-from pyrogram.raw.functions.channels import GetLeftChannels, TogglePreHistoryHidden
+from pyrogram.raw.functions.channels import TogglePreHistoryHidden
 
 log = logging.getLogger(__name__)
 
@@ -648,7 +648,6 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
             InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc['id']}"),
         ],
         [
-            InlineKeyboardButton(_("عرض القنوات المغادرة"), callback_data=f"mng_leftchannels_{acc['id']}"),
             InlineKeyboardButton(_("تقرير المجموعات"), callback_data=f"mng_groupreport_{acc['id']}"),
         ],
         [InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")]
@@ -741,40 +740,6 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             except Exception as e:
                 log.error(f"Error fetching groups for user {user_id}, account {account_id}: {e}")
                 await query.edit_message_text(_("An error occurred while fetching groups. The session might be invalid or revoked."))
-                if client.is_connected:
-                    await client.disconnect()
-        elif action == "leftchannels":
-            account_id = int(action_parts[2])
-            log.info(f"User {user_id} requested to view left channels for account {account_id}.")
-
-            await query.edit_message_text(_("Fetching left channels... Please wait."))
-
-            session_string = get_account_session_string(account_id)
-            if not session_string:
-                await query.edit_message_text(_("Error: Could not retrieve session for this account."))
-                return
-
-            client = Client(f"user_session_reader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
-
-            try:
-                await client.connect()
-                left_chats_raw = await client.invoke(GetLeftChannels(offset=0))
-                await client.disconnect()
-
-                chats = left_chats_raw.chats
-                if not chats:
-                    text = _("This account has not recently left any channels or groups.")
-                else:
-                    text = _("<b>Recently Left Channels/Groups:</b>\n\n")
-                    chat_titles = [f"• <code>{chat.title}</code>" for chat in chats]
-                    text += "\n".join(chat_titles)
-
-                buttons = [[InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")]]
-                await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode=ParseMode.HTML)
-
-            except Exception as e:
-                log.error(f"Error fetching left channels for user {user_id}, account {account_id}: {e}", exc_info=True)
-                await query.edit_message_text(_("An error occurred while fetching data. The session might be invalid or revoked."))
                 if client.is_connected:
                     await client.disconnect()
         elif action == "groupreport":
