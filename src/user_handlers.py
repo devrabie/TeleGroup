@@ -30,8 +30,8 @@ from src.database import (
     update_user_details, mark_proxy_as_bad, get_account_details
 )
 from src.translation import get_translation_func_for_user
-from pyrogram import Client
-from pyrogram.enums import ChatType
+from pyrogram.enums import ChatType, ChatMemberStatus
+from pyrogram.raw.functions.channels import GetLeftChannels, TogglePreHistoryHidden
 
 log = logging.getLogger(__name__)
 
@@ -647,6 +647,10 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
             InlineKeyboardButton(_("📂 View Groups"), callback_data=f"mng_viewgroups_{acc['id']}"),
             InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc['id']}"),
         ],
+        [
+            InlineKeyboardButton(_("عرض القنوات المغادرة"), callback_data=f"mng_leftchannels_{acc['id']}"),
+            InlineKeyboardButton(_("تقرير المجموعات"), callback_data=f"mng_groupreport_{acc['id']}"),
+        ],
         [InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")]
     ]
     reply_markup = InlineKeyboardMarkup(buttons)
@@ -739,6 +743,140 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                 await query.edit_message_text(_("An error occurred while fetching groups. The session might be invalid or revoked."))
                 if client.is_connected:
                     await client.disconnect()
+        elif action == "leftchannels":
+            account_id = int(action_parts[2])
+            log.info(f"User {user_id} requested to view left channels for account {account_id}.")
+
+            await query.edit_message_text(_("Fetching left channels... Please wait."))
+
+            session_string = get_account_session_string(account_id)
+            if not session_string:
+                await query.edit_message_text(_("Error: Could not retrieve session for this account."))
+                return
+
+            client = Client(f"user_session_reader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+
+            try:
+                await client.connect()
+                left_chats_raw = await client.invoke(GetLeftChannels(offset=0))
+                await client.disconnect()
+
+                chats = left_chats_raw.chats
+                if not chats:
+                    text = _("This account has not recently left any channels or groups.")
+                else:
+                    text = _("<b>Recently Left Channels/Groups:</b>\n\n")
+                    chat_titles = [f"• <code>{chat.title}</code>" for chat in chats]
+                    text += "\n".join(chat_titles)
+
+                buttons = [[InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")]]
+                await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode=ParseMode.HTML)
+
+            except Exception as e:
+                log.error(f"Error fetching left channels for user {user_id}, account {account_id}: {e}", exc_info=True)
+                await query.edit_message_text(_("An error occurred while fetching data. The session might be invalid or revoked."))
+                if client.is_connected:
+                    await client.disconnect()
+        elif action == "groupreport":
+            account_id = int(action_parts[2])
+            log.info(f"User {user_id} requested group report for account {account_id}.")
+
+            await query.edit_message_text(_("Generating group report... This may take a moment."))
+
+            session_string = get_account_session_string(account_id)
+            if not session_string:
+                await query.edit_message_text(_("Error: Could not retrieve session for this account."))
+                return
+
+            client = Client(f"user_session_reporter_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+
+            try:
+                await client.connect()
+
+                owned_groups = 0
+                normal_groups_count = 0
+                supergroups_count = 0
+                upgradable_groups = []
+
+                async for dialog in client.get_dialogs():
+                    if dialog.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+                        continue
+
+                    try:
+                        # We need to check membership to see if the user is the owner
+                        member = await client.get_chat_member(dialog.chat.id, "me")
+                        if member.status == ChatMemberStatus.OWNER:
+                            owned_groups += 1
+                            if dialog.chat.type == ChatType.GROUP:
+                                normal_groups_count += 1
+                                upgradable_groups.append(dialog.chat)
+                            else:
+                                supergroups_count += 1
+                    except Exception as e:
+                        log.warning(f"Could not get member status for chat {dialog.chat.id} ({dialog.chat.title}): {e}")
+                        continue
+
+                await client.disconnect()
+
+                text = _("<b>Group Ownership Report</b>\n\n")
+                text += _("<b>Total Owned Groups:</b> {count}\n").format(count=owned_groups)
+                text += _("- Normal Groups: {count}\n").format(count=normal_groups_count)
+                text += _("- Supergroups: {count}\n\n").format(count=supergroups_count)
+
+                buttons = []
+                if upgradable_groups:
+                    text += _("You can upgrade your normal groups to supergroups below:")
+                    for chat in upgradable_groups:
+                        btn_text = _("Upgrade '{title}'").format(title=chat.title)
+                        callback_data = f"mng_upgradegroup_{account_id}_{chat.id}"
+                        buttons.append([InlineKeyboardButton(btn_text, callback_data=callback_data)])
+
+                buttons.append([InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")])
+
+                await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode=ParseMode.HTML)
+
+            except Exception as e:
+                log.error(f"Error generating group report for user {user_id}, account {account_id}: {e}", exc_info=True)
+                await query.edit_message_text(_("An error occurred while generating the report. The session might be invalid or revoked."))
+                if client.is_connected:
+                    await client.disconnect()
+        elif action == "upgradegroup":
+            account_id = int(action_parts[2])
+            chat_id = int(action_parts[3])
+            log.info(f"User {user_id} requested to upgrade group {chat_id} for account {account_id}.")
+
+            await query.edit_message_text(_("Attempting to upgrade group..."))
+
+            session_string = get_account_session_string(account_id)
+            if not session_string:
+                await query.edit_message_text(_("Error: Could not retrieve session for this account."))
+                return
+
+            client = Client(f"user_session_upgrader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+
+            try:
+                await client.connect()
+
+                # To use raw functions, we often need the InputPeer
+                peer = await client.resolve_peer(chat_id)
+
+                # Toggling history visibility in a basic group upgrades it to a supergroup
+                await client.invoke(TogglePreHistoryHidden(channel=peer, enabled=False))
+
+                await client.disconnect()
+
+                text = _("✅ Group has been successfully upgraded to a Supergroup!")
+                await context.bot.answer_callback_query(query.id, _("Success!"), show_alert=False)
+
+            except Exception as e:
+                log.error(f"Error upgrading group {chat_id} for user {user_id}, account {account_id}: {e}", exc_info=True)
+                text = _("❌ An error occurred while upgrading the group: {error}").format(error=str(e))
+                if client.is_connected:
+                    await client.disconnect()
+
+            # Button to go back to the report
+            buttons = [[InlineKeyboardButton(_("🔙 Back to Group Report"), callback_data=f"mng_groupreport_{account_id}")]]
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode=ParseMode.HTML)
         elif action == "groupstats":
             group_log_id = int(action_parts[2])
             log.info(f"User {user_id} requested stats for group log ID {group_log_id}.")
