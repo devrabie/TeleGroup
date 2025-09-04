@@ -445,3 +445,36 @@ msgstr "Could not change language."
 #: src/user_handlers.py:442
 msgid "Language changed successfully."
 msgstr "Language changed successfully."
+
+msgid "plan_update_error_no_fields"
+msgstr "No fields provided to update."
+
+msgid "plan_update_error_invalid_field"
+msgstr "Invalid field: {value}"
+
+msgid "plan_update_error_no_valid_fields"
+msgstr "No valid fields provided to update."
+
+msgid "plan_update_success"
+msgstr "Plan updated successfully."
+
+msgid "plan_update_error_duplicate_name"
+msgstr "A plan with this name already exists."
+
+msgid "db_error"
+msgstr "A database error occurred."
+
+msgid "user_not_found"
+msgstr "User not found."
+
+msgid "grant_subscription_success"
+msgstr "Subscription granted successfully."
+
+msgid "no_available_proxies"
+msgstr "No available proxies."
+
+msgid "proxy_update_success"
+msgstr "Proxy updated."
+
+msgid "Status toggled successfully."
+msgstr "Status toggled successfully."

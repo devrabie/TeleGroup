@@ -219,7 +219,7 @@ async def edit_field_receive_value(update: Update, context: ContextTypes.DEFAULT
         return GET_NEW_VALUE # Ask again
 
     # --- Update Database ---
-    success, msg = update_plan(plan_id, **{field_to_edit: processed_value})
+    success, msg_key = update_plan(plan_id, **{field_to_edit: processed_value})
 
     # --- Clean up messages ---
     try:
@@ -234,7 +234,12 @@ async def edit_field_receive_value(update: Update, context: ContextTypes.DEFAULT
     if not success:
         # If the update failed, we still need to tell the user.
         # The original menu will be shown again by the call below.
-        await context.bot.send_message(chat_id, f"❌ {msg}")
+        if ":" in msg_key:
+            key, value = msg_key.split(":", 1)
+            error_message = _(key).format(value=value)
+        else:
+            error_message = _(msg_key)
+        await context.bot.send_message(chat_id, f"❌ {error_message}")
 
     # --- Clean up context and show the updated menu ---
     context.user_data.pop('edit_field', None)
@@ -263,12 +268,12 @@ async def edit_field_toggle_active(update: Update, context: ContextTypes.DEFAULT
         return
 
     new_status = not plan['is_active']
-    success, msg = update_plan(plan_id, is_active=new_status)
+    success, msg_key = update_plan(plan_id, is_active=new_status)
 
     if success:
         await context.bot.answer_callback_query(query.id, _("Status toggled successfully."))
     else:
-        await context.bot.answer_callback_query(query.id, f"❌ {msg}", show_alert=True)
+        await context.bot.answer_callback_query(query.id, f"❌ {_(msg_key)}", show_alert=True)
 
     await edit_plan_menu_handler(update, context)
 
@@ -505,12 +510,12 @@ async def grant_sub_receive_duration(update: Update, context: ContextTypes.DEFAU
         user_id = context.user_data['grant_sub_user_id']
         plan_id = context.user_data['grant_sub_plan_id']
 
-        success, msg = grant_subscription(user_id, plan_id, duration)
+        success, msg_key = grant_subscription(user_id, plan_id, duration)
 
         if success:
-            await update.message.reply_text(f"✅ {msg}")
+            await update.message.reply_text(f"✅ {_(msg_key)}")
         else:
-            await update.message.reply_text(f"❌ {msg}")
+            await update.message.reply_text(f"❌ {_(msg_key)}")
 
     except (ValueError, KeyError):
         await update.message.reply_text(_("An error occurred. Please try again."))

@@ -211,7 +211,7 @@ def update_plan(plan_id: int, **kwargs):
     """
     if not kwargs:
         log.warning("update_plan called with no fields to update.")
-        return False, "No fields provided to update."
+        return False, "plan_update_error_no_fields"
 
     allowed_fields = [
         "name", "price_stars", "price_usd", "duration_days",
@@ -227,10 +227,10 @@ def update_plan(plan_id: int, **kwargs):
             values.append(value)
         else:
             log.warning(f"Attempted to update an invalid plan field: {key}")
-            return False, f"Invalid field: {key}"
+            return False, f"plan_update_error_invalid_field:{key}"
 
     if not updates:
-        return False, "No valid fields provided to update."
+        return False, "plan_update_error_no_valid_fields"
 
     sql = f"UPDATE plans SET {', '.join(updates)} WHERE id = ?"
     values.append(plan_id)
@@ -241,13 +241,13 @@ def update_plan(plan_id: int, **kwargs):
             cursor.execute(sql, tuple(values))
             conn.commit()
         log.info(f"Successfully updated plan {plan_id} with data: {kwargs}")
-        return True, "Plan updated successfully."
+        return True, "plan_update_success"
     except sqlite3.IntegrityError as e:
         log.error(f"Failed to update plan {plan_id} due to integrity error (e.g., duplicate name): {e}")
-        return False, "A plan with this name already exists."
+        return False, "plan_update_error_duplicate_name"
     except sqlite3.Error as e:
         log.error(f"Failed to update plan {plan_id}: {e}")
-        return False, "A database error occurred."
+        return False, "db_error"
 
 
 # --- User Management Functions ---
@@ -287,7 +287,7 @@ def grant_subscription(telegram_id: int, plan_id: int, duration_days: int):
             if not user_row:
                 log.warning(f"No user found with telegram_id {telegram_id} to grant subscription.")
                 conn.rollback()
-                return False, "User not found."
+                return False, "user_not_found"
             user_id = user_row['id']
 
             cursor.execute(deactivate_sql, (user_id,))
@@ -295,11 +295,11 @@ def grant_subscription(telegram_id: int, plan_id: int, duration_days: int):
             conn.commit()
 
         log.info(f"Successfully granted plan {plan_id} to user {telegram_id} for {duration_days} days.")
-        return True, "Subscription granted successfully."
+        return True, "grant_subscription_success"
     except sqlite3.Error as e:
         log.error(f"Failed to grant subscription to user {telegram_id}: {e}")
         conn.rollback()
-        return False, "Database error."
+        return False, "db_error"
 
 def batch_insert_proxies(proxies: list[str]):
     """
@@ -437,7 +437,7 @@ def reassign_proxy(account_id: int, telegram_user_id: int):
     """Assigns a new random proxy to a managed account."""
     new_proxy_id = get_random_proxy_id()
     if new_proxy_id is None:
-        return False, "No available proxies."
+        return False, "no_available_proxies"
 
     sql = """
         UPDATE managed_accounts
@@ -449,10 +449,10 @@ def reassign_proxy(account_id: int, telegram_user_id: int):
             cursor = conn.cursor()
             cursor.execute(sql, (new_proxy_id, account_id, telegram_user_id))
             conn.commit()
-            return cursor.rowcount > 0, "Proxy updated."
+            return cursor.rowcount > 0, "proxy_update_success"
     except sqlite3.Error as e:
         log.error(f"Failed to reassign proxy for account {account_id}: {e}")
-        return False, "Database error."
+        return False, "db_error"
 
 def get_account_session_string(account_id: int):
     """Retrieves the session string for a specific managed account."""

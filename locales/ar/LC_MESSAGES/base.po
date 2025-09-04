@@ -83,10 +83,10 @@ msgid ""
 msgstr ""
 "<b>المعرف:</b> <code>{id}</code>\n"
 "<b>الاسم:</b> {name}\n"
-"<b>السعر:</b> {price} نجمة\n"
-"<b>المدة:</b> {days} يومًا\n"
+"<b>السعر:</b> {price} نجوم\n"
+"<b>المدة:</b> {days} أيام\n"
 "<b>الحسابات:</b> {accounts}\n"
-"<b>الحد اليومي:</b> {limit} مجموعة/يوم\n"
+"<b>الحد اليومي:</b> {limit} مجموعات/يوم\n"
 "<b>الحالة:</b> {status}\n"
 "--------------------\n"
 
@@ -276,7 +276,7 @@ msgstr "لا توجد باقات اشتراك متاحة حاليًا. يرجى 
 #: src/user_handlers.py:29
 #, python-brace-format
 msgid "{plan_name} - {price} Stars"
-msgstr "{plan_name} - {price} نجمة"
+msgstr "{plan_name} - {price} نجوم"
 
 #: src/user_handlers.py:34
 msgid "No active plans to display."
@@ -332,7 +332,7 @@ msgstr "اشتراك: {plan_name}"
 #: src/user_handlers.py:78
 #, python-brace-format
 msgid "Access to {accounts} accounts and {limit} groups/day."
-msgstr "وصول إلى {accounts} حساب و {limit} مجموعة/يوم."
+msgstr "وصول إلى {accounts} حسابات و {limit} مجموعات/يوم."
 
 #: src/user_handlers.py:82
 msgid "Subscription"
@@ -355,7 +355,7 @@ msgstr "حدثت مشكلة في العثور على الباقة التي اخ�
 msgid ""
 "✅ Thank you! Your '{plan_name}' subscription is now active for {days} "
 "days."
-msgstr "✅ شكرًا لك! اشتراكك في '{plan_name}' نشط الآن لمدة {days} يومًا."
+msgstr "✅ شكرًا لك! اشتراكك في '{plan_name}' نشط الآن لمدة {days} أيام."
 
 #: src/user_handlers.py:141
 #, python-brace-format
@@ -381,7 +381,7 @@ msgstr "تعذر العثور على باقة اشتراكك. يرجى التو�
 msgid ""
 "You have reached the maximum of {max_accounts} accounts for your "
 "'{plan_name}' plan."
-msgstr "لقد وصلت إلى الحد الأقصى وهو {max_accounts} حسابًا لباقتك '{plan_name}'."
+msgstr "لقد وصلت إلى الحد الأقصى وهو {max_accounts} حسابات لباقتك '{plan_name}'."
 
 #: src/user_handlers.py:186
 msgid ""
@@ -552,3 +552,36 @@ msgstr "تعذر تغيير اللغة."
 #: src/user_handlers.py:442
 msgid "Language changed successfully."
 msgstr "تم تغيير اللغة بنجاح."
+
+msgid "plan_update_error_no_fields"
+msgstr "لم يتم توفير أي حقول للتحديث."
+
+msgid "plan_update_error_invalid_field"
+msgstr "حقل غير صالح: {value}"
+
+msgid "plan_update_error_no_valid_fields"
+msgstr "لم يتم توفير أي حقول صالحة للتحديث."
+
+msgid "plan_update_success"
+msgstr "تم تحديث الخطة بنجاح."
+
+msgid "plan_update_error_duplicate_name"
+msgstr "توجد خطة بهذا الاسم بالفعل."
+
+msgid "db_error"
+msgstr "حدث خطأ في قاعدة البيانات."
+
+msgid "user_not_found"
+msgstr "لم يتم العثور على المستخدم."
+
+msgid "grant_subscription_success"
+msgstr "تم منح الاشتراك بنجاح."
+
+msgid "no_available_proxies"
+msgstr "لا توجد وكلاء متاحة."
+
+msgid "proxy_update_success"
+msgstr "تم تحديث الوكيل."
+
+msgid "Status toggled successfully."
+msgstr "تم تغيير الحالة بنجاح."
