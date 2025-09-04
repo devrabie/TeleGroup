@@ -902,6 +902,11 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                     )
                 )
 
+                # Invalidate the cache for this account so the next report is fresh
+                cache_key = f"group_report_cache_{account_id}"
+                if context.bot_data.pop(cache_key, None):
+                    log.info(f"Invalidated group report cache for account {account_id}.")
+
                 await client.disconnect()
 
                 text = _("✅ Group has been successfully upgraded to a Supergroup!")
