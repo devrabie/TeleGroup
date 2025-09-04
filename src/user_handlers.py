@@ -599,6 +599,29 @@ async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     else:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
+def _format_group_report(owned_groups, normal_groups_count, supergroups_count, upgradable_groups, account_id, _):
+    """Formats the group report text and buttons from provided data."""
+    text = _("<b>Group Ownership Report</b>\n\n")
+    text += _("<b>Total Owned Groups:</b> {count}\n").format(count=owned_groups)
+    text += _("- Normal Groups: {count}\n").format(count=normal_groups_count)
+    text += _("- Supergroups: {count}\n\n").format(count=supergroups_count)
+
+    buttons = []
+    if upgradable_groups:
+        text += _("You can upgrade your normal groups to supergroups below:")
+        for chat in upgradable_groups:
+            # The cached object might be a dict, so we access items with []
+            chat_id = chat['id'] if isinstance(chat, dict) else chat.id
+            chat_title = chat['title'] if isinstance(chat, dict) else chat.title
+
+            btn_text = _("Upgrade '{title}'").format(title=chat_title)
+            callback_data = f"mng_upgradegroup_{account_id}_{chat_id}"
+            buttons.append([InlineKeyboardButton(btn_text, callback_data=callback_data)])
+
+    buttons.append([InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")])
+    return text, InlineKeyboardMarkup(buttons)
+
+
 async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id: int, message_id: int):
     """Displays the management menu for a single account."""
     user_id = update.effective_user.id
@@ -699,26 +722,28 @@ async def async_generate_group_report(update: Update, context: ContextTypes.DEFA
 
         await client.disconnect()
 
-        text = _("<b>Group Ownership Report</b>\n\n")
-        text += _("<b>Total Owned Groups:</b> {count}\n").format(count=owned_groups)
-        text += _("- Normal Groups: {count}\n").format(count=normal_groups_count)
-        text += _("- Supergroups: {count}\n\n").format(count=supergroups_count)
+        # Convert chat objects to simple dicts for safer caching
+        upgradable_groups_data = [{'id': chat.id, 'title': chat.title} for chat in upgradable_groups]
 
-        buttons = []
-        if upgradable_groups:
-            text += _("You can upgrade your normal groups to supergroups below:")
-            for chat in upgradable_groups:
-                btn_text = _("Upgrade '{title}'").format(title=chat.title)
-                callback_data = f"mng_upgradegroup_{account_id}_{chat.id}"
-                buttons.append([InlineKeyboardButton(btn_text, callback_data=callback_data)])
+        # Cache the results
+        cache_key = f"group_report_cache_{account_id}"
+        context.bot_data[cache_key] = {
+            'timestamp': datetime.now(timezone.utc),
+            'owned_groups': owned_groups,
+            'normal_groups_count': normal_groups_count,
+            'supergroups_count': supergroups_count,
+            'upgradable_groups': upgradable_groups_data
+        }
 
-        buttons.append([InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")])
+        text, reply_markup = _format_group_report(
+            owned_groups, normal_groups_count, supergroups_count, upgradable_groups_data, account_id, _
+        )
 
         await context.bot.edit_message_text(
             chat_id=user_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=InlineKeyboardMarkup(buttons),
+            reply_markup=reply_markup,
             parse_mode=ParseMode.HTML
         )
 
@@ -742,6 +767,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
 
     try:
         _ = get_translation_func_for_user(user_id)
+        from datetime import timedelta
         action_parts = query.data.split("_")
         action = action_parts[1]
 
@@ -823,9 +849,26 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             account_id = int(action_parts[2])
             log.info(f"User {user_id} requested group report for account {account_id}.")
 
+            cache_key = f"group_report_cache_{account_id}"
+            cached_report = context.bot_data.get(cache_key)
+
+            # Check if a valid cache exists (e.g., within 5 minutes)
+            if cached_report and (datetime.now(timezone.utc) - cached_report.get('timestamp', datetime.min.replace(tzinfo=timezone.utc))) < timedelta(minutes=5):
+                log.info(f"Using cached group report for account {account_id}.")
+                text, reply_markup = _format_group_report(
+                    cached_report['owned_groups'],
+                    cached_report['normal_groups_count'],
+                    cached_report['supergroups_count'],
+                    cached_report['upgradable_groups'],
+                    account_id,
+                    _
+                )
+                await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+                return  # Stop here, don't run the background task
+
             # Immediately confirm and notify the user that the task is running in the background.
             await query.edit_message_text(
-                _("Generating your group report in the background. This message will be updated when it is ready...")
+                _("Generating your group report in the background. This may take a moment as it can be a slow operation. The message will be updated when ready...")
             )
 
             # Run the long-running task in the background
