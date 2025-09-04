@@ -31,7 +31,6 @@ from src.database import (
 )
 from src.translation import get_translation_func_for_user
 from pyrogram.enums import ChatType, ChatMemberStatus
-from pyrogram.raw.functions.channels import TogglePreHistoryHidden
 
 log = logging.getLogger(__name__)
 
@@ -848,11 +847,16 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             try:
                 await client.connect()
 
-                # To use raw functions, we often need the InputPeer
-                peer = await client.resolve_peer(chat_id)
+                # messages.MigrateChat requires the positive group ID.
+                if chat_id > 0:
+                    # This is a safeguard, but chat IDs from pyrogram for groups are typically negative.
+                    raise ValueError("chat_id for a basic group should be negative")
 
-                # Toggling history visibility in a basic group upgrades it to a supergroup
-                await client.invoke(TogglePreHistoryHidden(channel=peer, enabled=False))
+                await client.invoke(
+                    pyrogram.raw.functions.messages.MigrateChat(
+                        chat_id=-chat_id
+                    )
+                )
 
                 await client.disconnect()
 
