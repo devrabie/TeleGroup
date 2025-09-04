@@ -18,6 +18,8 @@ TABLE_DEFINITIONS = {
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY,
             telegram_id INTEGER NOT NULL UNIQUE,
+            first_name TEXT NOT NULL,
+            username TEXT,
             is_admin BOOLEAN NOT NULL DEFAULT 0,
             language_code TEXT NOT NULL DEFAULT 'en',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -103,6 +105,15 @@ def initialize_database():
                 cursor.execute(table_sql)
 
             # --- Migrations ---
+            cursor.execute("PRAGMA table_info(users)")
+            user_columns = [info[1] for info in cursor.fetchall()]
+            if 'first_name' not in user_columns:
+                log.info("Running migration: Adding 'first_name' column to 'users' table.")
+                cursor.execute("ALTER TABLE users ADD COLUMN first_name TEXT NOT NULL DEFAULT 'User'")
+            if 'username' not in user_columns:
+                log.info("Running migration: Adding 'username' column to 'users' table.")
+                cursor.execute("ALTER TABLE users ADD COLUMN username TEXT")
+
             cursor.execute("PRAGMA table_info(managed_accounts)")
             columns = [info[1] for info in cursor.fetchall()]
             if 'flood_wait_until' not in columns:
@@ -697,22 +708,44 @@ def apply_error_backoff(account_id: int, error_message: str, wait_seconds: int |
         return False
 
 
-def get_or_create_user(telegram_id: int):
+def update_user_details(user: "telegram.User"):
     """
-    Retrieves a user by their telegram_id, creating them if they don't exist.
-    Returns the user as a dict.
+    Ensures a user exists in the database and that their details
+    (first_name, username) are up-to-date.
     """
-    select_sql = "SELECT * FROM users WHERE telegram_id = ?"
-    # Note: Default language_code is 'en' via the table schema
-    insert_sql = "INSERT OR IGNORE INTO users (telegram_id) VALUES (?)"
+    insert_sql = "INSERT OR IGNORE INTO users (telegram_id, first_name, username) VALUES (?, ?, ?)"
+    update_sql = "UPDATE users SET first_name = ?, username = ? WHERE telegram_id = ?"
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            # Use INSERT OR IGNORE and then SELECT to handle race conditions gracefully
-            # and avoid a separate SELECT call first in the common case.
-            cursor.execute(insert_sql, (telegram_id,))
-            if cursor.rowcount > 0:
-                log.info(f"Created new user record for telegram_id: {telegram_id}")
+            # Use a transaction for consistency
+            cursor.execute("BEGIN")
+            # Create a record if they are totally new, ignoring if they exist
+            cursor.execute(insert_sql, (user.id, user.first_name, user.username))
+            # Always update their details in case their name/username changed
+            cursor.execute(update_sql, (user.first_name, user.username, user.id))
+            cursor.execute("COMMIT")
+        return True
+    except sqlite3.Error as e:
+        log.error(f"Database error in update_user_details for {user.id}: {e}")
+        return False
+
+
+def get_or_create_user(telegram_id: int):
+    """
+    Retrieves a user by their telegram_id, creating them with a default name if they don't exist.
+    This is a fallback for when we don't have the full user object.
+    Returns the user as a dict.
+    """
+    select_sql = "SELECT * FROM users WHERE telegram_id = ?"
+    insert_sql = "INSERT OR IGNORE INTO users (telegram_id, first_name) VALUES (?, ?)"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            # Create a basic record with a placeholder name if the user is new.
+            # Their details will be properly updated the next time update_user_details is called.
+            cursor.execute(insert_sql, (telegram_id, "User"))
 
             cursor.execute(select_sql, (telegram_id,))
             user = cursor.fetchone()

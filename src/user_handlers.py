@@ -27,7 +27,7 @@ from src.database import (
     get_all_plans, get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
     delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
     set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
-    get_or_create_user, mark_proxy_as_bad, get_account_details
+    update_user_details, mark_proxy_as_bad, get_account_details
 )
 from src.translation import get_translation_func_for_user
 from pyrogram import Client
@@ -80,8 +80,8 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, message_
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Greets the user, ensures they are in the DB, and shows the main menu."""
-    user_id = update.effective_user.id
-    get_or_create_user(user_id) # Ensure user is in the database
+    # This will create the user if they don't exist, and update their name/username if they do.
+    update_user_details(update.effective_user)
     await main_menu(update, context)
 
 async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):

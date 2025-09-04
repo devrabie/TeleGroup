@@ -349,7 +349,7 @@ async def users_list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             # Add a button for each user to view their details
             keyboard.append([
                 InlineKeyboardButton(
-                    f"👤 {user['telegram_id']}{admin_badge}",
+                    f"👤 {user['first_name']} ({user['telegram_id']})",
                     callback_data=f"admin_user_view_{user['telegram_id']}"
                 )
             ])
@@ -388,9 +388,19 @@ async def user_view_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sub = details['subscription']
     accounts = details['accounts']
 
-    reply = _("<b>User Details for:</b> <code>{user_id}</code>\n").format(user_id=user['telegram_id'])
+    # Create a user mention string that is clickable
+    if user.get('username'):
+        user_mention = f"@{user['username']}"
+    else:
+        # Use HTML for a "mention" link if no username
+        user_mention = f'<a href="tg://user?id={user["telegram_id"]}">{user["first_name"]}</a>'
+
+    reply = _("<b>User Details for:</b> {user_mention} (<code>{user_id}</code>)\n").format(
+        user_mention=user_mention, user_id=user['telegram_id']
+    )
     is_admin_text = _("Yes") if user['is_admin'] else _("No")
     reply += _("<b>Admin:</b> {is_admin}\n").format(is_admin=is_admin_text)
+    reply += _("<b>Language:</b> {lang}\n").format(lang=user['language_code'])
     reply += _("<b>Joined:</b> {join_date}\n").format(join_date=user['created_at'])
     reply += "--------------------\n"
 
