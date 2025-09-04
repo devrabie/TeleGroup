@@ -21,7 +21,7 @@ from pyrogram.raw.functions.messages import MigrateChat
 from pyrogram.errors import (
     SessionPasswordNeeded,
     PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired,
-    Timeout
+    Timeout, UserNotParticipant
 )
 
 from src import config
@@ -710,6 +710,8 @@ async def group_tools_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, a
                         owned_groups.append(dialog.chat)
                         if dialog.chat.type == ChatType.GROUP:
                             normal_groups.append(dialog.chat)
+                except UserNotParticipant:
+                    pass  # It's okay if the user is not in the chat anymore.
                 except Exception as e:
                     log.warning(f"Could not get member for chat {dialog.chat.id}: {e}")
 
@@ -903,8 +905,10 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                             member = await client.get_chat_member(dialog.chat.id, me.id)
                             if member.status == ChatMemberStatus.OWNER:
                                 normal_groups.append(dialog.chat)
+                        except UserNotParticipant:
+                            pass # Ignore if the user is not in the chat.
                         except Exception:
-                            pass  # Ignore if not owner or can't get member
+                            pass  # Ignore other errors like not being able to get member
 
                 for group in normal_groups:
                     try:
