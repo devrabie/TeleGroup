@@ -908,3 +908,76 @@ msgstr "✅ تم حذف الحساب."
 #: src/user_handlers.py:804
 msgid "❌ Could not delete account."
 msgstr "❌ تعذر حذف الحساب."
+
+#: src/user_handlers.py:652
+msgid "📢 Channels & Groups"
+msgstr "📢 القنوات والمجموعات"
+
+#: src/user_handlers.py:663
+msgid "Advanced Channel & Group Management"
+msgstr "إدارة متقدمة للقنوات والمجموعات"
+
+#: src/user_handlers.py:665
+msgid "View Left Channels"
+msgstr "عرض القنوات المغادرة"
+
+#: src/user_handlers.py:666
+msgid "Group Tools"
+msgstr "أدوات المجموعات"
+
+#: src/user_handlers.py:667
+msgid "🔙 Back to Account"
+msgstr "🔙 رجوع إلى الحساب"
+
+#: src/user_handlers.py:700
+msgid "Fetching group data..."
+msgstr "جاري جلب بيانات المجموعات..."
+
+#: src/user_handlers.py:721
+#, python-brace-format
+msgid ""
+"<b>Group Statistics</b>\n"
+"\n"
+"Total owned groups: {owned_count}\n"
+"Normal groups (can be upgraded): {normal_count}"
+msgstr ""
+"<b>إحصائيات المجموعات</b>\n"
+"\n"
+"إجمالي المجموعات المملوكة: {owned_count}\n"
+"المجموعات العادية (يمكن ترقيتها): {normal_count}"
+
+#: src/user_handlers.py:728
+msgid "Upgrade Normal Groups"
+msgstr "ترقية المجموعات العادية"
+
+#: src/user_handlers.py:738
+msgid "An error occurred while fetching group data."
+msgstr "حدث خطأ أثناء جلب بيانات المجموعة."
+
+#: src/user_handlers.py:840
+msgid "Fetching left channels... Please wait."
+msgstr "جاري جلب القنوات المغادرة... يرجى الانتظار."
+
+#: src/user_handlers.py:856
+msgid "No left channels found."
+msgstr "لم يتم العثور على قنوات مغادرة."
+
+#: src/user_handlers.py:861
+msgid "<b>Left Channels:</b>\n\n"
+msgstr "<b>القنوات المغادرة:</b>\n\n"
+
+#: src/user_handlers.py:875
+msgid "An error occurred while fetching left chats."
+msgstr "حدث خطأ أثناء جلب المحادثات المغادرة."
+
+#: src/user_handlers.py:882
+msgid "Upgrading groups... This may take a moment."
+msgstr "جاري ترقية المجموعات... قد يستغرق هذا بعض الوقت."
+
+#: src/user_handlers.py:906
+msgid "All upgradable groups have been processed."
+msgstr "تمت معالجة جميع المجموعات القابلة للترقية."
+
+#: src/user_handlers.py:912
+msgid "An error occurred during the upgrade process."
+msgstr "حدث خطأ أثناء عملية الترقية."

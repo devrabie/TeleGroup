@@ -932,6 +932,79 @@ msgstr "✅ Account has been deleted."
 msgid "❌ Could not delete account."
 msgstr "❌ Could not delete account."
 
+#: src/user_handlers.py:652
+msgid "📢 Channels & Groups"
+msgstr "📢 Channels & Groups"
+
+#: src/user_handlers.py:663
+msgid "Advanced Channel & Group Management"
+msgstr "Advanced Channel & Group Management"
+
+#: src/user_handlers.py:665
+msgid "View Left Channels"
+msgstr "View Left Channels"
+
+#: src/user_handlers.py:666
+msgid "Group Tools"
+msgstr "Group Tools"
+
+#: src/user_handlers.py:667
+msgid "🔙 Back to Account"
+msgstr "🔙 Back to Account"
+
+#: src/user_handlers.py:700
+msgid "Fetching group data..."
+msgstr "Fetching group data..."
+
+#: src/user_handlers.py:721
+#, python-brace-format
+msgid ""
+"<b>Group Statistics</b>\n"
+"\n"
+"Total owned groups: {owned_count}\n"
+"Normal groups (can be upgraded): {normal_count}"
+msgstr ""
+"<b>Group Statistics</b>\n"
+"\n"
+"Total owned groups: {owned_count}\n"
+"Normal groups (can be upgraded): {normal_count}"
+
+#: src/user_handlers.py:728
+msgid "Upgrade Normal Groups"
+msgstr "Upgrade Normal Groups"
+
+#: src/user_handlers.py:738
+msgid "An error occurred while fetching group data."
+msgstr "An error occurred while fetching group data."
+
+#: src/user_handlers.py:840
+msgid "Fetching left channels... Please wait."
+msgstr "Fetching left channels... Please wait."
+
+#: src/user_handlers.py:856
+msgid "No left channels found."
+msgstr "No left channels found."
+
+#: src/user_handlers.py:861
+msgid "<b>Left Channels:</b>\n\n"
+msgstr "<b>Left Channels:</b>\n\n"
+
+#: src/user_handlers.py:875
+msgid "An error occurred while fetching left chats."
+msgstr "An error occurred while fetching left chats."
+
+#: src/user_handlers.py:882
+msgid "Upgrading groups... This may take a moment."
+msgstr "Upgrading groups... This may take a moment."
+
+#: src/user_handlers.py:906
+msgid "All upgradable groups have been processed."
+msgstr "All upgradable groups have been processed."
+
+#: src/user_handlers.py:912
+msgid "An error occurred during the upgrade process."
+msgstr "An error occurred during the upgrade process."
+
 #~ msgid "Left Channels"
 #~ msgstr "Left Channels"
 
