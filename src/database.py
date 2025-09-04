@@ -192,6 +192,53 @@ def get_all_plans(active_only: bool = True):
         log.error(f"Failed to retrieve plans: {e}")
         return []
 
+
+def update_plan(plan_id: int, **kwargs):
+    """
+    Updates a plan's details.
+    Only allows updating specific fields to prevent SQL injection.
+    """
+    if not kwargs:
+        log.warning("update_plan called with no fields to update.")
+        return False, "No fields provided to update."
+
+    allowed_fields = [
+        "name", "price_stars", "price_usd", "duration_days",
+        "max_accounts", "daily_group_limit", "is_active"
+    ]
+
+    updates = []
+    values = []
+
+    for key, value in kwargs.items():
+        if key in allowed_fields:
+            updates.append(f"{key} = ?")
+            values.append(value)
+        else:
+            log.warning(f"Attempted to update an invalid plan field: {key}")
+            return False, f"Invalid field: {key}"
+
+    if not updates:
+        return False, "No valid fields provided to update."
+
+    sql = f"UPDATE plans SET {', '.join(updates)} WHERE id = ?"
+    values.append(plan_id)
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, tuple(values))
+            conn.commit()
+        log.info(f"Successfully updated plan {plan_id} with data: {kwargs}")
+        return True, "Plan updated successfully."
+    except sqlite3.IntegrityError as e:
+        log.error(f"Failed to update plan {plan_id} due to integrity error (e.g., duplicate name): {e}")
+        return False, "A plan with this name already exists."
+    except sqlite3.Error as e:
+        log.error(f"Failed to update plan {plan_id}: {e}")
+        return False, "A database error occurred."
+
+
 # --- User Management Functions ---
 
 def get_all_users():

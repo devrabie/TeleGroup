@@ -2,15 +2,16 @@ import httpx
 import logging
 from src import config
 
-API_BASE_URL = "https://pay.crypt.bot/api/"
-
 log = logging.getLogger(__name__)
 
 class CryptoPayAPI:
-    def __init__(self, api_token: str):
+    def __init__(self, api_token: str, base_url: str):
         if not api_token:
             raise ValueError("Crypto Pay API token is required.")
+        if not base_url:
+            raise ValueError("Crypto Pay API base URL is required.")
         self.api_token = api_token
+        self.base_url = base_url
         self.headers = {
             "Crypto-Pay-API-Token": self.api_token,
             "Content-Type": "application/json"
@@ -20,7 +21,7 @@ class CryptoPayAPI:
         """Helper to make requests to the Crypto Pay API."""
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.request(method, f"{API_BASE_URL}{endpoint}", headers=self.headers, **kwargs)
+                response = await client.request(method, f"{self.base_url}{endpoint}", headers=self.headers, **kwargs)
                 response.raise_for_status()
                 data = response.json()
                 if data.get("ok"):
@@ -60,4 +61,7 @@ class CryptoPayAPI:
         return await self._make_request("GET", "getBalance")
 
 # Global client instance
-cryptopay_client = CryptoPayAPI(config.CRYPTO_PAY_API_TOKEN) if config.CRYPTO_PAY_API_TOKEN else None
+cryptopay_client = CryptoPayAPI(
+    api_token=config.CRYPTO_PAY_API_TOKEN,
+    base_url=config.CRYPTO_PAY_API_BASE_URL
+) if config.CRYPTO_PAY_API_TOKEN else None

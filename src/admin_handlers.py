@@ -5,7 +5,10 @@ from telegram.ext import ContextTypes, CommandHandler, filters, CallbackQueryHan
 from telegram.constants import ParseMode
 
 from src import config
-from src.database import add_plan, get_all_plans, get_all_users, get_user_details, grant_subscription, get_system_stats
+from src.database import (
+    add_plan, get_all_plans, get_all_users, get_user_details, grant_subscription,
+    get_system_stats, get_plan_by_id, update_plan
+)
 from src.translation import get_translation_func_for_user
 
 log = logging.getLogger(__name__)
@@ -61,6 +64,187 @@ async def stats_view_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
+
+async def edit_plan_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Displays the menu for editing a single plan's details."""
+    query = update.callback_query
+    await query.answer()
+    _ = get_translation_func_for_user(update.effective_user.id)
+
+    # The plan_id can come from the initial selection or from the conversation context after an edit
+    if 'edit_plan_id' in context.user_data:
+        plan_id = context.user_data['edit_plan_id']
+    else:
+        plan_id = int(query.data.split('_')[-1])
+        context.user_data['edit_plan_id'] = plan_id
+
+    plan = get_plan_by_id(plan_id)
+    if not plan:
+        await query.edit_message_text(_("Error: Plan not found."))
+        context.user_data.pop('edit_plan_id', None)
+        return
+
+    status = _("Active") if plan['is_active'] else _("Inactive")
+    price_usd_text = f"${plan['price_usd']:.2f}" if plan.get('price_usd') and plan['price_usd'] > 0 else "Not set"
+
+    text = _(
+        "<b>Editing Plan:</b> {name} (ID: <code>{id}</code>)\n\n"
+        "Select a field to modify:\n\n"
+        "<b>Name:</b> {name}\n"
+        "<b>Price (Stars):</b> {price_stars}\n"
+        "<b>Price (USD):</b> {price_usd}\n"
+        "<b>Duration:</b> {duration} days\n"
+        "<b>Max Accounts:</b> {max_accounts}\n"
+        "<b>Daily Limit:</b> {limit} groups/day\n"
+        "<b>Status:</b> {status}"
+    ).format(
+        id=plan['id'],
+        name=plan['name'],
+        price_stars=plan['price_stars'],
+        price_usd=price_usd_text,
+        duration=plan['duration_days'],
+        max_accounts=plan['max_accounts'],
+        limit=plan['daily_group_limit'],
+        status=status
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton(_("✏️ Name"), callback_data=f"edit_field_name"),
+            InlineKeyboardButton(_("✨ Price (Stars)"), callback_data=f"edit_field_price_stars"),
+        ],
+        [
+            InlineKeyboardButton(_("💵 Price (USD)"), callback_data=f"edit_field_price_usd"),
+            InlineKeyboardButton(_("📅 Duration"), callback_data=f"edit_field_duration_days"),
+        ],
+        [
+            InlineKeyboardButton(_("👤 Max Accounts"), callback_data=f"edit_field_max_accounts"),
+            InlineKeyboardButton(_("📈 Daily Limit"), callback_data=f"edit_field_daily_group_limit"),
+        ],
+        [
+            InlineKeyboardButton(_("Toggle Active/Inactive"), callback_data=f"edit_field_toggle_active"),
+        ],
+        [InlineKeyboardButton(_("🔙 Back to Plan List"), callback_data='admin_plan_edit_list')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+
+# --- Edit Plan Conversation Handlers ---
+GET_NEW_VALUE = range(30, 31)
+
+async def edit_field_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Starts the conversation to edit a specific field."""
+    query = update.callback_query
+    await query.answer()
+    _ = get_translation_func_for_user(update.effective_user.id)
+
+    field_to_edit = query.data.replace("edit_field_", "")
+    context.user_data['edit_field'] = field_to_edit
+
+    # Provide a more user-friendly name for the field
+    field_map = {
+        "name": "Name",
+        "price_stars": "Price (Stars)",
+        "price_usd": "Price (USD)",
+        "duration_days": "Duration (days)",
+        "max_accounts": "Max Accounts",
+        "daily_group_limit": "Daily Limit"
+    }
+    field_name = _(field_map.get(field_to_edit, field_to_edit))
+
+    text = _("Please send the new value for <b>{field_name}</b>.\n\nSend /cancel to abort.").format(field_name=field_name)
+    # We need to send a new message here because we can't get a text reply from a button press
+    await query.message.reply_text(text, parse_mode=ParseMode.HTML)
+    return GET_NEW_VALUE
+
+async def edit_field_receive_value(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the new value, updates the plan, and ends the conversation."""
+    _ = get_translation_func_for_user(update.effective_user.id)
+    new_value = update.message.text
+    field_to_edit = context.user_data.get('edit_field')
+    plan_id = context.user_data.get('edit_plan_id')
+
+    if not all([field_to_edit, plan_id]):
+        await update.message.reply_text(_("An error occurred (missing context). Please start over."))
+        return ConversationHandler.END
+
+    # Basic validation and type conversion
+    try:
+        if field_to_edit in ["price_stars", "duration_days", "max_accounts", "daily_group_limit"]:
+            processed_value = int(new_value)
+        elif field_to_edit == "price_usd":
+            processed_value = float(new_value)
+        else:
+            processed_value = new_value
+    except ValueError:
+        await update.message.reply_text(_("Invalid value type. Please enter a valid number."))
+        # Ask again
+        return GET_NEW_VALUE
+
+    success, msg = update_plan(plan_id, **{field_to_edit: processed_value})
+
+    if success:
+        await update.message.reply_text(f"✅ {msg}")
+    else:
+        await update.message.reply_text(f"❌ {msg}")
+
+    # Clean up and show the edit menu again
+    context.user_data.pop('edit_field', None)
+    await edit_plan_menu_handler(update, context) # This will show the menu again
+    return ConversationHandler.END
+
+async def edit_field_toggle_active(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Toggles the is_active status of a plan without a conversation."""
+    query = update.callback_query
+    await query.answer()
+    _ = get_translation_func_for_user(update.effective_user.id)
+    plan_id = context.user_data.get('edit_plan_id')
+
+    if not plan_id:
+        # If context is lost, try to get it from the callback data as a fallback
+        # This is not ideal, but can prevent some errors.
+        # A better solution would involve more robust state management.
+        await query.edit_message_text(_("An error occurred (missing context). Please start over."))
+        return
+
+    plan = get_plan_by_id(plan_id)
+    if not plan:
+        await query.edit_message_text(_("Error: Plan not found."))
+        return
+
+    new_status = not plan['is_active']
+    success, msg = update_plan(plan_id, is_active=new_status)
+
+    if success:
+        await context.bot.answer_callback_query(query.id, _("Status toggled successfully."))
+    else:
+        await context.bot.answer_callback_query(query.id, f"❌ {msg}", show_alert=True)
+
+    await edit_plan_menu_handler(update, context)
+
+async def edit_conv_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancels the edit process and cleans up user_data."""
+    _ = get_translation_func_for_user(update.effective_user.id)
+
+    context.user_data.pop('edit_field', None)
+
+    await update.message.reply_text(_("Edit operation cancelled."))
+
+    # Show the edit menu again
+    await edit_plan_menu_handler(update, context)
+    return ConversationHandler.END
+
+edit_plan_conv_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(edit_field_start, pattern='^edit_field_')],
+    states={
+        GET_NEW_VALUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_field_receive_value)],
+    },
+    fallbacks=[CommandHandler('cancel', edit_conv_cancel)],
+    # We need to make sure this conversation doesn't block the main menu navigation
+    block=False,
+    per_message=False,
+)
 
 async def users_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Displays the user management menu."""
@@ -316,6 +500,7 @@ async def plans_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     keyboard = [
         [InlineKeyboardButton(_("📜 List All Plans"), callback_data='admin_plans_list')],
         [InlineKeyboardButton(_("➕ Create New Plan"), callback_data='admin_plan_create_start')],
+        [InlineKeyboardButton(_("✏️ Edit a Plan"), callback_data='admin_plan_edit_list')],
         [InlineKeyboardButton(_("🔙 Back"), callback_data='admin_menu_main')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -340,21 +525,47 @@ async def plans_list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         text = _("<b>Existing Subscription Plans:</b>\n\n")
         for plan in plans:
             status = _("Active") if plan['is_active'] else _("Inactive")
-            price_usd_text = f", <b>Price (USD):</b> ${plan['price_usd']:.2f}" if plan.get('price_usd') else ""
+            price_usd_text = f", <b>Price (USD):</b> ${plan['price_usd']:.2f}" if plan.get('price_usd') and plan['price_usd'] > 0 else ""
             text += (
                 _("<b>ID:</b> <code>{id}</code>, <b>Name:</b> {name}\n"
-                  "<b>Price (Stars):</b> {price}{price_usd}, <b>Duration:</b> {days} days\n"
+                  "<b>Price (Stars):</b> {price}{price_usd_text}, <b>Duration:</b> {days} days\n"
                   "<b>Accounts:</b> {accounts}, <b>Limit:</b> {limit} groups/day\n"
                   "<b>Status:</b> {status}\n"
                   "--------------------\n").format(
                     id=plan['id'], name=plan['name'], price=plan['price_stars'],
-                    price_usd=price_usd_text,
+                    price_usd_text=price_usd_text,
                     days=plan['duration_days'], accounts=plan['max_accounts'],
                     limit=plan['daily_group_limit'], status=status
                 )
             )
 
     keyboard = [[InlineKeyboardButton(_("🔙 Back"), callback_data='admin_menu_plans')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+
+async def edit_plan_list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Displays a list of all plans to choose from for editing."""
+    query = update.callback_query
+    await query.answer()
+    _ = get_translation_func_for_user(update.effective_user.id)
+
+    plans = get_all_plans(active_only=False)
+    if not plans:
+        text = _("No subscription plans found to edit.")
+        keyboard = [[InlineKeyboardButton(_("🔙 Back"), callback_data='admin_menu_plans')]]
+    else:
+        text = _("Please select a plan to edit:")
+        keyboard = []
+        for plan in plans:
+            keyboard.append([
+                InlineKeyboardButton(
+                    plan['name'],
+                    callback_data=f"admin_plan_edit_{plan['id']}"
+                )
+            ])
+        keyboard.append([InlineKeyboardButton(_("🔙 Back"), callback_data='admin_menu_plans')])
+
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
@@ -561,6 +772,12 @@ async def admin_callback_router(update: Update, context: ContextTypes.DEFAULT_TY
         await plans_menu_handler(update, context)
     elif action == 'admin_plans_list':
         await plans_list_handler(update, context)
+    elif action == 'admin_plan_edit_list':
+        await edit_plan_list_handler(update, context)
+    elif query.data.startswith('admin_plan_edit_'):
+        await edit_plan_menu_handler(update, context)
+    elif query.data == 'edit_field_toggle_active':
+        await edit_field_toggle_active(update, context)
     else:
         # Fallback for any unhandled admin actions
         await query.answer("This action is not yet implemented.")
@@ -574,6 +791,7 @@ admin_handlers_list = [
     # Conversation handlers must come before the generic callback router to catch their entry points
     create_plan_conv_handler,
     grant_sub_conv_handler,
+    edit_plan_conv_handler,
     # Generic callback router for menus
     CallbackQueryHandler(admin_callback_router, pattern="^admin_"),
 ]

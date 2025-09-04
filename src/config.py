@@ -20,6 +20,7 @@ PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN")
 
 # --- Crypto Pay API Configuration ---
 CRYPTO_PAY_API_TOKEN = os.getenv("CRYPTO_PAY_API_TOKEN")
+CRYPTO_PAY_API_BASE_URL = os.getenv("CRYPTO_PAY_API_BASE_URL", "https://pay.crypt.bot/api/")
 
 # --- Webhook Configuration (Optional) ---
 # Required for receiving Crypto Pay updates.
