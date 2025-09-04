@@ -66,27 +66,45 @@ async def stats_view_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def edit_plan_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Displays the menu for editing a single plan's details."""
-    query = update.callback_query
-    await query.answer()
+    """
+    Displays the menu for editing a single plan's details.
+    Can either edit an existing message or send a new one.
+    """
     _ = get_translation_func_for_user(update.effective_user.id)
+    query = update.callback_query
+    chat_id = update.effective_chat.id
 
-    # The plan_id can come from the initial selection or from the conversation context after an edit
+    # Determine the plan_id from context or a new query
     if 'edit_plan_id' in context.user_data:
         plan_id = context.user_data['edit_plan_id']
-    else:
+    elif query:
         plan_id = int(query.data.split('_')[-1])
         context.user_data['edit_plan_id'] = plan_id
+        context.user_data['edit_menu_message_id'] = query.message.message_id
+    else:
+        # This can happen if context is lost.
+        if update.message:
+            await update.message.reply_text(_("Could not determine which plan to edit. Please start over."))
+        return
+
+    if query:
+        await query.answer()
 
     plan = get_plan_by_id(plan_id)
     if not plan:
-        await query.edit_message_text(_("Error: Plan not found."))
+        # Handle plan not found
         context.user_data.pop('edit_plan_id', None)
+        context.user_data.pop('edit_menu_message_id', None)
+        error_text = _("Error: Plan not found. It might have been deleted.")
+        if query:
+            await query.edit_message_text(error_text)
+        else:
+            await context.bot.send_message(chat_id, error_text)
         return
 
+    # Build the message text and keyboard
     status = _("Active") if plan['is_active'] else _("Inactive")
     price_usd_text = f"${plan['price_usd']:.2f}" if plan.get('price_usd') and plan['price_usd'] > 0 else "Not set"
-
     text = _(
         "<b>Editing Plan:</b> {name} (ID: <code>{id}</code>)\n\n"
         "Select a field to modify:\n\n"
@@ -98,16 +116,10 @@ async def edit_plan_menu_handler(update: Update, context: ContextTypes.DEFAULT_T
         "<b>Daily Limit:</b> {limit} groups/day\n"
         "<b>Status:</b> {status}"
     ).format(
-        id=plan['id'],
-        name=plan['name'],
-        price_stars=plan['price_stars'],
-        price_usd=price_usd_text,
-        duration=plan['duration_days'],
-        max_accounts=plan['max_accounts'],
-        limit=plan['daily_group_limit'],
-        status=status
+        id=plan['id'], name=plan['name'], price_stars=plan['price_stars'],
+        price_usd=price_usd_text, duration=plan['duration_days'],
+        max_accounts=plan['max_accounts'], limit=plan['daily_group_limit'], status=status
     )
-
     keyboard = [
         [
             InlineKeyboardButton(_("✏️ Name"), callback_data=f"edit_field_name"),
@@ -127,7 +139,30 @@ async def edit_plan_menu_handler(update: Update, context: ContextTypes.DEFAULT_T
         [InlineKeyboardButton(_("🔙 Back to Plan List"), callback_data='admin_plan_edit_list')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+    # Try to edit the existing menu message, otherwise send a new one
+    menu_message_id = context.user_data.get('edit_menu_message_id')
+    if menu_message_id:
+        try:
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=menu_message_id,
+                text=text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+        except Exception:
+             # If editing fails (e.g., message too old), send a new message
+            new_menu_message = await context.bot.send_message(
+                chat_id, text, reply_markup=reply_markup, parse_mode=ParseMode.HTML
+            )
+            context.user_data['edit_menu_message_id'] = new_menu_message.message_id
+    else:
+        # If we don't have a message ID, we must send a new one
+        new_menu_message = await context.bot.send_message(
+            chat_id, text, reply_markup=reply_markup, parse_mode=ParseMode.HTML
+        )
+        context.user_data['edit_menu_message_id'] = new_menu_message.message_id
 
 
 # --- Edit Plan Conversation Handlers ---
@@ -155,43 +190,57 @@ async def edit_field_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     text = _("Please send the new value for <b>{field_name}</b>.\n\nSend /cancel to abort.").format(field_name=field_name)
     # We need to send a new message here because we can't get a text reply from a button press
-    await query.message.reply_text(text, parse_mode=ParseMode.HTML)
+    prompt_message = await query.message.reply_text(text, parse_mode=ParseMode.HTML)
+    context.user_data['prompt_message_id'] = prompt_message.message_id
     return GET_NEW_VALUE
 
 async def edit_field_receive_value(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receives the new value, updates the plan, and ends the conversation."""
+    """Receives the new value, updates the plan, and cleans up the chat."""
     _ = get_translation_func_for_user(update.effective_user.id)
     new_value = update.message.text
     field_to_edit = context.user_data.get('edit_field')
     plan_id = context.user_data.get('edit_plan_id')
+    chat_id = update.effective_chat.id
 
     if not all([field_to_edit, plan_id]):
         await update.message.reply_text(_("An error occurred (missing context). Please start over."))
         return ConversationHandler.END
 
-    # Basic validation and type conversion
+    # --- Validation and Type Conversion ---
     try:
         if field_to_edit in ["price_stars", "duration_days", "max_accounts", "daily_group_limit"]:
             processed_value = int(new_value)
         elif field_to_edit == "price_usd":
-            processed_value = float(new_value)
+            processed_value = float(new_value.replace(',', '.')) # Allow comma as decimal separator
         else:
             processed_value = new_value
     except ValueError:
         await update.message.reply_text(_("Invalid value type. Please enter a valid number."))
-        # Ask again
-        return GET_NEW_VALUE
+        return GET_NEW_VALUE # Ask again
 
+    # --- Update Database ---
     success, msg = update_plan(plan_id, **{field_to_edit: processed_value})
 
-    if success:
-        await update.message.reply_text(f"✅ {msg}")
-    else:
-        await update.message.reply_text(f"❌ {msg}")
+    # --- Clean up messages ---
+    try:
+        # Delete the user's reply
+        await context.bot.delete_message(chat_id=chat_id, message_id=update.message.message_id)
+        # Delete the bot's prompt
+        if 'prompt_message_id' in context.user_data:
+            await context.bot.delete_message(chat_id=chat_id, message_id=context.user_data['prompt_message_id'])
+    except Exception as e:
+        log.warning(f"Could not delete messages during plan edit: {e}")
 
-    # Clean up and show the edit menu again
+    if not success:
+        # If the update failed, we still need to tell the user.
+        # The original menu will be shown again by the call below.
+        await context.bot.send_message(chat_id, f"❌ {msg}")
+
+    # --- Clean up context and show the updated menu ---
     context.user_data.pop('edit_field', None)
-    await edit_plan_menu_handler(update, context) # This will show the menu again
+    context.user_data.pop('prompt_message_id', None)
+
+    await edit_plan_menu_handler(update, context)
     return ConversationHandler.END
 
 async def edit_field_toggle_active(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -224,15 +273,19 @@ async def edit_field_toggle_active(update: Update, context: ContextTypes.DEFAULT
     await edit_plan_menu_handler(update, context)
 
 async def edit_conv_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Cancels the edit process and cleans up user_data."""
+    """Cancels the edit process, cleans up all context, and returns to the main admin panel."""
     _ = get_translation_func_for_user(update.effective_user.id)
 
+    # Clean up all session data for this conversation
     context.user_data.pop('edit_field', None)
+    context.user_data.pop('prompt_message_id', None)
+    context.user_data.pop('edit_plan_id', None)
+    context.user_data.pop('edit_menu_message_id', None)
 
-    await update.message.reply_text(_("Edit operation cancelled."))
+    await update.message.reply_text(_("Edit operation cancelled. Returning to the main admin panel."))
 
-    # Show the edit menu again
-    await edit_plan_menu_handler(update, context)
+    # Show the main admin panel to avoid leaving the user in a broken state
+    await admin_panel_handler(update, context)
     return ConversationHandler.END
 
 edit_plan_conv_handler = ConversationHandler(
