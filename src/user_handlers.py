@@ -15,6 +15,7 @@ from telegram.ext import (
     PreCheckoutQueryHandler,
 )
 
+import pyrogram
 from pyrogram import Client
 from pyrogram.errors import (
     SessionPasswordNeeded,
