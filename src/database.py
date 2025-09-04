@@ -254,7 +254,7 @@ def update_plan(plan_id: int, **kwargs):
 
 def get_all_users():
     """Retrieves all users from the database."""
-    sql = "SELECT id, telegram_id, is_admin, created_at FROM users ORDER BY created_at DESC"
+    sql = "SELECT * FROM users ORDER BY created_at DESC"
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
