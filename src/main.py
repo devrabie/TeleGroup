@@ -4,6 +4,7 @@ import json
 import hashlib
 import hmac
 
+from telegram import Update
 from telegram.ext import Application
 from aiohttp import web
 
