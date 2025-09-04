@@ -656,6 +656,84 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     await context.bot.edit_message_text(chat_id=user_id, message_id=message_id, text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
 
+async def async_generate_group_report(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id: int):
+    """Generates the group report in the background and edits the original message."""
+    query = update.callback_query
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+
+    session_string = get_account_session_string(account_id)
+    if not session_string:
+        await context.bot.edit_message_text(
+            chat_id=user_id,
+            message_id=query.message.message_id,
+            text=_("Error: Could not retrieve session for this account.")
+        )
+        return
+
+    client = Client(f"user_session_reporter_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+
+    try:
+        await client.connect()
+
+        owned_groups = 0
+        normal_groups_count = 0
+        supergroups_count = 0
+        upgradable_groups = []
+
+        async for dialog in client.get_dialogs():
+            if dialog.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+                continue
+
+            try:
+                member = await client.get_chat_member(dialog.chat.id, "me")
+                if member.status == ChatMemberStatus.OWNER:
+                    owned_groups += 1
+                    if dialog.chat.type == ChatType.GROUP:
+                        normal_groups_count += 1
+                        upgradable_groups.append(dialog.chat)
+                    else:
+                        supergroups_count += 1
+            except Exception as e:
+                log.warning(f"Could not get member status for chat {dialog.chat.id} ({dialog.chat.title}): {e}")
+                continue
+
+        await client.disconnect()
+
+        text = _("<b>Group Ownership Report</b>\n\n")
+        text += _("<b>Total Owned Groups:</b> {count}\n").format(count=owned_groups)
+        text += _("- Normal Groups: {count}\n").format(count=normal_groups_count)
+        text += _("- Supergroups: {count}\n\n").format(count=supergroups_count)
+
+        buttons = []
+        if upgradable_groups:
+            text += _("You can upgrade your normal groups to supergroups below:")
+            for chat in upgradable_groups:
+                btn_text = _("Upgrade '{title}'").format(title=chat.title)
+                callback_data = f"mng_upgradegroup_{account_id}_{chat.id}"
+                buttons.append([InlineKeyboardButton(btn_text, callback_data=callback_data)])
+
+        buttons.append([InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")])
+
+        await context.bot.edit_message_text(
+            chat_id=user_id,
+            message_id=query.message.message_id,
+            text=text,
+            reply_markup=InlineKeyboardMarkup(buttons),
+            parse_mode=ParseMode.HTML
+        )
+
+    except Exception as e:
+        log.error(f"Error generating group report for user {user_id}, account {account_id}: {e}", exc_info=True)
+        await context.bot.edit_message_text(
+            chat_id=user_id,
+            message_id=query.message.message_id,
+            text=_("An error occurred while generating the report. The session might be invalid or revoked.")
+        )
+        if client.is_connected:
+            await client.disconnect()
+
+
 async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Main router for all management callbacks."""
     query = update.callback_query
@@ -746,65 +824,13 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             account_id = int(action_parts[2])
             log.info(f"User {user_id} requested group report for account {account_id}.")
 
-            await query.edit_message_text(_("Generating group report... This may take a moment."))
+            # Immediately confirm and notify the user that the task is running in the background.
+            await query.edit_message_text(
+                _("Generating your group report in the background. This message will be updated when it is ready...")
+            )
 
-            session_string = get_account_session_string(account_id)
-            if not session_string:
-                await query.edit_message_text(_("Error: Could not retrieve session for this account."))
-                return
-
-            client = Client(f"user_session_reporter_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
-
-            try:
-                await client.connect()
-
-                owned_groups = 0
-                normal_groups_count = 0
-                supergroups_count = 0
-                upgradable_groups = []
-
-                async for dialog in client.get_dialogs():
-                    if dialog.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
-                        continue
-
-                    try:
-                        # We need to check membership to see if the user is the owner
-                        member = await client.get_chat_member(dialog.chat.id, "me")
-                        if member.status == ChatMemberStatus.OWNER:
-                            owned_groups += 1
-                            if dialog.chat.type == ChatType.GROUP:
-                                normal_groups_count += 1
-                                upgradable_groups.append(dialog.chat)
-                            else:
-                                supergroups_count += 1
-                    except Exception as e:
-                        log.warning(f"Could not get member status for chat {dialog.chat.id} ({dialog.chat.title}): {e}")
-                        continue
-
-                await client.disconnect()
-
-                text = _("<b>Group Ownership Report</b>\n\n")
-                text += _("<b>Total Owned Groups:</b> {count}\n").format(count=owned_groups)
-                text += _("- Normal Groups: {count}\n").format(count=normal_groups_count)
-                text += _("- Supergroups: {count}\n\n").format(count=supergroups_count)
-
-                buttons = []
-                if upgradable_groups:
-                    text += _("You can upgrade your normal groups to supergroups below:")
-                    for chat in upgradable_groups:
-                        btn_text = _("Upgrade '{title}'").format(title=chat.title)
-                        callback_data = f"mng_upgradegroup_{account_id}_{chat.id}"
-                        buttons.append([InlineKeyboardButton(btn_text, callback_data=callback_data)])
-
-                buttons.append([InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")])
-
-                await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode=ParseMode.HTML)
-
-            except Exception as e:
-                log.error(f"Error generating group report for user {user_id}, account {account_id}: {e}", exc_info=True)
-                await query.edit_message_text(_("An error occurred while generating the report. The session might be invalid or revoked."))
-                if client.is_connected:
-                    await client.disconnect()
+            # Run the long-running task in the background
+            asyncio.create_task(async_generate_group_report(update, context, account_id))
         elif action == "upgradegroup":
             account_id = int(action_parts[2])
             chat_id = int(action_parts[3])
