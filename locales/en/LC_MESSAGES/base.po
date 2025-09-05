@@ -1002,6 +1002,29 @@ msgstr "❌ Failed to update content for '<b>{page_key}</b>'."
 msgid "Content edit operation cancelled."
 msgstr "Content edit operation cancelled."
 
+#: src/admin_handlers.py:108
+msgid "Please choose which language to edit:"
+msgstr "Please choose which language to edit:"
+
+#: src/admin_handlers.py:137
+#, python-brace-format
+msgid "You are editing the content for: <b>{page_key} ({lang})</b>\n\n"
+"Please send the new text. Send /cancel to abort.\n\n"
+"<b>Current content:</b>\n\n<pre>{current_content}</pre>"
+msgstr "You are editing the content for: <b>{page_key} ({lang})</b>\n\n"
+"Please send the new text. Send /cancel to abort.\n\n"
+"<b>Current content:</b>\n\n<pre>{current_content}</pre>"
+
+#: src/admin_handlers.py:155
+#, python-brace-format
+msgid "✅ Content for '<b>{page_key} ({lang})</b>' updated successfully."
+msgstr "✅ Content for '<b>{page_key} ({lang})</b>' updated successfully."
+
+#: src/admin_handlers.py:157
+#, python-brace-format
+msgid "❌ Failed to update content for '<b>{page_key} ({lang})</b>'."
+msgstr "❌ Failed to update content for '<b>{page_key} ({lang})</b>'."
+
 #~ msgid "Left Channels"
 #~ msgstr "Left Channels"
 

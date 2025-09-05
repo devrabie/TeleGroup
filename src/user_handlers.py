@@ -28,7 +28,8 @@ from src.database import (
     get_all_plans, get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
     delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
     set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
-    update_user_details, mark_proxy_as_bad, get_account_details, get_info_page_content
+    update_user_details, mark_proxy_as_bad, get_account_details, get_info_page_content,
+    get_user_language
 )
 from src.translation import get_translation_func_for_user
 from pyrogram.enums import ChatType, ChatMemberStatus
@@ -192,6 +193,7 @@ async def info_page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     _ = get_translation_func_for_user(user_id)
 
     page_key = query.data.split('_')[1]
+    lang_code = get_user_language(user_id)
 
     # Map page_key to a title
     page_titles = {
@@ -203,7 +205,7 @@ async def info_page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     }
     title = page_titles.get(page_key, _("Information"))
 
-    content = get_info_page_content(page_key)
+    content = get_info_page_content(page_key, lang_code)
     if not content:
         content = _("Content for this page is not available yet. Please check back later.")
 

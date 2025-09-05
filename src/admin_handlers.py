@@ -67,7 +67,7 @@ async def stats_view_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 # --- Content Management Handlers ---
-EDIT_CONTENT_VALUE = range(40, 41)
+CHOOSE_LANG, EDIT_CONTENT_VALUE = range(40, 42)
 
 async def content_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Displays the menu for managing info page content."""
@@ -89,7 +89,7 @@ async def content_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def edit_content_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Starts the conversation to edit a content page."""
+    """Starts the content edit conversation by asking for the language."""
     query = update.callback_query
     await query.answer()
     _ = get_translation_func_for_user(update.effective_user.id)
@@ -97,15 +97,45 @@ async def edit_content_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
     page_key = query.data.split('_')[-1]
     context.user_data['edit_content_key'] = page_key
 
-    current_content = get_info_page_content(page_key)
+    text = _("Please choose which language to edit:")
+    keyboard = [
+        [
+            InlineKeyboardButton("English 🇬🇧", callback_data='edit_lang_en'),
+            InlineKeyboardButton("العربية 🇸🇦", callback_data='edit_lang_ar')
+        ],
+        [
+            InlineKeyboardButton(_("❌ Cancel"), callback_data='edit_lang_cancel')
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    return CHOOSE_LANG
+
+
+async def edit_content_receive_lang(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the language choice and asks for the new content."""
+    query = update.callback_query
+    await query.answer()
+    _ = get_translation_func_for_user(update.effective_user.id)
+
+    lang_code = query.data.split('_')[-1]
+    context.user_data['edit_content_lang'] = lang_code
+    page_key = context.user_data['edit_content_key']
+
+    current_content = get_info_page_content(page_key, lang_code)
 
     text = _(
-        "You are editing the content for: <b>{page_key}</b>\n\n"
+        "You are editing the content for: <b>{page_key} ({lang})</b>\n\n"
         "Please send the new text. Send /cancel to abort.\n\n"
         "<b>Current content:</b>\n\n<pre>{current_content}</pre>"
-    ).format(page_key=page_key.replace('_', ' ').title(), current_content=current_content)
+    ).format(
+        page_key=page_key.replace('_', ' ').title(),
+        lang=lang_code.upper(),
+        current_content=current_content
+    )
 
-    await query.message.reply_text(text, parse_mode=ParseMode.HTML)
+    # Edit the message to show the prompt
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML)
     return EDIT_CONTENT_VALUE
 
 
@@ -114,35 +144,56 @@ async def edit_content_receive_value(update: Update, context: ContextTypes.DEFAU
     _ = get_translation_func_for_user(update.effective_user.id)
     new_content = update.message.text
     page_key = context.user_data.get('edit_content_key')
+    lang_code = context.user_data.get('edit_content_lang')
 
-    if not page_key:
+    if not page_key or not lang_code:
         await update.message.reply_text(_("An error occurred (missing context). Please start over."))
         return ConversationHandler.END
 
-    if update_info_page_content(page_key, new_content):
-        await update.message.reply_text(_("✅ Content for '<b>{page_key}</b>' updated successfully.").format(page_key=page_key))
+    if update_info_page_content(page_key, lang_code, new_content):
+        await update.message.reply_text(_("✅ Content for '<b>{page_key} ({lang})</b>' updated successfully.").format(page_key=page_key, lang=lang_code.upper()))
     else:
-        await update.message.reply_text(_("❌ Failed to update content for '<b>{page_key}</b>'.").format(page_key=page_key))
+        await update.message.reply_text(_("❌ Failed to update content for '<b>{page_key} ({lang})</b>'.").format(page_key=page_key, lang=lang_code.upper()))
 
+    # Clean up context
     context.user_data.pop('edit_content_key', None)
-    await admin_panel_handler(update, context) # Show main admin menu
+    context.user_data.pop('edit_content_lang', None)
+
+    # We can't easily go back to the admin menu from a text message reply,
+    # so we just confirm and end. The admin can use /admin again.
     return ConversationHandler.END
 
 
 async def edit_content_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancels the content edit process."""
     _ = get_translation_func_for_user(update.effective_user.id)
+    # Clean up all context keys for this conversation
     context.user_data.pop('edit_content_key', None)
-    await update.message.reply_text(_("Content edit operation cancelled."))
-    await admin_panel_handler(update, context) # Show main admin menu
+    context.user_data.pop('edit_content_lang', None)
+
+    # Determine if it was a button press or a command
+    query = update.callback_query
+    if query:
+        await query.answer()
+        await query.edit_message_text(_("Content edit operation cancelled."))
+    else:
+        await update.message.reply_text(_("Content edit operation cancelled."))
+
+    # Don't try to go back to the admin panel, just end.
     return ConversationHandler.END
 
 edit_content_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(edit_content_start, pattern='^admin_content_edit_')],
     states={
+        CHOOSE_LANG: [
+            CallbackQueryHandler(edit_content_receive_lang, pattern='^edit_lang_(en|ar)$'),
+        ],
         EDIT_CONTENT_VALUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_content_receive_value)],
     },
-    fallbacks=[CommandHandler('cancel', edit_content_cancel)],
+    fallbacks=[
+        CommandHandler('cancel', edit_content_cancel),
+        CallbackQueryHandler(edit_content_cancel, pattern='^edit_lang_cancel$')
+    ],
     block=False,
     per_message=False,
 )

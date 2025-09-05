@@ -87,8 +87,10 @@ TABLE_DEFINITIONS = {
     """,
     "info_pages": """
         CREATE TABLE IF NOT EXISTS info_pages (
-            page_key TEXT PRIMARY KEY,
-            content TEXT NOT NULL
+            page_key TEXT NOT NULL,
+            lang_code TEXT NOT NULL,
+            content TEXT NOT NULL,
+            PRIMARY KEY (page_key, lang_code)
         );
     """
 }
@@ -146,16 +148,26 @@ def initialize_database():
             # --- Default Content for Info Pages ---
             log.debug("Inserting default content for info_pages...")
             default_pages = {
-                'privacy': 'This is the default Privacy Policy. Please edit this text in the admin panel.',
-                'disclaimer': 'This is the default Disclaimer. Please edit this text in the admin panel.',
-                'payment': 'This is the default Payment and Refund Policy. Please edit this text in the admin panel.',
-                'project': 'This is the default Project Information. Please edit this text in the admin panel.',
-                'features': 'This is the default Bot Features description. Please edit this text in the admin panel.'
+                'en': {
+                    'privacy': 'This is the default Privacy Policy. Please edit this text in the admin panel.',
+                    'disclaimer': 'This is the default Disclaimer. Please edit this text in the admin panel.',
+                    'payment': 'This is the default Payment and Refund Policy. Please edit this text in the admin panel.',
+                    'project': 'This is the default Project Information. Please edit this text in the admin panel.',
+                    'features': 'This is the default Bot Features description. Please edit this text in the admin panel.'
+                },
+                'ar': {
+                    'privacy': 'هذه هي سياسة الخصوصية الافتراضية. يرجى تعديل هذا النص من لوحة التحكم.',
+                    'disclaimer': 'هذا هو إخلاء المسؤولية الافتراضي. يرجى تعديل هذا النص من لوحة التحكم.',
+                    'payment': 'هذه هي سياسة الدفع والاسترداد الافتراضية. يرجى تعديل هذا النص من لوحة التحكم.',
+                    'project': 'هذه هي معلومات المشروع الافتراضية. يرجى تعديل هذا النص من لوحة التحكم.',
+                    'features': 'هذا هو وصف ميزات البوت الافتراضي. يرجى تعديل هذا النص من لوحة التحكم.'
+                }
             }
-            for key, content in default_pages.items():
-                # INSERT OR IGNORE will not overwrite existing content, which is what we want.
-                cursor.execute("INSERT OR IGNORE INTO info_pages (page_key, content) VALUES (?, ?)", (key, content))
-            log.info("Default info pages content checked/inserted.")
+            for lang_code, pages in default_pages.items():
+                for page_key, content in pages.items():
+                    # INSERT OR IGNORE will not overwrite existing content, which is what we want.
+                    cursor.execute("INSERT OR IGNORE INTO info_pages (page_key, lang_code, content) VALUES (?, ?, ?)", (page_key, lang_code, content))
+            log.info("Default info pages content checked/inserted for all languages.")
             # --- End Default Content ---
 
             conn.commit()
@@ -273,30 +285,35 @@ def update_plan(plan_id: int, **kwargs):
 
 # --- Info Page Management Functions ---
 
-def get_info_page_content(page_key: str):
-    """Retrieves the content of an info page."""
-    sql = "SELECT content FROM info_pages WHERE page_key = ?"
+def get_info_page_content(page_key: str, lang_code: str):
+    """Retrieves the content of an info page for a specific language."""
+    sql = "SELECT content FROM info_pages WHERE page_key = ? AND lang_code = ?"
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (page_key,))
+            cursor.execute(sql, (page_key, lang_code))
             row = cursor.fetchone()
+            # Fallback to English if the requested language has no content
+            if not row:
+                log.warning(f"No content for page '{page_key}' in lang '{lang_code}', falling back to 'en'.")
+                cursor.execute(sql, (page_key, 'en'))
+                row = cursor.fetchone()
             return row['content'] if row else None
     except sqlite3.Error as e:
-        log.error(f"Failed to retrieve info page '{page_key}': {e}")
+        log.error(f"Failed to retrieve info page '{page_key}' for lang '{lang_code}': {e}")
         return None
 
-def update_info_page_content(page_key: str, content: str):
-    """Updates the content of an info page."""
-    sql = "UPDATE info_pages SET content = ? WHERE page_key = ?"
+def update_info_page_content(page_key: str, lang_code: str, content: str):
+    """Updates the content of an info page for a specific language."""
+    sql = "UPDATE info_pages SET content = ? WHERE page_key = ? AND lang_code = ?"
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (content, page_key))
+            cursor.execute(sql, (content, page_key, lang_code))
             conn.commit()
             return cursor.rowcount > 0
     except sqlite3.Error as e:
-        log.error(f"Failed to update info page '{page_key}': {e}")
+        log.error(f"Failed to update info page '{page_key}' for lang '{lang_code}': {e}")
         return False
 
 

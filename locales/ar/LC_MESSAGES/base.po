@@ -977,3 +977,26 @@ msgstr "❌ فشل تحديث المحتوى لـ '<b>{page_key}</b>'."
 #: src/admin_handlers.py:125
 msgid "Content edit operation cancelled."
 msgstr "تم إلغاء عملية تعديل المحتوى."
+
+#: src/admin_handlers.py:108
+msgid "Please choose which language to edit:"
+msgstr "الرجاء اختيار اللغة التي تريد تعديلها:"
+
+#: src/admin_handlers.py:137
+#, python-brace-format
+msgid "You are editing the content for: <b>{page_key} ({lang})</b>\n\n"
+"Please send the new text. Send /cancel to abort.\n\n"
+"<b>Current content:</b>\n\n<pre>{current_content}</pre>"
+msgstr "أنت تقوم بتعديل المحتوى لـ: <b>{page_key} ({lang})</b>\n\n"
+"الرجاء إرسال النص الجديد. أرسل /cancel للإلغاء.\n\n"
+"<b>المحتوى الحالي:</b>\n\n<pre>{current_content}</pre>"
+
+#: src/admin_handlers.py:155
+#, python-brace-format
+msgid "✅ Content for '<b>{page_key} ({lang})</b>' updated successfully."
+msgstr "✅ تم تحديث المحتوى لـ '<b>{page_key} ({lang})</b>' بنجاح."
+
+#: src/admin_handlers.py:157
+#, python-brace-format
+msgid "❌ Failed to update content for '<b>{page_key} ({lang})</b>'."
+msgstr "❌ فشل تحديث المحتوى لـ '<b>{page_key} ({lang})</b>'."
