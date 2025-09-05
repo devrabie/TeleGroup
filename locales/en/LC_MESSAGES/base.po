@@ -932,6 +932,76 @@ msgstr "✅ Account has been deleted."
 msgid "❌ Could not delete account."
 msgstr "❌ Could not delete account."
 
+#: src/user_handlers.py:69
+msgid "ℹ️ Information & Policies"
+msgstr "ℹ️ Information & Policies"
+
+#: src/user_handlers.py:160
+msgid "Please select a topic to read about:"
+msgstr "Please select a topic to read about:"
+
+#: src/user_handlers.py:163
+msgid "📜 Privacy Policy"
+msgstr "📜 Privacy Policy"
+
+#: src/user_handlers.py:164
+msgid "⚖️ Disclaimer"
+msgstr "⚖️ Disclaimer"
+
+#: src/user_handlers.py:167
+msgid "💳 Payment & Refunds"
+msgstr "💳 Payment & Refunds"
+
+#: src/user_handlers.py:170
+msgid "ℹ️ About the Project"
+msgstr "ℹ️ About the Project"
+
+#: src/user_handlers.py:173
+msgid "✨ Bot Features"
+msgstr "✨ Bot Features"
+
+#: src/user_handlers.py:195
+msgid "Content for this page is not available yet. Please check back later."
+msgstr "Content for this page is not available yet. Please check back later."
+
+#: src/user_handlers.py:201
+msgid "Information"
+msgstr "Information"
+
+#: src/admin_handlers.py:32
+msgid "📝 Manage Content"
+msgstr "📝 Manage Content"
+
+#: src/admin_handlers.py:75
+msgid "Please select the content page you want to edit:"
+msgstr "Please select the content page you want to edit:"
+
+#: src/admin_handlers.py:97
+#, python-brace-format
+msgid ""
+"You are editing the content for: <b>{page_key}</b>\n\n"
+"Please send the new text. Send /cancel to abort.\n\n"
+"<b>Current content:</b>\n\n<pre>{current_content}</pre>"
+msgstr ""
+"You are editing the content for: <b>{page_key}</b>\n\n"
+"Please send the new text. Send /cancel to abort.\n\n"
+"<b>Current content:</b>\n\n<pre>{current_content}</pre>"
+
+
+#: src/admin_handlers.py:113
+#, python-brace-format
+msgid "✅ Content for '<b>{page_key}</b>' updated successfully."
+msgstr "✅ Content for '<b>{page_key}</b>' updated successfully."
+
+#: src/admin_handlers.py:115
+#, python-brace-format
+msgid "❌ Failed to update content for '<b>{page_key}</b>'."
+msgstr "❌ Failed to update content for '<b>{page_key}</b>'."
+
+#: src/admin_handlers.py:125
+msgid "Content edit operation cancelled."
+msgstr "Content edit operation cancelled."
+
 #~ msgid "Left Channels"
 #~ msgstr "Left Channels"
 

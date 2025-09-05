@@ -908,3 +908,72 @@ msgstr "✅ تم حذف الحساب."
 #: src/user_handlers.py:804
 msgid "❌ Could not delete account."
 msgstr "❌ تعذر حذف الحساب."
+
+#: src/user_handlers.py:69
+msgid "ℹ️ Information & Policies"
+msgstr "ℹ️ معلومات وسياسات"
+
+#: src/user_handlers.py:160
+msgid "Please select a topic to read about:"
+msgstr "الرجاء اختيار موضوع للقراءة عنه:"
+
+#: src/user_handlers.py:163
+msgid "📜 Privacy Policy"
+msgstr "📜 سياسة الخصوصية"
+
+#: src/user_handlers.py:164
+msgid "⚖️ Disclaimer"
+msgstr "⚖️ إخلاء المسؤولية"
+
+#: src/user_handlers.py:167
+msgid "💳 Payment & Refunds"
+msgstr "💳 شروط الدفع والاسترداد"
+
+#: src/user_handlers.py:170
+msgid "ℹ️ About the Project"
+msgstr "ℹ️ معلومات عن المشروع"
+
+#: src/user_handlers.py:173
+msgid "✨ Bot Features"
+msgstr "✨ ميزات البوت"
+
+#: src/user_handlers.py:195
+msgid "Content for this page is not available yet. Please check back later."
+msgstr "المحتوى لهذه الصفحة غير متوفر بعد. يرجى المراجعة لاحقاً."
+
+#: src/user_handlers.py:201
+msgid "Information"
+msgstr "معلومات"
+
+#: src/admin_handlers.py:32
+msgid "📝 Manage Content"
+msgstr "📝 إدارة المحتوى"
+
+#: src/admin_handlers.py:75
+msgid "Please select the content page you want to edit:"
+msgstr "الرجاء اختيار صفحة المحتوى التي تريد تعديلها:"
+
+#: src/admin_handlers.py:97
+#, python-brace-format
+msgid ""
+"You are editing the content for: <b>{page_key}</b>\n\n"
+"Please send the new text. Send /cancel to abort.\n\n"
+"<b>Current content:</b>\n\n<pre>{current_content}</pre>"
+msgstr ""
+"أنت تقوم بتعديل المحتوى لـ: <b>{page_key}</b>\n\n"
+"الرجاء إرسال النص الجديد. أرسل /cancel للإلغاء.\n\n"
+"<b>المحتوى الحالي:</b>\n\n<pre>{current_content}</pre>"
+
+#: src/admin_handlers.py:113
+#, python-brace-format
+msgid "✅ Content for '<b>{page_key}</b>' updated successfully."
+msgstr "✅ تم تحديث المحتوى لـ '<b>{page_key}</b>' بنجاح."
+
+#: src/admin_handlers.py:115
+#, python-brace-format
+msgid "❌ Failed to update content for '<b>{page_key}</b>'."
+msgstr "❌ فشل تحديث المحتوى لـ '<b>{page_key}</b>'."
+
+#: src/admin_handlers.py:125
+msgid "Content edit operation cancelled."
+msgstr "تم إلغاء عملية تعديل المحتوى."

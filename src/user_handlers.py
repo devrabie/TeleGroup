@@ -28,7 +28,7 @@ from src.database import (
     get_all_plans, get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
     delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
     set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
-    update_user_details, mark_proxy_as_bad, get_account_details
+    update_user_details, mark_proxy_as_bad, get_account_details, get_info_page_content
 )
 from src.translation import get_translation_func_for_user
 from pyrogram.enums import ChatType, ChatMemberStatus
@@ -67,6 +67,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, message_
          InlineKeyboardButton(_("👤 My Accounts"), callback_data='main_my_accounts')],
         [InlineKeyboardButton(_("➕ Add Account"), callback_data='start_add_account'),
          InlineKeyboardButton(_("🌐 Language"), callback_data='main_language')],
+        [InlineKeyboardButton(_("ℹ️ Information & Policies"), callback_data='main_info_policies')],
         [InlineKeyboardButton(_("❓ Help"), callback_data='main_help')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -97,6 +98,8 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await my_accounts_handler(update, context)
         elif action == 'language':
             await language_handler(update, context)
+        elif action == 'info_policies':
+            await show_info_policies_menu(update, context)
         elif action == 'help':
             await help_handler(update, context)
         elif action == 'back':
@@ -148,6 +151,68 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
     else:
         await update.message.reply_text(help_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+
+async def show_info_policies_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Displays the info & policies sub-menu."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+
+    text = _("Please select a topic to read about:")
+    keyboard = [
+        [
+            InlineKeyboardButton(_("📜 Privacy Policy"), callback_data='info_privacy'),
+            InlineKeyboardButton(_("⚖️ Disclaimer"), callback_data='info_disclaimer')
+        ],
+        [
+            InlineKeyboardButton(_("💳 Payment & Refunds"), callback_data='info_payment')
+        ],
+        [
+            InlineKeyboardButton(_("ℹ️ About the Project"), callback_data='info_project')
+        ],
+        [
+            InlineKeyboardButton(_("✨ Bot Features"), callback_data='info_features')
+        ],
+        [
+            InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+
+async def info_page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles callbacks for the info pages, displaying the content."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+
+    page_key = query.data.split('_')[1]
+
+    # Map page_key to a title
+    page_titles = {
+        'privacy': _("📜 Privacy Policy"),
+        'disclaimer': _("⚖️ Disclaimer"),
+        'payment': _("💳 Payment & Refunds"),
+        'project': _("ℹ️ About the Project"),
+        'features': _("✨ Bot Features")
+    }
+    title = page_titles.get(page_key, _("Information"))
+
+    content = get_info_page_content(page_key)
+    if not content:
+        content = _("Content for this page is not available yet. Please check back later.")
+
+    text = f"<b>{title}</b>\n\n{content}"
+
+    keyboard = [[InlineKeyboardButton(_("🔙 Back"), callback_data='main_info_policies')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
 
 async def subscribe_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1021,6 +1086,7 @@ user_handlers_list = [
     CallbackQueryHandler(set_language_callback, pattern="^set_lang_"),
     CommandHandler("my_accounts", my_accounts_handler),
     CallbackQueryHandler(manage_account_callback, pattern="^mng_"),
+    CallbackQueryHandler(info_page_callback, pattern="^info_"),
     CallbackQueryHandler(main_menu_callback, pattern="^main_"),
     add_account_conv_handler,
 ]

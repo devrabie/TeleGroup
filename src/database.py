@@ -84,6 +84,12 @@ TABLE_DEFINITIONS = {
             creation_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (account_id) REFERENCES managed_accounts (id)
         );
+    """,
+    "info_pages": """
+        CREATE TABLE IF NOT EXISTS info_pages (
+            page_key TEXT PRIMARY KEY,
+            content TEXT NOT NULL
+        );
     """
 }
 
@@ -136,6 +142,21 @@ def initialize_database():
                 # Setting a default of 0 for existing plans. Admins should update them.
                 cursor.execute("ALTER TABLE plans ADD COLUMN price_usd REAL NOT NULL DEFAULT 0")
             # --- End Migrations ---
+
+            # --- Default Content for Info Pages ---
+            log.debug("Inserting default content for info_pages...")
+            default_pages = {
+                'privacy': 'This is the default Privacy Policy. Please edit this text in the admin panel.',
+                'disclaimer': 'This is the default Disclaimer. Please edit this text in the admin panel.',
+                'payment': 'This is the default Payment and Refund Policy. Please edit this text in the admin panel.',
+                'project': 'This is the default Project Information. Please edit this text in the admin panel.',
+                'features': 'This is the default Bot Features description. Please edit this text in the admin panel.'
+            }
+            for key, content in default_pages.items():
+                # INSERT OR IGNORE will not overwrite existing content, which is what we want.
+                cursor.execute("INSERT OR IGNORE INTO info_pages (page_key, content) VALUES (?, ?)", (key, content))
+            log.info("Default info pages content checked/inserted.")
+            # --- End Default Content ---
 
             conn.commit()
         log.info("Database initialized successfully.")
@@ -248,6 +269,35 @@ def update_plan(plan_id: int, **kwargs):
     except sqlite3.Error as e:
         log.error(f"Failed to update plan {plan_id}: {e}")
         return False, "db_error"
+
+
+# --- Info Page Management Functions ---
+
+def get_info_page_content(page_key: str):
+    """Retrieves the content of an info page."""
+    sql = "SELECT content FROM info_pages WHERE page_key = ?"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (page_key,))
+            row = cursor.fetchone()
+            return row['content'] if row else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to retrieve info page '{page_key}': {e}")
+        return None
+
+def update_info_page_content(page_key: str, content: str):
+    """Updates the content of an info page."""
+    sql = "UPDATE info_pages SET content = ? WHERE page_key = ?"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (content, page_key))
+            conn.commit()
+            return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        log.error(f"Failed to update info page '{page_key}': {e}")
+        return False
 
 
 # --- User Management Functions ---

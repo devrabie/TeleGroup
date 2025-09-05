@@ -7,7 +7,7 @@ from telegram.constants import ParseMode
 from src import config
 from src.database import (
     add_plan, get_all_plans, get_all_users, get_user_details, grant_subscription,
-    get_system_stats, get_plan_by_id, update_plan
+    get_system_stats, get_plan_by_id, update_plan, get_info_page_content, update_info_page_content
 )
 from src.translation import get_translation_func_for_user
 
@@ -29,6 +29,7 @@ async def admin_panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         [InlineKeyboardButton(_("📊 Statistics"), callback_data='admin_view_stats')],
         [InlineKeyboardButton(_("👥 Manage Users"), callback_data='admin_menu_users')],
         [InlineKeyboardButton(_("📋 Manage Plans"), callback_data='admin_menu_plans')],
+        [InlineKeyboardButton(_("📝 Manage Content"), callback_data='admin_menu_content')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -64,6 +65,87 @@ async def stats_view_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
+
+# --- Content Management Handlers ---
+EDIT_CONTENT_VALUE = range(40, 41)
+
+async def content_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Displays the menu for managing info page content."""
+    query = update.callback_query
+    await query.answer()
+    _ = get_translation_func_for_user(update.effective_user.id)
+
+    text = _("Please select the content page you want to edit:")
+    keyboard = [
+        [InlineKeyboardButton(_("📜 Privacy Policy"), callback_data='admin_content_edit_privacy')],
+        [InlineKeyboardButton(_("⚖️ Disclaimer"), callback_data='admin_content_edit_disclaimer')],
+        [InlineKeyboardButton(_("💳 Payment & Refunds"), callback_data='admin_content_edit_payment')],
+        [InlineKeyboardButton(_("ℹ️ About the Project"), callback_data='admin_content_edit_project')],
+        [InlineKeyboardButton(_("✨ Bot Features"), callback_data='admin_content_edit_features')],
+        [InlineKeyboardButton(_("🔙 Back"), callback_data='admin_menu_main')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+
+async def edit_content_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Starts the conversation to edit a content page."""
+    query = update.callback_query
+    await query.answer()
+    _ = get_translation_func_for_user(update.effective_user.id)
+
+    page_key = query.data.split('_')[-1]
+    context.user_data['edit_content_key'] = page_key
+
+    current_content = get_info_page_content(page_key)
+
+    text = _(
+        "You are editing the content for: <b>{page_key}</b>\n\n"
+        "Please send the new text. Send /cancel to abort.\n\n"
+        "<b>Current content:</b>\n\n<pre>{current_content}</pre>"
+    ).format(page_key=page_key.replace('_', ' ').title(), current_content=current_content)
+
+    await query.message.reply_text(text, parse_mode=ParseMode.HTML)
+    return EDIT_CONTENT_VALUE
+
+
+async def edit_content_receive_value(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the new content and updates the database."""
+    _ = get_translation_func_for_user(update.effective_user.id)
+    new_content = update.message.text
+    page_key = context.user_data.get('edit_content_key')
+
+    if not page_key:
+        await update.message.reply_text(_("An error occurred (missing context). Please start over."))
+        return ConversationHandler.END
+
+    if update_info_page_content(page_key, new_content):
+        await update.message.reply_text(_("✅ Content for '<b>{page_key}</b>' updated successfully.").format(page_key=page_key))
+    else:
+        await update.message.reply_text(_("❌ Failed to update content for '<b>{page_key}</b>'.").format(page_key=page_key))
+
+    context.user_data.pop('edit_content_key', None)
+    await admin_panel_handler(update, context) # Show main admin menu
+    return ConversationHandler.END
+
+
+async def edit_content_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancels the content edit process."""
+    _ = get_translation_func_for_user(update.effective_user.id)
+    context.user_data.pop('edit_content_key', None)
+    await update.message.reply_text(_("Content edit operation cancelled."))
+    await admin_panel_handler(update, context) # Show main admin menu
+    return ConversationHandler.END
+
+edit_content_conv_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(edit_content_start, pattern='^admin_content_edit_')],
+    states={
+        EDIT_CONTENT_VALUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_content_receive_value)],
+    },
+    fallbacks=[CommandHandler('cancel', edit_content_cancel)],
+    block=False,
+    per_message=False,
+)
 
 async def edit_plan_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -830,6 +912,8 @@ async def admin_callback_router(update: Update, context: ContextTypes.DEFAULT_TY
         await admin_panel_handler(update, context)
     elif action == 'admin_view_stats':
         await stats_view_handler(update, context)
+    elif action == 'admin_menu_content':
+        await content_menu_handler(update, context)
     elif action == 'admin_menu_users':
         await users_menu_handler(update, context)
     elif query.data.startswith('admin_users_list_'):
@@ -860,6 +944,7 @@ admin_handlers_list = [
     create_plan_conv_handler,
     grant_sub_conv_handler,
     edit_plan_conv_handler,
+    edit_content_conv_handler,
     # Generic callback router for menus
     CallbackQueryHandler(admin_callback_router, pattern="^admin_"),
 ]
