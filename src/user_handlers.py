@@ -494,7 +494,7 @@ async def async_send_code(phone, context, user_id, _):
                 api_hash=device_profile.get('api_hash') or config.API_HASH,
                 device_model=device_profile.get('device_model'),
                 system_version=device_profile.get('system_version'),
-                app_version=device_profile.get('app_version'),
+                # app_version is intentionally omitted during login as requested by user
                 lang_code=device_profile.get('lang_code'),
                 in_memory=True,
                 proxy=proxy_dict
