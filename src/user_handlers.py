@@ -20,7 +20,8 @@ from pyrogram import Client
 from pyrogram.errors import (
     SessionPasswordNeeded,
     PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired,
-    Timeout
+    Timeout,
+    Forbidden
 )
 
 from src import config
@@ -505,6 +506,17 @@ async def async_send_code(phone, context, user_id, _):
             context.user_data['phone_code_hash'] = sent_code.phone_code_hash
             await context.bot.send_message(user_id, _("A login code has been sent. Please send it here."))
             return  # Success
+
+        except Forbidden as e:
+            if "RECAPTCHA_CHECK" in str(e):
+                log.warning(f"Login for user {user_id} blocked by reCAPTCHA.")
+                await context.bot.send_message(user_id, _("Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number."))
+            else:
+                log.error(f"An unexpected Forbidden error occurred while sending code for user {user_id}: {e}", exc_info=True)
+                await context.bot.send_message(user_id, _("An unexpected error occurred. Please try again."))
+            if client and client.is_connected:
+                await client.disconnect()
+            return # Stop the process
 
         except (Timeout, ConnectionError) as e:
             log.warning(f"Proxy/Connection failed for user {user_id} on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. Proxy ID: {proxy_id}. Error: {e}")

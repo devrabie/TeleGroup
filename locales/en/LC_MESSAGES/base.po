@@ -1074,6 +1074,10 @@ msgstr "❌ Failed to update content for '<b>{page_key} ({lang})</b>'."
 #~ "account may not have the required "
 #~ "permissions, or the group may already"
 #~ " be a supergroup."
+
+#: src/user_handlers.py:516
+msgid "Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number."
+msgstr "Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number."
 #~ msgstr ""
 #~ "❌ Failed to convert group. The "
 #~ "account may not have the required "

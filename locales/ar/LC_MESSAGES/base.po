@@ -1000,3 +1000,7 @@ msgstr "✅ تم تحديث المحتوى لـ '<b>{page_key} ({lang})</b>' ب�
 #, python-brace-format
 msgid "❌ Failed to update content for '<b>{page_key} ({lang})</b>'."
 msgstr "❌ فشل تحديث المحتوى لـ '<b>{page_key} ({lang})</b>'."
+
+#: src/user_handlers.py:516
+msgid "Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number."
+msgstr "لقد حظر تليجرام محاولة تسجيل الدخول هذه بواسطة اختبار CAPTCHA. قد يكون هذا بسبب رقم الهاتف أو عنوان IP الخاص بالخادم. يرجى المحاولة مرة أخرى لاحقًا أو باستخدام رقم هاتف مختلف."
