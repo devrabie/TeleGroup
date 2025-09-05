@@ -143,6 +143,27 @@ def initialize_database():
                 log.info("Running migration: Adding 'price_usd' column to 'plans' table.")
                 # Setting a default of 0 for existing plans. Admins should update them.
                 cursor.execute("ALTER TABLE plans ADD COLUMN price_usd REAL NOT NULL DEFAULT 0")
+
+            # Migration for info_pages to add lang_code
+            cursor.execute("PRAGMA table_info(info_pages)")
+            info_pages_columns = [info[1] for info in cursor.fetchall()]
+            if 'lang_code' not in info_pages_columns and 'page_key' in info_pages_columns:
+                log.info("Running migration: Adding 'lang_code' to 'info_pages' and migrating data.")
+                try:
+                    cursor.execute("BEGIN")
+                    cursor.execute("ALTER TABLE info_pages RENAME TO info_pages_old")
+                    cursor.execute(TABLE_DEFINITIONS['info_pages'])
+                    cursor.execute("""
+                        INSERT INTO info_pages (page_key, lang_code, content)
+                        SELECT page_key, 'en', content FROM info_pages_old
+                    """)
+                    cursor.execute("DROP TABLE info_pages_old")
+                    cursor.execute("COMMIT")
+                    log.info("Migration for 'info_pages' completed successfully.")
+                except Exception as e:
+                    log.error(f"Error during 'info_pages' migration: {e}. Rolling back.")
+                    cursor.execute("ROLLBACK")
+                    raise e
             # --- End Migrations ---
 
             # --- Default Content for Info Pages ---
