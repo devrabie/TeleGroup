@@ -3,6 +3,7 @@ import logging
 import random
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
+from .device_profiles import DEVICES
 
 # --- Configuration ---
 DB_FILE = Path(__file__).parent.parent / "data" / "bot.db"
@@ -92,6 +93,18 @@ TABLE_DEFINITIONS = {
             content TEXT NOT NULL,
             PRIMARY KEY (page_key, lang_code)
         );
+    """,
+    "device_profiles": """
+        CREATE TABLE IF NOT EXISTS device_profiles (
+            id INTEGER PRIMARY KEY,
+            device_model TEXT NOT NULL,
+            system_version TEXT NOT NULL,
+            app_version TEXT NOT NULL,
+            lang_code TEXT NOT NULL,
+            client_platform TEXT NOT NULL,
+            api_id INTEGER,
+            api_hash TEXT
+        );
     """
 }
 
@@ -165,6 +178,45 @@ def initialize_database():
                     cursor.execute("ROLLBACK")
                     raise e
             # --- End Migrations ---
+
+            # --- Populate Device Profiles ---
+            log.debug("Populating device_profiles table...")
+            for device in DEVICES:
+                # The client_platform is an enum, we need its string value
+                platform_str = device["client_platform"].value
+                cursor.execute("""
+                    INSERT OR IGNORE INTO device_profiles
+                    (device_model, system_version, app_version, lang_code, client_platform, api_id, api_hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    device["device_model"],
+                    device["system_version"],
+                    device["app_version"],
+                    device["lang_code"],
+                    platform_str,
+                    device.get("api_id"),
+                    device.get("api_hash")
+                ))
+            log.info("Device profiles table populated/updated.")
+
+            # --- Migration for managed_accounts to add device_profile_id ---
+            cursor.execute("PRAGMA table_info(managed_accounts)")
+            managed_accounts_columns = [info[1] for info in cursor.fetchall()]
+            if 'device_profile_id' not in managed_accounts_columns:
+                log.info("Running migration: Adding 'device_profile_id' to 'managed_accounts'.")
+                # Add the column, allowing NULL for now
+                cursor.execute("ALTER TABLE managed_accounts ADD COLUMN device_profile_id INTEGER REFERENCES device_profiles(id)")
+
+            # Assign a random profile to any account that doesn't have one
+            # This handles both the initial migration and any potential future cases
+            log.info("Assigning random device profiles to accounts without one...")
+            cursor.execute("""
+                UPDATE managed_accounts
+                SET device_profile_id = (SELECT id FROM device_profiles ORDER BY RANDOM() LIMIT 1)
+                WHERE device_profile_id IS NULL
+            """)
+            log.info(f"{cursor.rowcount} accounts were assigned a device profile.")
+
 
             # --- Default Content for Info Pages ---
             log.debug("Inserting default content for info_pages...")
@@ -427,15 +479,45 @@ def get_random_proxy_id():
         log.error(f"Failed to retrieve a random proxy: {e}")
         return None
 
-def add_managed_account(user_id: int, phone: str, session_string: str):
+def get_random_device_profile():
+    """Retrieves a random device profile from the database."""
+    sql = "SELECT * FROM device_profiles ORDER BY RANDOM() LIMIT 1"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            profile = cursor.fetchone()
+            return dict(profile) if profile else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to retrieve a random device profile: {e}")
+        return None
+
+def get_device_profile_by_account_id(account_id: int):
+    """Retrieves the device profile associated with a managed account."""
+    sql = """
+        SELECT dp.* FROM device_profiles dp
+        JOIN managed_accounts ma ON ma.device_profile_id = dp.id
+        WHERE ma.id = ?
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (account_id,))
+            profile = cursor.fetchone()
+            return dict(profile) if profile else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to get device profile for account {account_id}: {e}")
+        return None
+
+def add_managed_account(user_id: int, phone: str, session_string: str, device_profile_id: int):
     """Adds a new managed account for a user and assigns a random proxy."""
     proxy_id = get_random_proxy_id()
     if proxy_id is None:
         log.warning(f"No available proxies to assign to account {phone}.")
 
     sql = """
-        INSERT INTO managed_accounts (user_id, phone, session_string, proxy_id, is_active, is_running)
-        VALUES (?, ?, ?, ?, 1, 0)
+        INSERT INTO managed_accounts (user_id, phone, session_string, proxy_id, device_profile_id, is_active, is_running)
+        VALUES (?, ?, ?, ?, ?, 1, 0)
     """
     try:
         with get_db_connection() as conn:
@@ -449,9 +531,9 @@ def add_managed_account(user_id: int, phone: str, session_string: str):
                 return False
 
             internal_user_id = internal_user_id_row['id']
-            cursor.execute(sql, (internal_user_id, phone, session_string, proxy_id))
+            cursor.execute(sql, (internal_user_id, phone, session_string, proxy_id, device_profile_id))
             conn.commit()
-        log.info(f"Successfully added account {phone} for user {user_id}.")
+        log.info(f"Successfully added account {phone} for user {user_id} with profile {device_profile_id}.")
         return True
     except sqlite3.IntegrityError:
         log.warning(f"Account with phone number {phone} already exists.")
@@ -650,11 +732,18 @@ def get_eligible_accounts():
             ma.session_string,
             ma.proxy_id,
             p.daily_group_limit,
-            u.telegram_id
+            u.telegram_id,
+            dp.device_model,
+            dp.system_version,
+            dp.app_version,
+            dp.lang_code,
+            dp.api_id,
+            dp.api_hash
         FROM managed_accounts ma
         JOIN users u ON ma.user_id = u.id
         JOIN subscriptions s ON u.id = s.user_id
         JOIN plans p ON s.plan_id = p.id
+        LEFT JOIN device_profiles dp ON ma.device_profile_id = dp.id
         WHERE ma.is_active = 1
           AND s.is_active = 1
           AND s.end_date >= datetime('now')

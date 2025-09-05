@@ -91,7 +91,18 @@ async def process_single_account(account_details: dict):
 
         try:
             client_name = f"auto_session_{account_id}_{random.randint(1000, 9999)}"
-            user_client = Client(client_name, session_string=session_string, in_memory=True, proxy=proxy_dict)
+            user_client = Client(
+                client_name,
+                session_string=session_string,
+                api_id=account_details.get('api_id') or config.API_ID,
+                api_hash=account_details.get('api_hash') or config.API_HASH,
+                device_model=account_details.get('device_model'),
+                system_version=account_details.get('system_version'),
+                app_version=account_details.get('app_version'),
+                lang_code=account_details.get('lang_code'),
+                in_memory=True,
+                proxy=proxy_dict
+            )
 
             await asyncio.wait_for(user_client.start(), timeout=30.0)
             log.info(f"Successfully started client for account {account_id}.")

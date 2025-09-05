@@ -29,7 +29,7 @@ from src.database import (
     delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
     set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
     update_user_details, mark_proxy_as_bad, get_account_details, get_info_page_content,
-    get_user_language
+    get_user_language, get_random_device_profile, get_device_profile_by_account_id
 )
 from src.translation import get_translation_func_for_user
 from pyrogram.enums import ChatType, ChatMemberStatus
@@ -444,6 +444,16 @@ async def async_send_code(phone, context, user_id, _):
     Tries to connect to Telegram and send a login code.
     Retries with a new proxy if the connection fails.
     """
+    # Fetch a random device profile to use for this login attempt.
+    device_profile = get_random_device_profile()
+    if not device_profile:
+        log.error(f"Could not get a device profile for user {user_id}. Aborting login.")
+        await context.bot.send_message(user_id, _("Could not prepare a secure session. Please contact support."))
+        return
+
+    # Store the chosen profile ID to be saved with the account later
+    context.user_data['device_profile_id'] = device_profile['id']
+
     for attempt in range(MAX_PROXY_RETRIES):
         proxy_id = get_random_proxy_id()
         proxy_string = get_proxy_string(proxy_id) if proxy_id else None
@@ -476,10 +486,15 @@ async def async_send_code(phone, context, user_id, _):
             log.warning(f"Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: No proxy available for user {user_id}. Proceeding without proxy.")
 
         try:
+            # Use the device profile parameters. Fallback to config for api_id/hash if not in profile.
             client = Client(
                 f"user_session_{phone}_{attempt}",
-                api_id=config.API_ID,
-                api_hash=config.API_HASH,
+                api_id=device_profile.get('api_id') or config.API_ID,
+                api_hash=device_profile.get('api_hash') or config.API_HASH,
+                device_model=device_profile.get('device_model'),
+                system_version=device_profile.get('system_version'),
+                app_version=device_profile.get('app_version'),
+                lang_code=device_profile.get('lang_code'),
                 in_memory=True,
                 proxy=proxy_dict
             )
@@ -571,9 +586,10 @@ async def receive_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def async_complete_login(context, user_id, _):
     client = context.user_data['pyrogram_client']
     phone = context.user_data['phone']
+    device_profile_id = context.user_data['device_profile_id']
     session_string = await client.export_session_string()
     await client.disconnect()
-    if add_managed_account(user_id, phone, session_string):
+    if add_managed_account(user_id, phone, session_string, device_profile_id):
         await context.bot.send_message(user_id, _("✅ Account added successfully!"))
     else:
         await context.bot.send_message(user_id, _("❌ Could not save your account to the database. It might already be registered."))
@@ -761,7 +777,22 @@ async def async_generate_group_report(update: Update, context: ContextTypes.DEFA
         )
         return
 
-    client = Client(f"user_session_reporter_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+    device_profile = get_device_profile_by_account_id(account_id)
+    if not device_profile:
+        log.warning(f"No device profile found for account {account_id}. Using default client settings.")
+        client = Client(f"user_session_reporter_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+    else:
+        client = Client(
+            f"user_session_reporter_{account_id}",
+            session_string=session_string,
+            api_id=device_profile.get('api_id') or config.API_ID,
+            api_hash=device_profile.get('api_hash') or config.API_HASH,
+            device_model=device_profile.get('device_model'),
+            system_version=device_profile.get('system_version'),
+            app_version=device_profile.get('app_version'),
+            lang_code=device_profile.get('lang_code'),
+            in_memory=True
+        )
 
     try:
         await client.connect()
@@ -866,7 +897,22 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                 await query.edit_message_text(_("Error: Could not retrieve session for this account."))
                 return
 
-            client = Client(f"user_session_reader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+            device_profile = get_device_profile_by_account_id(account_id)
+            if not device_profile:
+                log.warning(f"No device profile found for account {account_id}. Using default client settings.")
+                client = Client(f"user_session_reader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+            else:
+                client = Client(
+                    f"user_session_reader_{account_id}",
+                    session_string=session_string,
+                    api_id=device_profile.get('api_id') or config.API_ID,
+                    api_hash=device_profile.get('api_hash') or config.API_HASH,
+                    device_model=device_profile.get('device_model'),
+                    system_version=device_profile.get('system_version'),
+                    app_version=device_profile.get('app_version'),
+                    lang_code=device_profile.get('lang_code'),
+                    in_memory=True
+                )
 
             try:
                 await client.connect()
@@ -953,7 +999,22 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                 await query.edit_message_text(_("Error: Could not retrieve session for this account."))
                 return
 
-            client = Client(f"user_session_upgrader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+            device_profile = get_device_profile_by_account_id(account_id)
+            if not device_profile:
+                log.warning(f"No device profile found for account {account_id}. Using default client settings.")
+                client = Client(f"user_session_upgrader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+            else:
+                client = Client(
+                    f"user_session_upgrader_{account_id}",
+                    session_string=session_string,
+                    api_id=device_profile.get('api_id') or config.API_ID,
+                    api_hash=device_profile.get('api_hash') or config.API_HASH,
+                    device_model=device_profile.get('device_model'),
+                    system_version=device_profile.get('system_version'),
+                    app_version=device_profile.get('app_version'),
+                    lang_code=device_profile.get('lang_code'),
+                    in_memory=True
+                )
 
             try:
                 await client.connect()
