@@ -443,58 +443,51 @@ MAX_PROXY_RETRIES = 3
 async def async_send_code(phone, context, user_id, _):
     """
     Tries to connect to Telegram and send a login code.
-    Retries with a new proxy if the connection fails.
+    Retries with a new proxy and device profile if the connection fails or if a CAPTCHA is requested.
     """
-    # Fetch a random device profile to use for this login attempt.
-    device_profile = get_random_device_profile()
-    if not device_profile:
-        log.error(f"Could not get a device profile for user {user_id}. Aborting login.")
-        await context.bot.send_message(user_id, _("Could not prepare a secure session. Please contact support."))
-        return
-
-    # Store the chosen profile ID to be saved with the account later
-    context.user_data['device_profile_id'] = device_profile['id']
-
     for attempt in range(MAX_PROXY_RETRIES):
+        # --- Get a new proxy and device profile for each attempt ---
         proxy_id = get_random_proxy_id()
         proxy_string = get_proxy_string(proxy_id) if proxy_id else None
         proxy_dict = None
         client = None
 
+        device_profile = get_random_device_profile()
+        if not device_profile:
+            log.error(f"Could not get a device profile for user {user_id} on attempt {attempt + 1}. Aborting login.")
+            await context.bot.send_message(user_id, _("Could not prepare a secure session. Please contact support."))
+            return
+
+        # Store the chosen profile ID to be saved with the account later
+        context.user_data['device_profile_id'] = device_profile['id']
+
+        # --- Prepare Proxy ---
         if proxy_string:
             try:
                 parts = proxy_string.split(':')
                 hostname, port = parts[0], parts[1]
-
-                # Use credentials from env vars if they exist, otherwise use from proxy string
                 username = config.PROXY_USERNAME or parts[2]
                 password = config.PROXY_PASSWORD or parts[3]
-
                 proxy_dict = {
-                    "scheme": "socks5",
-                    "hostname": hostname,
-                    "port": int(port),
-                    "username": username,
-                    "password": password,
+                    "scheme": "socks5", "hostname": hostname, "port": int(port),
+                    "username": username, "password": password
                 }
-                log.info(f"Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: Using proxy {hostname} for user {user_id}")
+                log.info(f"Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: User {user_id} using proxy {hostname} and device '{device_profile['device_model']}'")
             except (ValueError, IndexError) as e:
                 log.error(f"Invalid proxy format: '{proxy_string}'. Error: {e}")
-                if proxy_id:
-                    mark_proxy_as_bad(proxy_id)
-                continue
+                if proxy_id: mark_proxy_as_bad(proxy_id)
+                continue # Try next attempt
         else:
             log.warning(f"Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: No proxy available for user {user_id}. Proceeding without proxy.")
 
+        # --- Attempt Connection and Send Code ---
         try:
-            # Use the device profile parameters. Fallback to config for api_id/hash if not in profile.
             client = Client(
                 f"user_session_{phone}_{attempt}",
                 api_id=device_profile.get('api_id') or config.API_ID,
                 api_hash=device_profile.get('api_hash') or config.API_HASH,
                 device_model=device_profile.get('device_model'),
                 system_version=device_profile.get('system_version'),
-                # app_version is intentionally omitted during login as requested by user
                 lang_code=device_profile.get('lang_code'),
                 in_memory=True,
                 proxy=proxy_dict

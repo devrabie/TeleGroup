@@ -66,12 +66,4 @@ DEVICES = [
     {"api_id": ANDROID_API_ID, "api_hash": ANDROID_API_HASH, "device_model": "Pixel 7a", "system_version": "14 (34)", "app_version": "11.13.2 (60601)", "lang_code": "en", "client_platform": enums.ClientPlatform.ANDROID},
     {"api_id": ANDROID_API_ID, "api_hash": ANDROID_API_HASH, "device_model": "Pixel 6", "system_version": "13 (33)", "app_version": "11.13.2 (60601)", "lang_code": "en", "client_platform": enums.ClientPlatform.ANDROID},
     {"api_id": ANDROID_API_ID, "api_hash": ANDROID_API_HASH, "device_model": "Pixel 5", "system_version": "12 (31)", "app_version": "11.13.2 (60601)", "lang_code": "en", "client_platform": enums.ClientPlatform.ANDROID},
-
-    # --- iOS Devices ---
-    # For iOS, we don't set a specific api_id/hash, letting Pyrogram use its default for iOS clients.
-    {"device_model": "iPhone15,2", "system_version": "17.0 (21A329)", "app_version": "11.13.2", "lang_code": "en", "client_platform": enums.ClientPlatform.IOS},
-    {"device_model": "iPhone14,7", "system_version": "16.6 (20G75)", "app_version": "11.13.2", "lang_code": "en", "client_platform": enums.ClientPlatform.IOS},
-    {"device_model": "iPhone13,2", "system_version": "15.8 (19H357)", "app_version": "11.13.2", "lang_code": "en", "client_platform": enums.ClientPlatform.IOS},
-    {"device_model": "iPhone12,5", "system_version": "15.7 (19H12)", "app_version": "11.13.2", "lang_code": "en", "client_platform": enums.ClientPlatform.IOS},
-    {"device_model": "iPhone11,8", "system_version": "15.7 (19H12)", "app_version": "11.13.2", "lang_code": "en", "client_platform": enums.ClientPlatform.IOS},
 ]
