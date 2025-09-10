@@ -484,11 +484,11 @@ async def async_send_code(phone, context, user_id, _):
         try:
             client = Client(
                 f"user_session_{phone}_{attempt}",
-                api_id=device_profile.get('api_id') or config.API_ID,
-                api_hash=device_profile.get('api_hash') or config.API_HASH,
+                api_id=config.API_ID or device_profile.get('api_id'),
+                api_hash=config.API_HASH or device_profile.get('api_hash'),
                 device_model=device_profile.get('device_model'),
                 system_version=device_profile.get('system_version'),
-                lang_code="ar",
+                lang_code=device_profile.get('lang_code'),
                 in_memory=True,
                 proxy=proxy_dict
             )
@@ -802,12 +802,12 @@ async def async_generate_group_report(update: Update, context: ContextTypes.DEFA
         client = Client(
             f"user_session_reporter_{account_id}",
             session_string=session_string,
-            api_id=device_profile.get('api_id') or config.API_ID,
-            api_hash=device_profile.get('api_hash') or config.API_HASH,
+            api_id=config.API_ID or device_profile.get('api_id'),
+            api_hash=config.API_HASH or device_profile.get('api_hash'),
             device_model=device_profile.get('device_model'),
             system_version=device_profile.get('system_version'),
             app_version=device_profile.get('app_version'),
-            lang_code="ar",
+            lang_code=device_profile.get('lang_code'),
             in_memory=True
         )
 
@@ -922,12 +922,12 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                 client = Client(
                     f"user_session_reader_{account_id}",
                     session_string=session_string,
-                    api_id=device_profile.get('api_id') or config.API_ID,
-                    api_hash=device_profile.get('api_hash') or config.API_HASH,
+                    api_id=config.API_ID or device_profile.get('api_id'),
+                    api_hash=config.API_HASH or device_profile.get('api_hash'),
                     device_model=device_profile.get('device_model'),
                     system_version=device_profile.get('system_version'),
                     app_version=device_profile.get('app_version'),
-                    lang_code="ar",
+                    lang_code=device_profile.get('lang_code'),
                     in_memory=True
                 )
 
@@ -1024,12 +1024,12 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                 client = Client(
                     f"user_session_upgrader_{account_id}",
                     session_string=session_string,
-                    api_id=device_profile.get('api_id') or config.API_ID,
-                    api_hash=device_profile.get('api_hash') or config.API_HASH,
+                    api_id=config.API_ID or device_profile.get('api_id'),
+                    api_hash=config.API_HASH or device_profile.get('api_hash'),
                     device_model=device_profile.get('device_model'),
                     system_version=device_profile.get('system_version'),
                     app_version=device_profile.get('app_version'),
-                    lang_code="ar",
+                    lang_code=device_profile.get('lang_code'),
                     in_memory=True
                 )
 
