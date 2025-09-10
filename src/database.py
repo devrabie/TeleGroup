@@ -71,6 +71,7 @@ TABLE_DEFINITIONS = {
             next_creation_time TIMESTAMP,
             backoff_level INTEGER NOT NULL DEFAULT 0,
             last_error TEXT,
+            deleted_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
             FOREIGN KEY (proxy_id) REFERENCES proxies (id)
@@ -149,6 +150,9 @@ def initialize_database():
             if 'last_error' not in columns:
                 log.info("Running migration: Adding 'last_error' column to 'managed_accounts' table.")
                 cursor.execute("ALTER TABLE managed_accounts ADD COLUMN last_error TEXT")
+            if 'deleted_at' not in columns:
+                log.info("Running migration: Adding 'deleted_at' column to 'managed_accounts' table.")
+                cursor.execute("ALTER TABLE managed_accounts ADD COLUMN deleted_at TIMESTAMP")
 
             cursor.execute("PRAGMA table_info(plans)")
             plan_columns = [info[1] for info in cursor.fetchall()]
@@ -531,18 +535,18 @@ def get_device_profile_by_account_id(account_id: int):
         return None
 
 def add_managed_account(user_id: int, phone: str, session_string: str, device_profile_id: int):
-    """Adds a new managed account for a user and assigns a random proxy."""
-    proxy_id = get_random_proxy_id()
-    if proxy_id is None:
-        log.warning(f"No available proxies to assign to account {phone}.")
-
-    sql = """
-        INSERT INTO managed_accounts (user_id, phone, session_string, proxy_id, device_profile_id, is_active, is_running)
-        VALUES (?, ?, ?, ?, ?, 1, 0)
     """
+    Adds a new managed account or reactivates a soft-deleted one.
+    Assigns a new random proxy in either case.
+    """
+    new_proxy_id = get_random_proxy_id()
+    if new_proxy_id is None:
+        log.warning(f"No available proxies to assign to new account {phone}.")
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+
             # We need the internal DB user ID, not the telegram_id
             internal_user_id_query = "SELECT id FROM users WHERE telegram_id = ?"
             cursor.execute(internal_user_id_query, (user_id,))
@@ -550,35 +554,73 @@ def add_managed_account(user_id: int, phone: str, session_string: str, device_pr
             if not internal_user_id_row:
                 log.error(f"Cannot add account. User with Telegram ID {user_id} not found in users table.")
                 return False
-
             internal_user_id = internal_user_id_row['id']
-            cursor.execute(sql, (internal_user_id, phone, session_string, proxy_id, device_profile_id))
+
+            # Check if a soft-deleted account exists for this user and phone
+            check_sql = "SELECT id FROM managed_accounts WHERE user_id = ? AND phone = ? AND deleted_at IS NOT NULL"
+            cursor.execute(check_sql, (internal_user_id, phone))
+            existing_account = cursor.fetchone()
+
+            if existing_account:
+                # --- Undelete and update existing account ---
+                account_id = existing_account['id']
+                log.info(f"Reactivating soft-deleted account for phone {phone} (ID: {account_id}).")
+                update_sql = """
+                    UPDATE managed_accounts
+                    SET session_string = ?,
+                        proxy_id = ?,
+                        device_profile_id = ?,
+                        is_active = 1,
+                        deleted_at = NULL,
+                        last_error = NULL,
+                        backoff_level = 0,
+                        next_creation_time = NULL
+                    WHERE id = ?
+                """
+                cursor.execute(update_sql, (session_string, new_proxy_id, device_profile_id, account_id))
+                log.info(f"Successfully reactivated account {phone}.")
+            else:
+                # --- Insert new account ---
+                log.info(f"Adding new account for phone {phone}.")
+                insert_sql = """
+                    INSERT INTO managed_accounts (user_id, phone, session_string, proxy_id, device_profile_id, is_active, is_running)
+                    VALUES (?, ?, ?, ?, ?, 1, 0)
+                """
+                cursor.execute(insert_sql, (internal_user_id, phone, session_string, new_proxy_id, device_profile_id))
+                log.info(f"Successfully added account {phone}.")
+
             conn.commit()
-        log.info(f"Successfully added account {phone} for user {user_id} with profile {device_profile_id}.")
-        return True
+            return True
+
     except sqlite3.IntegrityError:
-        log.warning(f"Account with phone number {phone} already exists.")
+        # This will now only catch active duplicates, since we checked for soft-deleted ones.
+        log.warning(f"Attempted to add a duplicate, active account with phone number {phone}.")
         return False
     except sqlite3.Error as e:
-        log.error(f"Failed to add managed account {phone} for user {user_id}: {e}")
+        log.error(f"Failed to add or reactivate managed account {phone} for user {user_id}: {e}")
         return False
 
 # --- User Dashboard Functions ---
 
 def delete_managed_account(account_id: int, telegram_user_id: int):
-    """Deletes a managed account, ensuring the user owns it."""
+    """
+    Soft-deletes a managed account by setting the deleted_at timestamp.
+    Also deactivates the account to pull it from any active loops.
+    """
     sql = """
-        DELETE FROM managed_accounts
+        UPDATE managed_accounts
+        SET deleted_at = ?, is_active = 0
         WHERE id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
     """
+    now_utc = datetime.now(timezone.utc)
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (account_id, telegram_user_id))
+            cursor.execute(sql, (now_utc, account_id, telegram_user_id))
             conn.commit()
-            return cursor.rowcount > 0 # Returns True if a row was deleted
+            return cursor.rowcount > 0 # Returns True if a row was updated
     except sqlite3.Error as e:
-        log.error(f"Failed to delete account {account_id} for user {telegram_user_id}: {e}")
+        log.error(f"Failed to soft-delete account {account_id} for user {telegram_user_id}: {e}")
         return False
 
 def toggle_account_status(account_id: int, telegram_user_id: int):
@@ -766,6 +808,7 @@ def get_eligible_accounts():
         JOIN plans p ON s.plan_id = p.id
         LEFT JOIN device_profiles dp ON ma.device_profile_id = dp.id
         WHERE ma.is_active = 1
+          AND ma.deleted_at IS NULL
           AND s.is_active = 1
           AND s.end_date >= datetime('now')
           AND (ma.flood_wait_until IS NULL OR ma.flood_wait_until < datetime('now'))
@@ -986,7 +1029,7 @@ def get_user_details(telegram_id: int):
         WHERE s.user_id = ? AND s.is_active = 1
         ORDER BY s.end_date DESC LIMIT 1
     """
-    accounts_sql = "SELECT id, phone, is_active, last_error, next_creation_time FROM managed_accounts WHERE user_id = ?"
+    accounts_sql = "SELECT id, phone, is_active, last_error, next_creation_time FROM managed_accounts WHERE user_id = ? AND deleted_at IS NULL"
 
     try:
         with get_db_connection() as conn:
