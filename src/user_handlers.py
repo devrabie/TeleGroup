@@ -503,7 +503,19 @@ async def async_send_code(phone, context, user_id, _):
         except Forbidden as e:
             if "RECAPTCHA_CHECK" in str(e):
                 log.warning(f"Login for user {user_id} blocked by reCAPTCHA.")
-                await context.bot.send_message(user_id, _("Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number."))
+
+                # Format the device profile details for the user
+                device_info = "\n".join([f"- {k}: {v}" for k, v in device_profile.items()])
+
+                # Format the final message
+                debug_message = (
+                    _("Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number.") +
+                    "\n\n--- 🐞 Debug Info ---\n" +
+                    _("Proxy Used: `{proxy}`").format(proxy=proxy_string or _("None")) + "\n" +
+                    _("Device Profile:") + f"\n<pre>{device_info}</pre>"
+                )
+
+                await context.bot.send_message(user_id, debug_message, parse_mode=ParseMode.HTML)
             else:
                 log.error(f"An unexpected Forbidden error occurred while sending code for user {user_id}: {e}", exc_info=True)
                 await context.bot.send_message(user_id, _("An unexpected error occurred. Please try again."))
