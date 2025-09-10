@@ -83,7 +83,7 @@ TABLE_DEFINITIONS = {
             group_id INTEGER NOT NULL,
             group_name TEXT NOT NULL,
             creation_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (account_id) REFERENCES managed_accounts (id)
+            FOREIGN KEY (account_id) REFERENCES managed_accounts (id) ON DELETE CASCADE
         );
     """,
     "info_pages": """
@@ -177,6 +177,27 @@ def initialize_database():
                     log.error(f"Error during 'info_pages' migration: {e}. Rolling back.")
                     cursor.execute("ROLLBACK")
                     raise e
+            # --- Migration for group_creation_log to add ON DELETE CASCADE ---
+            cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='group_creation_log'")
+            result = cursor.fetchone()
+            if result and "on delete cascade" not in result[0].lower():
+                log.info("Running migration: Adding ON DELETE CASCADE to 'group_creation_log'.")
+                try:
+                    # Use a savepoint for this specific migration
+                    cursor.execute("SAVEPOINT group_log_migration")
+                    cursor.execute("ALTER TABLE group_creation_log RENAME TO group_creation_log_old")
+                    cursor.execute(TABLE_DEFINITIONS['group_creation_log'])
+                    # Note: We don't need to specify columns if they are the same order
+                    cursor.execute("INSERT INTO group_creation_log SELECT * FROM group_creation_log_old")
+                    cursor.execute("DROP TABLE group_creation_log_old")
+                    cursor.execute("RELEASE SAVEPOINT group_log_migration")
+                    log.info("Migration for 'group_creation_log' completed successfully.")
+                except Exception as e:
+                    log.error(f"Error during 'group_creation_log' migration: {e}. Rolling back.")
+                    cursor.execute("ROLLBACK TO SAVEPOINT group_log_migration")
+                    raise e
+            # --- End Migration ---
+
             # --- End Migrations ---
 
             # --- Populate Device Profiles ---
