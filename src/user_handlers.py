@@ -488,7 +488,7 @@ async def async_send_code(phone, context, user_id, _):
                 api_hash=device_profile.get('api_hash') or config.API_HASH,
                 device_model=device_profile.get('device_model'),
                 system_version=device_profile.get('system_version'),
-                lang_code=device_profile.get('lang_code'),
+                lang_code="ar",
                 in_memory=True,
                 proxy=proxy_dict
             )
@@ -795,7 +795,7 @@ async def async_generate_group_report(update: Update, context: ContextTypes.DEFA
             device_model=device_profile.get('device_model'),
             system_version=device_profile.get('system_version'),
             app_version=device_profile.get('app_version'),
-            lang_code=device_profile.get('lang_code'),
+            lang_code="ar",
             in_memory=True
         )
 
@@ -915,7 +915,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                     device_model=device_profile.get('device_model'),
                     system_version=device_profile.get('system_version'),
                     app_version=device_profile.get('app_version'),
-                    lang_code=device_profile.get('lang_code'),
+                    lang_code="ar",
                     in_memory=True
                 )
 
@@ -1017,7 +1017,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                     device_model=device_profile.get('device_model'),
                     system_version=device_profile.get('system_version'),
                     app_version=device_profile.get('app_version'),
-                    lang_code=device_profile.get('lang_code'),
+                    lang_code="ar",
                     in_memory=True
                 )
 
