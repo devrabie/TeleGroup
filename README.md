@@ -2,6 +2,10 @@
 
 This is a comprehensive Telegram bot designed to manage multiple Telegram user accounts for the purpose of automated group creation. The bot is multi-user, subscription-based (using Telegram Stars), and includes a full admin panel for management.
 
+It uses a dual-library architecture:
+- **`python-telegram-bot`**: For the user-facing bot interface (commands, buttons, conversations).
+- **`Pyrogram`**: For the backend automation involving user accounts (logging in, creating groups).
+
 ## Features
 
 - **Multi-User & Subscriptions**: Regular users can subscribe to plans to use the bot's features.

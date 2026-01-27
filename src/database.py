@@ -178,9 +178,10 @@ def get_all_users():
 
 def grant_subscription(telegram_id: int, plan_id: int, duration_days: int):
     """Grants a subscription to a user, deactivating any existing active ones."""
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
-    end_date = datetime.now() + timedelta(days=duration_days)
+    now_utc = datetime.now(timezone.utc)
+    end_date = now_utc + timedelta(days=duration_days)
 
     get_user_sql = "SELECT id FROM users WHERE telegram_id = ?"
     deactivate_sql = "UPDATE subscriptions SET is_active = 0 WHERE user_id = ? AND is_active = 1"
@@ -203,7 +204,7 @@ def grant_subscription(telegram_id: int, plan_id: int, duration_days: int):
             user_id = user_row['id']
 
             cursor.execute(deactivate_sql, (user_id,))
-            cursor.execute(insert_sql, (user_id, plan_id, datetime.now(), end_date))
+            cursor.execute(insert_sql, (user_id, plan_id, now_utc, end_date))
             conn.commit()
 
         log.info(f"Successfully granted plan {plan_id} to user {telegram_id} for {duration_days} days.")
@@ -345,6 +346,19 @@ def reassign_proxy(account_id: int, telegram_user_id: int):
         log.error(f"Failed to reassign proxy for account {account_id}: {e}")
         return False, "Database error."
 
+def get_account_session_string(account_id: int):
+    """Retrieves the session string for a specific managed account."""
+    sql = "SELECT session_string FROM managed_accounts WHERE id = ?"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (account_id,))
+            row = cursor.fetchone()
+            return row['session_string'] if row else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to get session string for account {account_id}: {e}")
+        return None
+
 def get_account_stats(account_id: int):
     """Gets creation stats for a specific managed account."""
     sql = "SELECT COUNT(id) as total_groups FROM group_creation_log WHERE account_id = ?"
@@ -357,6 +371,32 @@ def get_account_stats(account_id: int):
     except sqlite3.Error as e:
         log.error(f"Failed to get stats for account {account_id}: {e}")
         return 0
+
+def get_groups_for_account(account_id: int):
+    """Retrieves all groups created by a specific managed account."""
+    sql = "SELECT id, group_id, group_name, creation_timestamp FROM group_creation_log WHERE account_id = ? ORDER BY creation_timestamp DESC"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (account_id,))
+            groups = cursor.fetchall()
+            return [dict(group) for group in groups]
+    except sqlite3.Error as e:
+        log.error(f"Failed to get groups for account {account_id}: {e}")
+        return []
+
+def get_group_log_details(group_log_id: int):
+    """Retrieves the details of a single group from the creation log."""
+    sql = "SELECT group_name, creation_timestamp FROM group_creation_log WHERE id = ?"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (group_log_id,))
+            group_details = cursor.fetchone()
+            return dict(group_details) if group_details else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to get group log details for log {group_log_id}: {e}")
+        return None
 
 def mark_proxy_as_bad(proxy_id: int):
     """Marks a proxy as not working."""
@@ -405,7 +445,7 @@ def get_eligible_accounts():
         JOIN plans p ON s.plan_id = p.id
         WHERE ma.is_active = 1
           AND s.is_active = 1
-          AND date(s.end_date) >= date('now')
+          AND s.end_date >= datetime('now')
     """
     try:
         with get_db_connection() as conn:
@@ -447,8 +487,33 @@ def log_group_creation(account_id: int, group_id: int, group_name: str):
         log.error(f"Failed to log group creation for account {account_id}: {e}")
         return False
 
+def get_or_create_user(telegram_id: int):
+    """
+    Retrieves a user by their telegram_id, creating them if they don't exist.
+    Returns the user as a dict.
+    """
+    select_sql = "SELECT * FROM users WHERE telegram_id = ?"
+    # Note: Default language_code is 'en' via the table schema
+    insert_sql = "INSERT OR IGNORE INTO users (telegram_id) VALUES (?)"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            # Use INSERT OR IGNORE and then SELECT to handle race conditions gracefully
+            # and avoid a separate SELECT call first in the common case.
+            cursor.execute(insert_sql, (telegram_id,))
+            if cursor.rowcount > 0:
+                log.info(f"Created new user record for telegram_id: {telegram_id}")
+
+            cursor.execute(select_sql, (telegram_id,))
+            user = cursor.fetchone()
+            return dict(user) if user else None
+    except sqlite3.Error as e:
+        log.error(f"Database error in get_or_create_user for {telegram_id}: {e}")
+        return None
+
 def set_user_language(telegram_id: int, lang_code: str):
     """Sets the preferred language for a user."""
+    get_or_create_user(telegram_id)  # Ensure user exists before setting language
     sql = "UPDATE users SET language_code = ? WHERE telegram_id = ?"
     try:
         with get_db_connection() as conn:
@@ -461,16 +526,13 @@ def set_user_language(telegram_id: int, lang_code: str):
         return False
 
 def get_user_language(telegram_id: int):
-    """Gets the preferred language for a user."""
-    sql = "SELECT language_code FROM users WHERE telegram_id = ?"
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(sql, (telegram_id,))
-            row = cursor.fetchone()
-            return row['language_code'] if row else 'en' # Default to 'en'
-    except sqlite3.Error:
-        return 'en' # Default to 'en' on error
+    """
+    Gets the preferred language for a user, creating the user if they don't exist.
+    """
+    user = get_or_create_user(telegram_id)
+    if user and user.get('language_code'):
+        return user['language_code']
+    return 'en' # Default to 'en'
 
 
 def get_user_details(telegram_id: int):

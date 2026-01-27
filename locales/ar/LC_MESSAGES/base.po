@@ -181,7 +181,93 @@ msgstr ""
 msgid "Invalid number format in arguments."
 msgstr "صيغة الأرقام في المعاملات غير صالحة."
 
-#: src/user_handlers.py:24
+#: src/user_handlers.py:46
+msgid "Welcome to the main menu. Please choose an option:"
+msgstr "أهلاً بك في القائمة الرئيسية. الرجاء اختيار أحد الخيارات:"
+
+#: src/user_handlers.py:53
+msgid "🚀 Subscribe"
+msgstr "🚀 اشتراك"
+
+#: src/user_handlers.py:54
+msgid "👤 My Accounts"
+msgstr "👤 حساباتي"
+
+#: src/user_handlers.py:55
+msgid "➕ Add Account"
+msgstr "➕ إضافة حساب"
+
+#: src/user_handlers.py:56
+msgid "🌐 Language"
+msgstr "🌐 اللغة"
+
+#: src/user_handlers.py:57
+msgid "❓ Help"
+msgstr "❓ مساعدة"
+
+#: src/user_handlers.py:129
+msgid "🔙 Back"
+msgstr "🔙 رجوع"
+
+#: src/user_handlers.py:380
+msgid "Please select an account to manage:"
+msgstr "الرجاء اختيار حساب لإدارته:"
+
+#: src/user_handlers.py:433
+msgid "🔙 Back to Account List"
+msgstr "🔙 رجوع إلى قائمة الحسابات"
+
+#: src/user_handlers.py:417
+msgid "Error: Account not found."
+msgstr "خطأ: لم يتم العثور على الحساب."
+
+#: src/user_handlers.py:461
+#, python-brace-format
+msgid "<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}\n\n📊 <b>Stats:</b> {count} groups created."
+msgstr "<b>الحساب:</b> <code>{phone}</code>\n<b>الحالة:</b> {status}\n\n📊 <b>الإحصائيات:</b> تم إنشاء {count} مجموعة."
+
+#: src/user_handlers.py:549
+msgid "Are you sure you want to delete this account? This action cannot be undone."
+msgstr "هل أنت متأكد من أنك تريد حذف هذا الحساب؟ لا يمكن التراجع عن هذا الإجراء."
+
+#: src/user_handlers.py:432
+msgid "📂 View Groups"
+msgstr "📂 عرض المجموعات"
+
+#: src/user_handlers.py:501
+msgid "Fetching groups... Please wait."
+msgstr "جاري جلب المجموعات... الرجاء الانتظار."
+
+#: src/user_handlers.py:505
+msgid "Error: Could not retrieve session for this account."
+msgstr "خطأ: تعذر استرداد جلسة هذا الحساب."
+
+#: src/user_handlers.py:516
+msgid "This account is not a member of any groups."
+msgstr "هذا الحساب ليس عضوا في أي مجموعات."
+
+#: src/user_handlers.py:530
+#, python-brace-format
+msgid "<b>Groups for Account (Page {page_num}/{total_pages}):</b>\n\n"
+msgstr "<b>مجموعات الحساب (صفحة {page_num}/{total_pages}):</b>\n\n"
+
+#: src/user_handlers.py:536
+msgid "⬅️ Previous"
+msgstr "⬅️ السابق"
+
+#: src/user_handlers.py:538
+msgid "Next ➡️"
+msgstr "التالي ➡️"
+
+#: src/user_handlers.py:541
+msgid "🔙 Back to Account"
+msgstr "🔙 رجوع إلى الحساب"
+
+#: src/user_handlers.py:547
+msgid "An error occurred while fetching groups. The session might be invalid or revoked."
+msgstr "حدث خطأ أثناء جلب المجموعات. قد تكون الجلسة غير صالحة أو تم إلغاؤها."
+
+#: src/user_handlers.py:121
 msgid ""
 "There are currently no subscription plans available. Please check back "
 "later."
@@ -199,6 +285,40 @@ msgstr "لا توجد باقات نشطة لعرضها."
 #: src/user_handlers.py:39
 msgid "Please select a subscription plan from the list below:"
 msgstr "الرجاء اختيار باقة اشتراك من القائمة أدناه:"
+
+#: src/user_handlers.py:105
+#, python-brace-format
+msgid ""
+"<b>Bot Help & Commands</b>\n"
+"\n"
+"Here is a list of commands you can use:\n"
+"\n"
+"<b>/start</b> - Shows the welcome message.\n"
+"<b>/help</b> - Shows this help message.\n"
+"<b>/subscribe</b> - Browse and purchase a subscription plan to use the "
+"bot's features.\n"
+"<b>/my_accounts</b> - View and manage your connected Telegram accounts.\n"
+"<b>/add_account</b> - Start the process of adding a new Telegram account "
+"for the bot to manage.\n"
+"<b>/language</b> - Change the display language of the bot (English/العربية).\n"
+"\n"
+"For most features, you need an active subscription. You can get one via "
+"the /subscribe command."
+msgstr ""
+"<b>مساعدة البوت والأوامر</b>\n"
+"\n"
+"قائمة الأوامر المتاحة:\n"
+"\n"
+"<b>/start</b> - عرض القائمة الرئيسية.\n"
+"<b>/help</b> - عرض رسالة المساعدة هذه.\n"
+"<b>/subscribe</b> - تصفح وشراء باقة اشتراك لاستخدام ميزات البوت.\n"
+"<b>/my_accounts</b> - عرض وإدارة حساباتك المتصلة.\n"
+"<b>/add_account</b> - بدء عملية إضافة حساب تليجرام جديد لإدارته عبر "
+"البوت.\n"
+"<b>/language</b> - تغيير لغة عرض البوت (English/العربية).\n"
+"\n"
+"لاستخدام معظم الميزات، تحتاج إلى اشتراك نشط. يمكنك الحصول عليه عبر الأمر "
+"/subscribe."
 
 #: src/user_handlers.py:73
 msgid "This plan is no longer available."

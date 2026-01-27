@@ -1,12 +1,13 @@
 import logging
 import requests
+from telegram.ext import ContextTypes
 
-import config
-from database import batch_insert_proxies
+from src import config
+from src.database import batch_insert_proxies
 
 log = logging.getLogger(__name__)
 
-def update_proxies_from_url():
+async def update_proxies_from_url(context: ContextTypes.DEFAULT_TYPE):
     """
     Downloads the proxy list from the configured URL and updates the database.
     """
@@ -27,6 +28,15 @@ def update_proxies_from_url():
         if not proxy_list or (len(proxy_list) == 1 and not proxy_list[0]):
             log.warning("Downloaded proxy list is empty.")
             return
+
+        # Save the downloaded list to the file specified in config
+        try:
+            with open(config.DATA_PROXIES_FILE, "w") as f:
+                f.write("\n".join(proxy_list))
+            log.info(f"Successfully saved {len(proxy_list)} proxies to {config.DATA_PROXIES_FILE}")
+        except IOError as e:
+            log.error(f"Failed to write proxies to file {config.DATA_PROXIES_FILE}: {e}")
+            # We can still proceed to insert into DB
 
         new_proxies_count = batch_insert_proxies(proxy_list)
         log.info(f"Proxy update complete. Added {new_proxies_count} new proxies to the database.")

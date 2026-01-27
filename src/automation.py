@@ -1,10 +1,12 @@
 import asyncio
 import logging
 import random
+from datetime import datetime
+from telegram.ext import ContextTypes
 from pyrogram import Client
 from pyrogram.errors import FloodWait
 
-from database import (
+from src.database import (
     get_eligible_accounts,
     get_groups_created_today,
     get_account_stats,
@@ -16,7 +18,7 @@ from database import (
 
 log = logging.getLogger(__name__)
 
-async def run_group_creation_cycle():
+async def run_group_creation_cycle(context: ContextTypes.DEFAULT_TYPE):
     """The main automation cycle that creates groups."""
     log.info("Automation cycle started.")
     eligible_accounts = get_eligible_accounts()
@@ -63,7 +65,7 @@ async def process_single_account(account_details: dict):
             # Assuming format: hostname:port:username:password
             hostname, port, username, password = proxy_string.split(':')
             proxy_dict = {
-                "scheme": "http",
+                "scheme": "socks5",
                 "hostname": hostname,
                 "port": int(port),
                 "username": username,
@@ -83,20 +85,21 @@ async def process_single_account(account_details: dict):
         log.info(f"Successfully started client for account {account_id}.")
 
         total_groups_created = get_account_stats(account_id)
-        new_group_name = str(total_groups_created + 1)
+        now = datetime.now()
+        date_str = now.strftime("%Y-%m")
+        new_group_name = f"Group {total_groups_created + 1} {date_str}"
 
-        new_group = await user_client.create_group(title=new_group_name, users=[]) # Create empty group
-        log.info(f"Account {account_id} created group '{new_group_name}' (ID: {new_group.id}).")
+        # Create a new supergroup directly.
+        new_group = await user_client.create_supergroup(title=new_group_name, description="")
+        log.info(f"Account {account_id} created supergroup '{new_group_name}' (ID: {new_group.id}).")
 
-        # Convert to supergroup and send message
-        await asyncio.sleep(random.uniform(2, 5)) # Small delay before next action
-        await user_client.set_chat_history_for_new_members_enabled(new_group.id, True)
+        # Log the creation immediately to ensure the count is updated.
+        log_group_creation(account_id, new_group.id, new_group_name)
+
         await asyncio.sleep(random.uniform(2, 5))
         await user_client.send_message(new_group.id, f"Hello, group {new_group_name} is ready.")
 
-        # Log the success
-        log_group_creation(account_id, new_group.id, new_group_name)
-        log.info(f"Successfully processed and logged group creation for account {account_id}.")
+        log.info(f"Successfully processed group creation for account {account_id}.")
 
     except FloodWait as e:
         log.warning(f"Account {account_id} is flood-waited for {e.value} seconds. Skipping for now.")

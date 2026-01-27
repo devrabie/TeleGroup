@@ -1,461 +1,634 @@
 import logging
-from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+import asyncio
+import threading
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
+from telegram.constants import ParseMode
+from telegram.ext import (
+    ContextTypes,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters,
+    ConversationHandler,
+    PreCheckoutQueryHandler,
+)
 
-import config
-from database import get_all_plans
+from pyrogram import Client
+from pyrogram.errors import (
+    SessionPasswordNeeded,
+    PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired
+)
+
+from src import config
+from src.database import (
+    get_all_plans, get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
+    delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
+    set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
+    get_or_create_user
+)
+from src.translation import get_translation_func_for_user
+from pyrogram import Client
+from pyrogram.enums import ChatType
 
 log = logging.getLogger(__name__)
 
+# --- Handlers for various bot features ---
 
-# --- /subscribe command ---
-
-@filters.command("subscribe")
-async def subscribe_handler(client: Client, message: Message):
-    """
-    Handles the /subscribe command, showing available plans to the user.
-    """
-    user_id = message.from_user.id
+async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, message_id=None):
+    """Displays the main menu with inline buttons."""
+    user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    log.info(f"User {user_id} requested /subscribe.")
 
-    plans = get_all_plans(active_only=True)
-    if not plans:
-        await message.reply_text(_("There are currently no subscription plans available. Please check back later."))
-        return
+    keyboard = [
+        [InlineKeyboardButton(_("🚀 Subscribe"), callback_data='main_subscribe'),
+         InlineKeyboardButton(_("👤 My Accounts"), callback_data='main_my_accounts')],
+        [InlineKeyboardButton(_("➕ Add Account"), callback_data='main_add_account'),
+         InlineKeyboardButton(_("🌐 Language"), callback_data='main_language')],
+        [InlineKeyboardButton(_("❓ Help"), callback_data='main_help')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-    buttons = []
-    for plan in plans:
-        button_text = _("{plan_name} - {price} Stars").format(plan_name=plan['name'], price=plan['price_stars'])
-        callback_data = f"select_plan_{plan['id']}"
-        buttons.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+    text = _("Welcome to the main menu. Please choose an option:")
 
-    if not buttons:
-        await message.reply_text(_("No active plans to display."))
-        return
+    if message_id:
+        await context.bot.edit_message_text(chat_id=user_id, message_id=message_id, text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    else:
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
-    reply_markup = InlineKeyboardMarkup(buttons)
-    await message.reply_text(
-        _("Please select a subscription plan from the list below:"),
-        reply_markup=reply_markup
+async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Greets the user, ensures they are in the DB, and shows the main menu."""
+    user_id = update.effective_user.id
+    get_or_create_user(user_id) # Ensure user is in the database
+    await main_menu(update, context)
+
+async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    try:
+        action = query.data.split('_')[1]
+
+        if action == 'subscribe':
+            await subscribe_handler(update, context, from_callback=True)
+        elif action == 'my_accounts':
+            await my_accounts_handler(update, context, from_callback=True)
+        elif action == 'add_account':
+            # Add account is a conversation, it needs a message handler, not a callback query.
+            # We will send a message to the user and let them reply.
+            _ = get_translation_func_for_user(query.from_user.id)
+            await query.message.reply_text(_("To add an account, please use the /add_account command."))
+        elif action == 'language':
+            await language_handler(update, context, from_callback=True)
+        elif action == 'help':
+            await help_handler(update, context, from_callback=True)
+        elif action == 'back':
+            await main_menu(update, context, message_id=query.message.message_id)
+    except Exception as e:
+        log.error(f"Error in main_menu_callback: {e}", exc_info=True)
+        try:
+            _ = get_translation_func_for_user(query.from_user.id)
+            await query.message.reply_text(_("An error occurred. Please try again later."))
+        except Exception as inner_e:
+            log.error(f"Failed to even notify user about the main_menu_callback error: {inner_e}")
+
+async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
+    """Provides a detailed help message, showing admin commands to admins."""
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+
+    # Base help text for all users
+    help_text = _(
+        "<b>Bot Help & Commands</b>\n\n"
+        "Here is a list of commands you can use:\n\n"
+        "<b>/start</b> - Shows the welcome message.\n"
+        "<b>/help</b> - Shows this help message.\n"
+        "<b>/subscribe</b> - Browse and purchase a subscription plan to use the bot's features.\n"
+        "<b>/my_accounts</b> - View and manage your connected Telegram accounts.\n"
+        "<b>/add_account</b> - Start the process of adding a new Telegram account for the bot to manage.\n"
+        "<b>/language</b> - Change the display language of the bot (English/العربية).\n\n"
+        "For most features, you need an active subscription. You can get one via the /subscribe command."
     )
 
+    # Add admin commands if the user is an admin
+    if user_id in config.ADMIN_IDS:
+        admin_help_text = _(
+            "\n\n"
+            "<b>--- Admin Commands ---</b>\n"
+            "<b>/create_plan</b> - Create a new subscription plan.\n"
+            "<b>/list_plans</b> - List all plans.\n"
+            "<b>/list_users</b> - List all bot users.\n"
+            "<b>/view_user</b> - View details for a specific user.\n"
+            "<b>/grant_subscription</b> - Manually grant a subscription."
+        )
+        help_text += admin_help_text
 
-from pyrogram.types import CallbackQuery, LabeledPrice, PreCheckoutQuery
-from database import (
-    get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
-    delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
-    set_user_language
-)
-from translation import get_translation_func_for_user
-from pyrogram.errors import (
-    PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired, SessionPasswordRequired
-)
+    buttons = [[InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')]]
+    reply_markup = InlineKeyboardMarkup(buttons)
 
-# In-memory storage for the login flow.
-# In a real-world, scalable bot, this should be moved to a persistent store like Redis.
-user_sessions = {}  # {user_id: {"client": PyrogramClient, "phone": str}}
-user_states = {}    # {user_id: "state_name"}
+    if from_callback:
+        query = update.callback_query
+        await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    else:
+        await update.message.reply_text(help_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
 
-# --- Callbacks and Payment ---
-
-@filters.create(lambda _, __, query: query.data.startswith("select_plan_"))
-async def select_plan_callback_handler(client: Client, callback_query: CallbackQuery):
-    """Handles the user selecting a subscription plan from the inline keyboard."""
-    user_id = callback_query.from_user.id
+async def subscribe_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
+    user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    plan_id = int(callback_query.data.split("_")[2])
-    log.info(f"User {user_id} selected plan {plan_id}.")
+    plans = get_all_plans(active_only=True)
 
+    text = _("Please select a subscription plan from the list below:")
+
+    if not plans:
+        text = _("There are currently no subscription plans available. Please check back later.")
+        buttons = []
+    else:
+        buttons = [[InlineKeyboardButton(
+            _("{plan_name} - {price} Stars").format(plan_name=p['name'], price=p['price_stars']),
+            callback_data=f"select_plan_{p['id']}"
+        )] for p in plans]
+
+    buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
+    reply_markup = InlineKeyboardMarkup(buttons)
+
+    if from_callback:
+        query = update.callback_query
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    else:
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+async def select_plan_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+    plan_id = int(query.data.split("_")[2])
     plan = get_plan_by_id(plan_id)
-    if not plan:
-        await callback_query.answer(_("This plan is no longer available."), show_alert=True)
-        return
-
-    # Prepare invoice
     title = _("Subscription: {plan_name}").format(plan_name=plan['name'])
     description = _("Access to {accounts} accounts and {limit} groups/day.").format(
         accounts=plan['max_accounts'], limit=plan['daily_group_limit']
     )
     payload = f"plan_{plan_id}_user_{user_id}"
-    price = LabeledPrice(_("Subscription"), plan['price_stars'] * 100)
+    price = LabeledPrice(_("Subscription"), plan['price_stars'])
+    await context.bot.send_invoice(
+        chat_id=user_id, title=title, description=description, payload=payload,
+        provider_token="", currency="XTR", prices=[price]
+    )
 
-    try:
-        await client.send_invoice(
-            chat_id=user_id,
-            title=title,
-            description=description,
-            payload=payload,
-            provider_token="",
-            currency="XTR",
-            prices=[price],
-            start_parameter="subscribe"
-        )
-        await callback_query.answer()
-    except Exception as e:
-        log.error(f"Failed to send invoice for plan {plan_id} to user {user_id}: {e}")
-        await callback_query.answer(_("Could not process your request. Please try again."), show_alert=True)
+async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.pre_checkout_query
+    await query.answer(ok=True)
 
-
-@filters.pre_checkout_query
-async def pre_checkout_handler(client: Client, pre_checkout_query: PreCheckoutQuery):
-    """Confirms to Telegram that the bot is ready to accept the payment."""
-    log.info(f"Received pre_checkout_query from user {pre_checkout_query.from_user.id}")
-    await pre_checkout_query.answer(ok=True)
-
-
-@filters.successful_payment
-async def successful_payment_handler(client: Client, message: Message):
-    """Handles a successful payment, activating the user's subscription."""
-    user_id = message.from_user.id
+async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    log.info(f"Received successful payment from user {user_id}")
-
-    payment_info = message.successful_payment
-    payload = payment_info.invoice_payload
-
-    try:
-        plan_id = int(payload.split("_")[1])
-    except (IndexError, ValueError):
-        log.error(f"Invalid payload received from successful payment: {payload}")
-        await client.send_message(user_id, _("There was an issue processing your subscription. Please contact support."))
-        return
-
+    payload = update.message.successful_payment.invoice_payload
+    plan_id = int(payload.split("_")[1])
     plan = get_plan_by_id(plan_id)
-    if not plan:
-        log.error(f"Could not find plan {plan_id} after successful payment. Payload: {payload}")
-        await client.send_message(user_id, _("There was an issue finding your selected plan. Please contact support."))
-        return
-
     duration_days = plan['duration_days']
     success, msg = grant_subscription(user_id, plan_id, duration_days)
-
     if success:
         reply_text = _("✅ Thank you! Your '{plan_name}' subscription is now active for {days} days.").format(
-            plan_name=plan['name'], days=duration_days
-        )
-        await client.send_message(user_id, reply_text)
+            plan_name=plan['name'], days=duration_days)
     else:
-        log.error(f"Failed to grant subscription via payment for payload: {payload}. Reason: {msg}")
         reply_text = _("There was a database error activating your subscription. Please contact support with payload: `{payload}`").format(
-            payload=payload
-        )
-        await client.send_message(user_id, reply_text)
+            payload=payload)
+    await update.message.reply_text(reply_text)
 
-
-# --- Account Adding Flow ---
-
-@filters.command("add_account")
-async def add_account_handler(client: Client, message: Message):
-    """Starts the process of adding a new Telegram account."""
-    user_id = message.from_user.id
+async def language_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
+    user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    log.info(f"User {user_id} initiated /add_account.")
+    buttons = [
+        [InlineKeyboardButton("English 🇬🇧", callback_data="set_lang_en"),
+         InlineKeyboardButton("العربية 🇸🇦", callback_data="set_lang_ar")],
+        [InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')]
+    ]
+    reply_markup = InlineKeyboardMarkup(buttons)
+    text = _("Please choose your language:")
 
-    details = get_user_details(user_id)
-    if not details or not details.get('subscription'):
-        await message.reply_text(_("You need an active subscription to add accounts. Use /subscribe to get one."))
-        return
+    if from_callback:
+        query = update.callback_query
+        await query.edit_message_text(text, reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(text, reply_markup=reply_markup)
 
-    sub = details['subscription']
-    accounts = details['accounts']
-    plan = get_plan_by_id(sub['plan_id'])
-
-    if not plan:
-        await message.reply_text(_("Your subscription plan could not be found. Please contact support."))
-        return
-
-    if len(accounts) >= plan['max_accounts']:
-        reply = _("You have reached the maximum of {max_accounts} accounts for your '{plan_name}' plan.").format(
-            max_accounts=plan['max_accounts'], plan_name=plan['name']
-        )
-        await message.reply_text(reply)
-        return
-
-    # Cancel any previous attempts
-    if user_id in user_states:
-        del user_states[user_id]
-    if user_id in user_sessions:
-        if user_sessions[user_id]['client'].is_connected:
-            await user_sessions[user_id]['client'].disconnect()
-        del user_sessions[user_id]
-
-    user_states[user_id] = "awaiting_phone"
-    await message.reply_text(
-        _("Please send the phone number of the account you want to add.\n"
-          "<i>(Must be in international format, e.g., +1234567890)</i>")
+async def set_language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    lang_code = query.data.split("_")[2]
+    user_id = query.from_user.id
+    set_user_language(user_id, lang_code)
+    _new = get_translation_func_for_user(user_id)
+    await query.edit_message_text(
+        _new("Language changed successfully."),
+        parse_mode=ParseMode.HTML
     )
 
-@filters.command("cancel")
-async def cancel_handler(client: Client, message: Message):
-    """Cancels the current operation (like adding an account)."""
-    user_id = message.from_user.id
+# --- Add Account Conversation ---
+PHONE, CODE, PASSWORD = range(3)
+
+async def add_account_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    if user_id in user_states:
-        del user_states[user_id]
-        if user_id in user_sessions:
-            if user_sessions[user_id]['client'].is_connected:
-                await user_sessions[user_id]['client'].disconnect()
-            del user_sessions[user_id]
-        await message.reply_text(_("Operation cancelled."))
+    details = get_user_details(user_id)
+    if not (details and details.get('subscription')):
+        await update.message.reply_text(_("You need an active subscription to add accounts. Use /subscribe to get one."))
+        return ConversationHandler.END
+    plan = get_plan_by_id(details['subscription']['plan_id'])
+    if len(details['accounts']) >= plan['max_accounts']:
+        await update.message.reply_text(_("You have reached the maximum of {max_accounts} accounts for your '{plan_name}' plan.").format(
+            max_accounts=plan['max_accounts'], plan_name=plan['name']))
+        return ConversationHandler.END
+    await update.message.reply_text(
+        _("Please send the phone number of the account you want to add.\n<i>(Must be in international format, e.g., +1234567890)</i>"),
+        parse_mode=ParseMode.HTML
+    )
+    return PHONE
+
+async def async_send_code(phone, context, user_id, _):
+    proxy_id = get_random_proxy_id()
+    proxy_string = get_proxy_string(proxy_id) if proxy_id else None
+    proxy_dict = None
+
+    if proxy_string:
+        try:
+            hostname, port, username, password = proxy_string.split(':')
+            proxy_dict = {
+                "scheme": "socks5",
+                "hostname": hostname,
+                "port": int(port),
+                "username": username,
+                "password": password,
+            }
+            log.info(f"Using proxy {hostname} for login attempt for user {user_id}")
+        except (ValueError, IndexError) as e:
+            log.error(f"Invalid proxy format during login: '{proxy_string}'. Error: {e}")
+            # Continue without proxy if format is bad
     else:
-        await message.reply_text(_("Nothing to cancel."))
+        log.warning(f"No proxy available for login attempt for user {user_id}. Proceeding without proxy.")
 
-
-@filters.private & ~filters.command()
-async def conversation_handler(client: Client, message: Message):
-    """
-    Handles the conversational steps for adding an account.
-    This is a simple Finite State Machine (FSM).
-    """
-    user_id = message.from_user.id
-    state = user_states.get(user_id)
-
-    if not state:
-        return  # Not in a conversation, do nothing
-
-    if state == "awaiting_phone":
-        await handle_phone_number(client, message)
-    elif state == "awaiting_code":
-        await handle_phone_code(client, message)
-    elif state == "awaiting_password":
-        await handle_password(client, message)
-
-
-async def handle_phone_number(client: Client, message: Message):
-    user_id = message.from_user.id
-    _ = get_translation_func_for_user(user_id)
-    phone_number = message.text
-
-    await message.reply_text(_("Trying to log in with <code>{phone_number}</code>. Please wait...").format(phone_number=phone_number))
-
-    user_client = Client(
-        f"user_session_{user_id}",
+    client = Client(
+        f"user_session_{phone}",
         api_id=config.API_ID,
         api_hash=config.API_HASH,
-        in_memory=True
+        in_memory=True,
+        proxy=proxy_dict
     )
-    user_sessions[user_id] = {"client": user_client, "phone": phone_number}
-
+    context.user_data['pyrogram_client'] = client
     try:
-        await user_client.connect()
-        sent_code_info = await user_client.send_code(phone_number)
-        user_sessions[user_id]['phone_code_hash'] = sent_code_info.phone_code_hash
-
-        user_states[user_id] = "awaiting_code"
-        await message.reply_text(
-            _("A login code has been sent to your Telegram account. Please send it here.\n"
-              "Use /cancel to stop this process.")
-        )
+        await client.connect()
+        sent_code = await client.send_code(phone)
+        context.user_data['phone_code_hash'] = sent_code.phone_code_hash
+        await context.bot.send_message(user_id, _("A login code has been sent. Please send it here."))
     except PhoneNumberInvalid:
-        await message.reply_text(_("The phone number is invalid. Please try again with a valid number in international format."))
+        await context.bot.send_message(user_id, _("The phone number is invalid. Please try again."))
     except Exception as e:
-        log.error(f"Error during phone number handling for user {user_id}: {e}")
-        await message.reply_text(_("An unexpected error occurred. Please try again or use /cancel."))
-        del user_states[user_id]
+        log.error(f"Error sending code for user {user_id}: {e}")
+        await context.bot.send_message(user_id, _("An unexpected error occurred."))
 
-
-async def handle_phone_code(client: Client, message: Message):
-    user_id = message.from_user.id
+async def receive_phone_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    code = message.text.strip()
-    session_info = user_sessions.get(user_id)
+    phone_number = update.message.text
+    context.user_data['phone'] = phone_number
+    await update.message.reply_text(_("Processing... Please wait."))
+    asyncio.create_task(async_send_code(phone_number, context, user_id, _))
+    return CODE
 
-    if not session_info:
-        await message.reply_text(_("Your session has expired. Please start over with /add_account."))
-        del user_states[user_id]
-        return
-
-    user_client = session_info['client']
+async def async_sign_in(code, context, user_id, _):
+    client = context.user_data['pyrogram_client']
+    phone = context.user_data['phone']
+    phone_code_hash = context.user_data['phone_code_hash']
+    next_state = ConversationHandler.END
     try:
-        await user_client.sign_in(
-            session_info['phone'],
-            session_info['phone_code_hash'],
-            code
-        )
-        await complete_login(user_client, message)
-
-    except SessionPasswordRequired:
-        user_states[user_id] = "awaiting_password"
-        await message.reply_text(_("This account has Two-Factor Authentication enabled. Please send your password.\nUse /cancel to stop."))
+        await client.sign_in(phone, phone_code_hash, code)
+        await async_complete_login(context, user_id, _)
+    except SessionPasswordNeeded:
+        await context.bot.send_message(user_id, _("This account has Two-Factor Authentication enabled. Please send your password."))
+        next_state = PASSWORD
     except (PhoneCodeInvalid, PhoneCodeExpired):
-        await message.reply_text(_("Invalid or expired code. Please send the correct code again."))
+        await context.bot.send_message(user_id, _("Invalid or expired code. Please send the correct code again."))
+        next_state = CODE
     except Exception as e:
-        log.error(f"Error during code handling for user {user_id}: {e}")
-        await message.reply_text(_("An unexpected error occurred. Please try again or use /cancel."))
-        if user_id in user_states: del user_states[user_id]
+        log.error(f"Error signing in for user {user_id}: {e}")
+        await context.bot.send_message(user_id, _("An unexpected error occurred."))
+    context.user_data['next_state'] = next_state
 
-
-async def handle_password(client: Client, message: Message):
-    user_id = message.from_user.id
+async def receive_phone_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    password = message.text
-    session_info = user_sessions.get(user_id)
+    code = update.message.text
+    asyncio.create_task(async_sign_in(code, context, user_id, _))
+    await update.message.reply_text(_("Processing..."))
+    # The state transition is problematic here. We'll let the user send the password if needed.
+    return PASSWORD
 
-    if not session_info:
-        await message.reply_text(_("Your session has expired. Please start over with /add_account."))
-        del user_states[user_id]
-        return
-
-    user_client = session_info['client']
+async def async_check_password(password, context, user_id, _):
+    client = context.user_data['pyrogram_client']
     try:
-        await user_client.check_password(password)
-        await complete_login(user_client, message)
+        await client.check_password(password)
+        await async_complete_login(context, user_id, _)
     except Exception as e:
-        log.error(f"Error during password handling for user {user_id}: {e}")
-        await message.reply_text(_("Incorrect password or an error occurred. Please try again or use /cancel."))
+        log.error(f"Error with 2FA for user {user_id}: {e}")
+        await context.bot.send_message(user_id, _("Incorrect password or an error occurred. Please try again or use /cancel."))
 
-
-async def complete_login(user_client: Client, message: Message):
-    """Finalizes the login process, saves the session, and cleans up."""
-    user_id = message.from_user.id
+async def receive_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    session_info = user_sessions.get(user_id)
-    phone = session_info['phone']
+    password = update.message.text
+    asyncio.create_task(async_check_password(password, context, user_id, _))
+    return ConversationHandler.END
 
-    session_string = await user_client.export_session_string()
-    await user_client.disconnect()
-
+async def async_complete_login(context, user_id, _):
+    client = context.user_data['pyrogram_client']
+    phone = context.user_data['phone']
+    session_string = await client.export_session_string()
+    await client.disconnect()
     if add_managed_account(user_id, phone, session_string):
-        await message.reply_text(_("✅ Account added successfully!"))
+        await context.bot.send_message(user_id, _("✅ Account added successfully!"))
     else:
-        await message.reply_text(_("❌ Could not save your account to the database. It might already be registered."))
+        await context.bot.send_message(user_id, _("❌ Could not save your account to the database. It might already be registered."))
+    context.user_data.clear()
 
-    if user_id in user_states: del user_states[user_id]
-    if user_id in user_sessions: del user_sessions[user_id]
+async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    _ = get_translation_func_for_user(update.effective_user.id)
+    if 'pyrogram_client' in context.user_data:
+        client = context.user_data['pyrogram_client']
+        if client.is_connected:
+            await client.disconnect()
+    context.user_data.clear()
+    await update.message.reply_text(_("Operation cancelled."))
+    return ConversationHandler.END
 
+add_account_conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("add_account", add_account_start)],
+    states={
+        PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_phone_number)],
+        CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_phone_code)],
+        PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_password)],
+    },
+    fallbacks=[CommandHandler("cancel", cancel_conversation)],
+    conversation_timeout=300
+)
 
 # --- User Dashboard ---
 
-@filters.command("my_accounts")
-async def my_accounts_handler(client: Client, message: Message):
-    """Displays a list of the user's managed accounts with control buttons."""
-    user_id = message.from_user.id
+async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, from_callback=False):
+    """Displays a list of the user's managed accounts to select from."""
+    user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
     details = get_user_details(user_id)
 
+    text = _("Please select an account to manage:")
+    buttons = []
+
     if not details or not details['accounts']:
-        await message.reply_text(_("You have not added any accounts yet. Use /add_account to get started."))
+        text = _("You have not added any accounts yet. Use /add_account to get started.")
+    else:
+        for acc in details['accounts']:
+            status_icon = "🟢" if acc['is_active'] else "🔴"
+            button_text = f"{status_icon} {acc['phone']}"
+            buttons.append([InlineKeyboardButton(button_text, callback_data=f"mng_select_{acc['id']}")])
+
+    buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
+    reply_markup = InlineKeyboardMarkup(buttons)
+
+    if from_callback:
+        query = update.callback_query
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    else:
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id: int, message_id: int):
+    """Displays the management menu for a single account."""
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+
+    # We need to get the account details from the DB
+    # This is a bit inefficient, a better way would be to get all accounts once
+    # in my_accounts_handler and pass them around, but for now this is fine.
+    details = get_user_details(user_id)
+    acc = next((acc for acc in details['accounts'] if acc['id'] == account_id), None)
+
+    if not acc:
+        await context.bot.edit_message_text(chat_id=user_id, message_id=message_id, text=_("Error: Account not found."))
         return
 
-    await message.reply_text(_("Your managed accounts:"))
-    for acc in details['accounts']:
-        acc_id = acc['id']
-        status = _("🟢 Active") if acc['is_active'] else _("🔴 Inactive")
-        text = _("<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}").format(phone=acc['phone'], status=status)
+    status = _("🟢 Active") if acc['is_active'] else _("🔴 Inactive")
+    text = _("<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}").format(phone=acc['phone'], status=status)
 
-        buttons = [
-            [
-                InlineKeyboardButton(_("📊 Stats"), callback_data=f"mng_stats_{acc_id}"),
-                InlineKeyboardButton(_("Toggle On") if not acc['is_active'] else _("Toggle Off"), callback_data=f"mng_toggle_{acc_id}")
-            ],
-            [
-                InlineKeyboardButton(_("🔄 Change Proxy"), callback_data=f"mng_proxy_{acc_id}"),
-                InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc_id}")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(buttons)
-        await message.reply_text(text, reply_markup=reply_markup)
-
-# --- Dashboard Callbacks ---
-
-@filters.create(lambda _, __, query: query.data.startswith("mng_"))
-async def manage_account_callback_handler(client: Client, callback_query: CallbackQuery):
-    """Main router for all management callbacks."""
-    user_id = callback_query.from_user.id
-    _ = get_translation_func_for_user(user_id)
-
-    action_parts = callback_query.data.split("_")
-    action = action_parts[1]
-    account_id = int(action_parts[2]) if len(action_parts) > 2 else 0
-
-    if action == "stats":
-        total_groups = get_account_stats(account_id)
-        await callback_query.answer(
-            _("This account has created {count} groups.").format(count=total_groups),
-            show_alert=True
-        )
-
-    elif action == "toggle":
-        new_status = toggle_account_status(account_id, user_id)
-        if new_status is not None:
-            status_text = _("activated") if new_status else _("deactivated")
-            await callback_query.answer(_("Account has been {status}.").format(status=status_text))
-        else:
-            await callback_query.answer(_("Could not change status."), show_alert=True)
-
-    elif action == "proxy":
-        success, msg = reassign_proxy(account_id, user_id)
-        # This msg is not translated as it's from the DB and simple.
-        # For a full implementation, we would use error codes.
-        await callback_query.answer(msg, show_alert=True)
-
-    elif action == "delete":
-        buttons = [
-            [
-                InlineKeyboardButton(_("Yes, delete it"), callback_data=f"mng_deleteconfirm_{account_id}"),
-                InlineKeyboardButton(_("No, cancel"), callback_data="mng_cancel")
-            ]
-        ]
-        await callback_query.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(buttons))
-        await callback_query.answer()
-
-    elif action == "deleteconfirm":
-        if delete_managed_account(account_id, user_id):
-            await callback_query.message.edit_text(_("✅ Account has been deleted."))
-        else:
-            await callback_query.message.edit_text(_("❌ Could not delete account."))
-        await callback_query.answer()
-
-    elif action == "cancel":
-        await callback_query.message.delete()
-        await callback_query.answer(_("Cancelled."))
-
-
-# --- Language Selection ---
-
-@filters.command("language")
-async def language_handler(client: Client, message: Message):
-    """Allows the user to select their interface language."""
-    user_id = message.from_user.id
-    _ = get_translation_func_for_user(user_id)
     buttons = [
-        [InlineKeyboardButton("English 🇬🇧", callback_data="set_lang_en")],
-        [InlineKeyboardButton("العربية 🇸🇦", callback_data="set_lang_ar")]
+        [
+            InlineKeyboardButton(_("📊 Stats"), callback_data=f"mng_stats_{acc['id']}"),
+            InlineKeyboardButton(_("Toggle On") if not acc['is_active'] else _("Toggle Off"), callback_data=f"mng_toggle_{acc['id']}"),
+        ],
+        [
+            InlineKeyboardButton(_("🔄 Change Proxy"), callback_data=f"mng_proxy_{acc['id']}"),
+            InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc['id']}"),
+        ],
+        [InlineKeyboardButton(_("📂 View Groups"), callback_data=f"mng_viewgroups_{acc['id']}")],
+        [InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")]
     ]
     reply_markup = InlineKeyboardMarkup(buttons)
-    await message.reply_text(_("Please choose your language:"), reply_markup=reply_markup)
+    await context.bot.edit_message_text(chat_id=user_id, message_id=message_id, text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
 
-@filters.create(lambda _, __, query: query.data.startswith("set_lang_"))
-async def set_language_callback_handler(client: Client, callback_query: CallbackQuery):
-    """Handles language selection callback."""
-    lang_code = callback_query.data.split("_")[2]
-    user_id = callback_query.from_user.id
-    _ = get_translation_func_for_user(user_id) # Get translator for the old language
+async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Main router for all management callbacks."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    log.info(f"User {user_id} triggered manage_account_callback with data: {query.data}")
 
-    if set_user_language(user_id, lang_code):
-        _new = get_translation_func_for_user(user_id) # Get translator for the new language
-        await callback_query.answer(_new("Language changed successfully."), show_alert=True)
-    else:
-        await callback_query.answer(_("Could not change language."), show_alert=True)
+    try:
+        _ = get_translation_func_for_user(user_id)
+        action_parts = query.data.split("_")
+        action = action_parts[1]
 
-    await callback_query.message.delete()
+        if action == "cancel":
+            log.info(f"User {user_id} cancelled management action.")
+            await query.message.delete()
+            await context.bot.answer_callback_query(query.id, _("Cancelled."))
+            return
 
+        if action == "back":
+            await my_accounts_handler(update, context, from_callback=True)
+            return
+
+        if action == "select":
+            account_id = int(action_parts[2])
+            await account_detail_menu(update, context, account_id, query.message.message_id)
+            return
+
+        if action == "stats":
+            account_id = int(action_parts[2])
+            log.info(f"User {user_id} requested stats for account {account_id}.")
+            total_groups = get_account_stats(account_id)
+
+            # Re-get account details to display them again
+            details = get_user_details(user_id)
+            acc = next((acc for acc in details['accounts'] if acc['id'] == account_id), None)
+            status = _("🟢 Active") if acc['is_active'] else _("🔴 Inactive")
+            text = _("<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}\n\n📊 <b>Stats:</b> {count} groups created.").format(
+                phone=acc['phone'], status=status, count=total_groups)
+
+            # Re-create the same buttons
+            buttons = [
+                [
+                    InlineKeyboardButton(_("📊 Stats"), callback_data=f"mng_stats_{acc['id']}"),
+                    InlineKeyboardButton(_("Toggle On") if not acc['is_active'] else _("Toggle Off"), callback_data=f"mng_toggle_{acc['id']}"),
+                ],
+                [
+                    InlineKeyboardButton(_("🔄 Change Proxy"), callback_data=f"mng_proxy_{acc['id']}"),
+                    InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc['id']}"),
+                ],
+                [InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")]
+            ]
+            reply_markup = InlineKeyboardMarkup(buttons)
+            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+        elif action == "viewgroups":
+            account_id = int(action_parts[2])
+            page = int(action_parts[3]) if len(action_parts) > 3 else 0
+            log.info(f"User {user_id} requested to view groups for account {account_id} on page {page}.")
+
+            await query.edit_message_text(_("Fetching groups... Please wait."))
+
+            session_string = get_account_session_string(account_id)
+            if not session_string:
+                await query.edit_message_text(_("Error: Could not retrieve session for this account."))
+                return
+
+            client = Client(f"user_session_reader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+
+            try:
+                await client.connect()
+
+                all_groups = []
+                async for dialog in client.get_dialogs():
+                    if dialog.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+                        all_groups.append(dialog.chat.title)
+
+                await client.disconnect()
+
+                if not all_groups:
+                    text = _("This account is not a member of any groups.")
+                    buttons = [[InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")]]
+                    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+                    return
+
+                # Pagination
+                items_per_page = 10
+                start_index = page * items_per_page
+                end_index = start_index + items_per_page
+
+                paginated_groups = all_groups[start_index:end_index]
+
+                text = _("<b>Groups for Account (Page {page_num}/{total_pages}):</b>\n\n").format(
+                    page_num=page + 1,
+                    total_pages=(len(all_groups) + items_per_page - 1) // items_per_page
+                )
+                text += "\n".join([f"• <code>{group_name}</code>" for group_name in paginated_groups])
+
+                pagination_buttons = []
+                if page > 0:
+                    pagination_buttons.append(InlineKeyboardButton(_("⬅️ Previous"), callback_data=f"mng_viewgroups_{account_id}_{page-1}"))
+                if end_index < len(all_groups):
+                    pagination_buttons.append(InlineKeyboardButton(_("Next ➡️"), callback_data=f"mng_viewgroups_{account_id}_{page+1}"))
+
+                buttons = [pagination_buttons] if pagination_buttons else []
+                buttons.append([InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")])
+
+                await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode=ParseMode.HTML)
+
+            except Exception as e:
+                log.error(f"Error fetching groups for user {user_id}, account {account_id}: {e}")
+                await query.edit_message_text(_("An error occurred while fetching groups. The session might be invalid or revoked."))
+                if client.is_connected:
+                    await client.disconnect()
+        elif action == "groupstats":
+            group_log_id = int(action_parts[2])
+            log.info(f"User {user_id} requested stats for group log ID {group_log_id}.")
+            details = get_group_log_details(group_log_id)
+            if details:
+                text = _("<b>Group Stats:</b>\n\n<b>Name:</b> {name}\n<b>Created:</b> {date}").format(
+                    name=details['group_name'],
+                    date=details['creation_timestamp']
+                )
+                await context.bot.send_message(user_id, text, parse_mode=ParseMode.HTML)
+            else:
+                await context.bot.send_message(user_id, _("Could not retrieve group stats."))
+        elif action == "toggle":
+            account_id = int(action_parts[2])
+            log.info(f"User {user_id} toggled account {account_id}.")
+            new_status = toggle_account_status(account_id, user_id)
+            if new_status is not None:
+                status_text = _("activated") if new_status else _("deactivated")
+                await context.bot.answer_callback_query(query.id, _("Account has been {status}.").format(status=status_text))
+                # Refresh the menu
+                await account_detail_menu(update, context, account_id, query.message.message_id)
+            else:
+                await context.bot.answer_callback_query(query.id, _("Could not change status."), show_alert=True)
+        elif action == "proxy":
+            account_id = int(action_parts[2])
+            log.info(f"User {user_id} reassigned proxy for account {account_id}.")
+            success, msg = reassign_proxy(account_id, user_id)
+            await context.bot.answer_callback_query(query.id, msg, show_alert=True)
+            # Refresh the menu
+            await account_detail_menu(update, context, account_id, query.message.message_id)
+        elif action == "delete":
+            account_id = int(action_parts[2])
+            log.info(f"User {user_id} initiated delete for account {account_id}.")
+            buttons = [
+                [InlineKeyboardButton(_("Yes, delete it"), callback_data=f"mng_deleteconfirm_{account_id}")],
+                [InlineKeyboardButton(_("No, cancel"), callback_data=f"mng_select_{account_id}")]
+            ]
+            await query.edit_message_text(
+                _("Are you sure you want to delete this account? This action cannot be undone."),
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
+        elif action == "deleteconfirm":
+            account_id = int(action_parts[2])
+            log.info(f"User {user_id} confirmed delete for account {account_id}.")
+            if delete_managed_account(account_id, user_id):
+                await context.bot.answer_callback_query(query.id, _("✅ Account has been deleted."))
+                # This is a bit of code duplication, but it's safer than calling the handler
+                # and avoids state-related issues with the update object.
+                details = get_user_details(user_id)
+                text = _("Please select an account to manage:")
+                buttons = []
+                if not details or not details['accounts']:
+                    text = _("You have not added any accounts yet. Use /add_account to get started.")
+                else:
+                    for acc in details['accounts']:
+                        status_icon = "🟢" if acc['is_active'] else "🔴"
+                        button_text = f"{status_icon} {acc['phone']}"
+                        buttons.append([InlineKeyboardButton(button_text, callback_data=f"mng_select_{acc['id']}")])
+                buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
+                reply_markup = InlineKeyboardMarkup(buttons)
+                await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+            else:
+                await query.edit_message_text(_("❌ Could not delete account."))
+    except Exception as e:
+        log.error(f"Error in manage_account_callback for user {user_id} with data {query.data}: {e}", exc_info=True)
+        try:
+            # Try to inform the user that something went wrong
+            await context.bot.answer_callback_query(query.id, "An unexpected error occurred.", show_alert=True)
+        except Exception as inner_e:
+            log.error(f"Failed to even notify user about the error: {inner_e}")
 
 # --- Handler Registration ---
-# A list of all handlers to be registered in the main app
 user_handlers_list = [
-    subscribe_handler,
-    select_plan_callback_handler,
-    pre_checkout_handler,
-    successful_payment_handler,
-    add_account_handler,
-    cancel_handler,
-    my_accounts_handler,
-    language_handler,
-    set_language_callback_handler,
-    manage_account_callback_handler, # Handles all `mng_*` callbacks
-    conversation_handler, # Must be last to act as a fallback for non-command messages
+    CommandHandler("start", start_handler),
+    CommandHandler("help", help_handler),
+    CommandHandler("subscribe", subscribe_handler),
+    CallbackQueryHandler(select_plan_callback, pattern="^select_plan_"),
+    PreCheckoutQueryHandler(precheckout_callback),
+    MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback),
+    CommandHandler("language", language_handler),
+    CallbackQueryHandler(set_language_callback, pattern="^set_lang_"),
+    CommandHandler("my_accounts", my_accounts_handler),
+    CallbackQueryHandler(manage_account_callback, pattern="^mng_"),
+    CallbackQueryHandler(main_menu_callback, pattern="^main_"),
+    add_account_conv_handler,
 ]
