@@ -236,6 +236,19 @@ class ManagedAccountDefaultsTests(unittest.TestCase):
         self.assertFalse(self.database.user_owns_account(acc_id, 999))
         self.assertFalse(self.database.user_owns_account(999999, 111))
 
+    def test_new_arabic_telegram_user_gets_arabic_ui(self):
+        class ArUser:
+            id = 222
+            first_name = "Ali"
+            username = "ali"
+            language_code = "ar-SA"
+
+        self.database.update_user_details(ArUser())
+        self.assertEqual(self.database.get_user_language(222), "ar")
+        self.assertEqual(self.database.ui_language_from_telegram("ar"), "ar")
+        self.assertEqual(self.database.ui_language_from_telegram("en"), "en")
+        self.assertEqual(self.database.ui_language_from_telegram(None), "en")
+
 
 class TwoStepPasswordValidationTests(unittest.IsolatedAsyncioTestCase):
     def test_validate_two_step_password(self):
@@ -252,6 +265,23 @@ class TwoStepPasswordValidationTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(TwoStepError) as ctx:
             await apply_two_step_password(1, "ab")
         self.assertEqual(ctx.exception.code, "too_short")
+
+
+class TranslationCatalogTests(unittest.TestCase):
+    def setUp(self):
+        import src.translation as translation
+        self.translation = translation
+        translation._translation_cache.clear()
+        translation._compiled = False
+
+    def test_arabic_feature_strings_are_loaded_after_compile(self):
+        compiled = self.translation.compile_translations(force=True)
+        self.assertGreaterEqual(compiled, 1)
+        t = self.translation.get_translator("ar")
+        self.assertEqual(t.gettext("🔑 Two-Step Verification"), "🔑 رمز التحقق بخطوتين")
+        self.assertEqual(t.gettext("🔐 Enable Code Monitor"), "🔐 تفعيل مراقبة الأكواد")
+        self.assertEqual(t.gettext("▶️ Enable Group Creation"), "▶️ تفعيل إنشاء المجموعات")
+        self.assertEqual(t.gettext("Toggle On"), "تفعيل")
 
 
 class ProxyParseTests(unittest.TestCase):

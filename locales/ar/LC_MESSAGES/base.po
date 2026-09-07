@@ -1235,4 +1235,7 @@ msgstr "تعذر الاتصال بتليجرام. حاول لاحقاً."
 msgid "Could not update two-step verification. Please try again later."
 msgstr "تعذر تحديث التحقق بخطوتين. حاول لاحقاً."
 
+msgid "Language changed successfully."
+msgstr "تم تغيير اللغة بنجاح."
+
 

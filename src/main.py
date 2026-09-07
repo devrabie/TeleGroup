@@ -15,6 +15,7 @@ from src.user_handlers import user_handlers_list
 from src.proxy_manager import update_proxies_from_url
 from src.automation import run_group_creation_cycle
 from src.code_monitor import code_monitor_manager, run_code_monitor_sync
+from src.translation import compile_translations
 
 
 # --- Logging Setup ---
@@ -98,6 +99,8 @@ async def main() -> None:
     log.info("--- RUNNING JULES'S LATEST VERSION OF MAIN.PY ---")
     log.info("Initializing database...")
     initialize_database()
+    compiled = compile_translations()
+    log.info(f"Translation catalogs compiled/updated: {compiled}")
 
     log.info("Building bot application...")
     application = Application.builder().token(config.BOT_TOKEN).build()

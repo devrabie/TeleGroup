@@ -1084,12 +1084,22 @@ def apply_error_backoff(account_id: int, error_message: str, wait_seconds: int |
         return False
 
 
+def ui_language_from_telegram(language_code: str | None) -> str:
+    """Map Telegram's language_code to a UI language we ship catalogs for."""
+    code = (language_code or "").lower().replace("-", "_")
+    if code == "ar" or code.startswith("ar_"):
+        return "ar"
+    return "en"
+
+
 def update_user_details(user: "telegram.User"):
     """
     Ensures a user exists in the database and that their details
     (first_name, username) are up-to-date.
+    New users inherit Arabic if their Telegram client language is Arabic.
     """
-    insert_sql = "INSERT OR IGNORE INTO users (telegram_id, first_name, username) VALUES (?, ?, ?)"
+    ui_lang = ui_language_from_telegram(getattr(user, "language_code", None))
+    insert_sql = "INSERT OR IGNORE INTO users (telegram_id, first_name, username, language_code) VALUES (?, ?, ?, ?)"
     update_sql = "UPDATE users SET first_name = ?, username = ? WHERE telegram_id = ?"
 
     try:
@@ -1098,7 +1108,7 @@ def update_user_details(user: "telegram.User"):
             # Use a transaction for consistency
             cursor.execute("BEGIN")
             # Create a record if they are totally new, ignoring if they exist
-            cursor.execute(insert_sql, (user.id, user.first_name, user.username))
+            cursor.execute(insert_sql, (user.id, user.first_name, user.username, ui_lang))
             # Always update their details in case their name/username changed
             cursor.execute(update_sql, (user.first_name, user.username, user.id))
             cursor.execute("COMMIT")

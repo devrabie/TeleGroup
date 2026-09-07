@@ -16,7 +16,7 @@ It uses a dual-library architecture:
 - **Two-Step Verification**: Users can enable or change the Telegram cloud password (2FA) on a managed account from the account menu.
 - **Proxy Management**: Automatically downloads and rotates proxies to avoid rate-limiting and bans.
 - **User Dashboard**: Users can manage their added accounts, view stats, and control automation.
-- **Multi-Language Support**: Interface is available in English and Arabic, with easy extension to other languages.
+- **Multi-Language Support**: Interface is available in English and Arabic. Translation catalogs are compiled from `.po` files automatically when the bot starts.
 
 ## Project Structure
 
