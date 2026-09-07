@@ -475,13 +475,14 @@ def grant_subscription(telegram_id: int, plan_id: int, duration_days: int):
 def batch_insert_proxies(proxies: list[str]):
     """
     Inserts a list of proxy strings into the database, ignoring duplicates.
+    Also reactivates listed proxies that were previously marked not working.
     Returns the number of newly inserted proxies.
     """
     if not proxies:
         return 0
 
     sql = "INSERT OR IGNORE INTO proxies (proxy_string) VALUES (?)"
-    data = [(proxy,) for proxy in proxies if proxy.strip()] # Ensure no empty strings
+    data = [(proxy.strip(),) for proxy in proxies if proxy.strip()] # Ensure no empty strings
 
     if not data:
         return 0
@@ -490,12 +491,49 @@ def batch_insert_proxies(proxies: list[str]):
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.executemany(sql, data)
+            inserted = cursor.rowcount
+            cursor.executemany(
+                "UPDATE proxies SET is_working = 1, last_checked = CURRENT_TIMESTAMP WHERE proxy_string = ?",
+                data,
+            )
             conn.commit()
-            log.info(f"Batch inserted proxies. {cursor.rowcount} new proxies were added.")
-            return cursor.rowcount
+            log.info(f"Batch inserted proxies. {inserted} new proxies were added.")
+            return inserted
     except sqlite3.Error as e:
         log.error(f"Failed to batch insert proxies: {e}")
         return 0
+
+
+def count_working_proxies() -> int:
+    """Return how many proxies are currently marked working."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) AS n FROM proxies WHERE is_working = 1")
+            row = cursor.fetchone()
+            return int(row["n"] if row else 0)
+    except sqlite3.Error as e:
+        log.error(f"Failed to count working proxies: {e}")
+        return 0
+
+
+def warn_if_no_working_proxies() -> None:
+    """Log a clear error if every stored proxy is marked bad."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) AS n FROM proxies")
+            total = int(cursor.fetchone()["n"])
+            cursor.execute("SELECT COUNT(*) AS n FROM proxies WHERE is_working = 1")
+            working = int(cursor.fetchone()["n"])
+        if total > 0 and working == 0:
+            log.error(
+                "All %s stored proxies are marked not working. "
+                "Refresh the proxy list or run: UPDATE proxies SET is_working = 1;",
+                total,
+            )
+    except sqlite3.Error as e:
+        log.error(f"Failed to check proxy health: {e}")
 
 def get_random_proxy_id(exclude_id: int | None = None):
     """Retrieves the ID of a random, working proxy, optionally skipping one ID."""

@@ -9,7 +9,7 @@ from telegram.ext import Application
 from aiohttp import web
 
 from src import config
-from src.database import initialize_database, get_plan_by_id, grant_subscription
+from src.database import initialize_database, get_plan_by_id, grant_subscription, warn_if_no_working_proxies
 from src.admin_handlers import admin_handlers_list
 from src.user_handlers import user_handlers_list
 from src.proxy_manager import update_proxies_from_url
@@ -99,6 +99,7 @@ async def main() -> None:
     log.info("--- RUNNING JULES'S LATEST VERSION OF MAIN.PY ---")
     log.info("Initializing database...")
     initialize_database()
+    warn_if_no_working_proxies()
     compiled = compile_translations()
     log.info(f"Translation catalogs compiled/updated: {compiled}")
 

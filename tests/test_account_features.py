@@ -264,6 +264,19 @@ class ManagedAccountDefaultsTests(unittest.TestCase):
             seen.add(self.database.get_account_details(acc_id)["proxy_id"])
         self.assertGreaterEqual(len(seen), 2)
 
+    def test_batch_insert_reactivates_marked_bad_proxies(self):
+        self.database.batch_insert_proxies(["10.0.0.8:1080:u:p"])
+        with self.database.get_db_connection() as conn:
+            proxy_id = conn.execute(
+                "SELECT id FROM proxies WHERE proxy_string = ?",
+                ("10.0.0.8:1080:u:p",),
+            ).fetchone()["id"]
+        self.database.mark_proxy_as_bad(proxy_id)
+        self.assertEqual(self.database.count_working_proxies(), 0)
+
+        self.database.batch_insert_proxies(["10.0.0.8:1080:u:p"])
+        self.assertEqual(self.database.count_working_proxies(), 1)
+
     def test_rotate_account_proxy_marks_failed_and_switches(self):
         self.database.batch_insert_proxies(["10.0.0.1:1080:u:p", "10.0.0.2:1080:u:p"])
         self.database.add_managed_account(111, "+15550005555", "session-string", self.profile["id"])
