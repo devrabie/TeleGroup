@@ -29,6 +29,8 @@ from src.database import (
     get_code_monitor_accounts,
     get_proxy_string,
     get_random_proxy_id,
+    mark_session_invalid,
+    mark_session_ok,
     rotate_account_proxy,
 )
 from src.security_messages import (
@@ -253,10 +255,12 @@ class CodeMonitorManager:
                         "telegram_id": account_details.get("telegram_id"),
                     }
                     log.info(f"Code monitor started for account {account_id}.")
+                    mark_session_ok(account_id)
                     return True
                 except AUTH_ERRORS as e:
                     last_error = e
                     log.error(f"Auth error starting code monitor for account {account_id}: {e}")
+                    mark_session_invalid(account_id, str(e))
                     await self._safe_stop(client)
                     await self._notify_owner(
                         account_details.get("telegram_id"),

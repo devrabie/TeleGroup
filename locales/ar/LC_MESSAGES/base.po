@@ -1395,4 +1395,19 @@ msgstr "تيليجرام طلب الانتظار. حاول بعد لحظات."
 msgid "Unknown"
 msgstr "غير معروف"
 
+msgid "invalid"
+msgstr "غير صالح"
+
+msgid "❌ Invalid"
+msgstr "❌ غير صالح"
+
+msgid "❌ Invalid — sign in again"
+msgstr "❌ غير صالح — أعد تسجيل الدخول"
+
+msgid "⚠️ <b>Account invalid</b>"
+msgstr "⚠️ <b>الحساب غير صالح</b>"
+
+msgid "This session has expired or is no longer valid. You may need to sign in again — delete the account and add it once more."
+msgstr "هذه الجلسة منتهية أو لم تعد صالحة. قد تحتاج إعادة تسجيل الدخول: احذف الحساب ثم أضفه من جديد."
+
 

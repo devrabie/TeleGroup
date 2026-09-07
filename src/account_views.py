@@ -27,7 +27,7 @@ from src.account_explorer import (
     paginate,
     trim_html,
 )
-from src.database import get_account_details, user_owns_account
+from src.database import get_account_details, session_is_invalid, user_owns_account
 from src.translation import get_translation_func_for_user
 
 log = logging.getLogger(__name__)
@@ -63,7 +63,11 @@ def owned_account(account_id: int, telegram_user_id: int) -> bool:
     return bool(user_owns_account(account_id, telegram_user_id))
 
 
-async def load_identity_for_menu(account_id: int) -> dict | None:
+async def load_identity_for_menu(account_id: int, account: dict | None = None) -> dict | None:
+    if account is None:
+        account = get_account_details(account_id)
+    if session_is_invalid(account):
+        return get_cached_identity(account_id)
     cached = get_cached_identity(account_id)
     if cached:
         return cached

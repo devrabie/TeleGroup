@@ -11,6 +11,8 @@ from pyrogram.enums import ChatType, MessageMediaType
 from pyrogram.errors import FloodWait
 
 from src.cache_store import cache_store
+from src.code_monitor import AUTH_ERRORS
+from src.database import mark_session_invalid, mark_session_ok, session_is_invalid
 from src.two_step import TwoStepError, open_account_client
 
 log = logging.getLogger(__name__)
@@ -67,14 +69,20 @@ def display_name(identity: Optional[dict], fallback: str = "") -> str:
     return name or fallback
 
 
-def _map_client_error(exc: Exception) -> ExplorerError:
+def _map_client_error(exc: Exception, account_id: int | None = None) -> ExplorerError:
     if isinstance(exc, ExplorerError):
-        return exc
-    if isinstance(exc, TwoStepError):
-        return ExplorerError(exc.code, exc.detail)
-    if isinstance(exc, FloodWait):
-        return ExplorerError("flood_wait", str(getattr(exc, "value", "")))
-    return ExplorerError("unexpected", str(exc))
+        error = exc
+    elif isinstance(exc, TwoStepError):
+        error = ExplorerError(exc.code, exc.detail)
+    elif isinstance(exc, AUTH_ERRORS):
+        error = ExplorerError("session_invalid", str(exc))
+    elif isinstance(exc, FloodWait):
+        error = ExplorerError("flood_wait", str(getattr(exc, "value", "")))
+    else:
+        error = ExplorerError("unexpected", str(exc))
+    if error.code == "session_invalid" and account_id is not None:
+        mark_session_invalid(account_id, error.detail or str(exc))
+    return error
 
 
 def _user_full_name(user) -> str:
@@ -279,6 +287,20 @@ def format_message_line(message: dict, _: Callable[[str], str], you_label: str) 
     return f"{prefix}{arrow} {who_bit}{body}"
 
 
+def format_session_health_text(account: dict | None, _: Callable[[str], str]) -> str:
+    """Banner shown on account details when the Telegram session is dead."""
+    if not session_is_invalid(account):
+        return ""
+    return (
+        "\n\n"
+        + _("⚠️ <b>Account invalid</b>")
+        + "\n"
+        + _(
+            "This session has expired or is no longer valid. You may need to sign in again — delete the account and add it once more."
+        )
+    )
+
+
 def trim_html(text: str, limit: int = MAX_TEXT_CHARS) -> str:
     if len(text) <= limit:
         return text
@@ -308,7 +330,8 @@ async def fetch_identity(account_id: int, force: bool = False) -> dict:
                 log.debug(f"get_chat(me) failed for account {account_id}: {e}")
             identity = _serialize_identity(me, chat)
     except Exception as e:
-        raise _map_client_error(e) from e
+        raise _map_client_error(e, account_id) from e
+    mark_session_ok(account_id)
     cache_store.set_json(identity_cache_key(account_id), identity, IDENTITY_TTL)
     return identity
 
@@ -343,8 +366,9 @@ async def fetch_profile(account_id: int, force: bool = False) -> dict:
                 except Exception:
                     total_gifts = len(gifts)
     except Exception as e:
-        raise _map_client_error(e) from e
+        raise _map_client_error(e, account_id) from e
 
+    mark_session_ok(account_id)
     cache_store.set_json(identity_cache_key(account_id), identity, IDENTITY_TTL)
     payload = {
         "identity": identity,
@@ -376,7 +400,8 @@ async def fetch_private_dialogs(account_id: int, force: bool = False) -> list[di
                 if scanned >= MAX_DIALOG_SCAN:
                     break
     except Exception as e:
-        raise _map_client_error(e) from e
+        raise _map_client_error(e, account_id) from e
+    mark_session_ok(account_id)
     dialogs.sort(key=lambda d: (d.get("unread") or 0, d.get("date") or ""), reverse=True)
     cache_store.set_json(key, dialogs, INBOX_TTL)
     return dialogs
@@ -411,7 +436,8 @@ async def fetch_private_messages(account_id: int, chat_id: int, force: bool = Fa
             async for message in client.get_chat_history(chat_id, limit=36):
                 messages.append(serialize_message(message))
     except Exception as e:
-        raise _map_client_error(e) from e
+        raise _map_client_error(e, account_id) from e
+    mark_session_ok(account_id)
     payload = {"chat": chat_meta, "messages": messages}
     cache_store.set_json(key, payload, MESSAGES_TTL)
     return payload

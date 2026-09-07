@@ -228,6 +228,7 @@ class ManagedAccountDefaultsTests(unittest.TestCase):
             with self.database.get_db_connection() as conn:
                 columns = [row[1] for row in conn.execute("PRAGMA table_info(managed_accounts)")]
         self.assertIn("code_monitor_enabled", columns)
+        self.assertIn("session_status", columns)
 
     def test_user_owns_account(self):
         self.database.add_managed_account(111, "+15550003333", "session-string", self.profile["id"])
@@ -235,6 +236,33 @@ class ManagedAccountDefaultsTests(unittest.TestCase):
         self.assertTrue(self.database.user_owns_account(acc_id, 111))
         self.assertFalse(self.database.user_owns_account(acc_id, 999))
         self.assertFalse(self.database.user_owns_account(999999, 111))
+
+    def test_session_invalid_is_persisted_and_detected(self):
+        self.database.add_managed_account(111, "+15550006666", "session-string", self.profile["id"])
+        acc_id = self.database.get_user_details(111)["accounts"][0]["id"]
+        acc = self.database.get_account_details(acc_id)
+        self.assertEqual(acc["session_status"], "ok")
+        self.assertFalse(self.database.session_is_invalid(acc))
+
+        self.assertTrue(self.database.looks_like_invalid_session("AUTH_KEY_UNREGISTERED"))
+        self.assertTrue(self.database.looks_like_invalid_session("SessionRevoked: The session was revoked"))
+        self.assertFalse(self.database.looks_like_invalid_session("SOCKS5 authentication failed"))
+
+        self.database.mark_session_invalid(acc_id, "AUTH_KEY_UNREGISTERED")
+        acc = self.database.get_account_details(acc_id)
+        self.assertEqual(acc["session_status"], "invalid")
+        self.assertTrue(self.database.session_is_invalid(acc))
+
+        from src.account_explorer import format_session_health_text
+        banner = format_session_health_text(acc, lambda s: s)
+        self.assertIn("Account invalid", banner)
+        self.assertIn("sign in again", banner)
+
+        self.database.mark_session_ok(acc_id)
+        acc = self.database.get_account_details(acc_id)
+        self.assertEqual(acc["session_status"], "ok")
+        self.assertFalse(self.database.session_is_invalid(acc))
+        self.assertEqual(format_session_health_text(acc, lambda s: s), "")
 
     def test_new_arabic_telegram_user_gets_arabic_ui(self):
         class ArUser:
@@ -328,6 +356,7 @@ class TranslationCatalogTests(unittest.TestCase):
         self.assertEqual(t.gettext("👤 View Profile"), "👤 الملف الشخصي")
         self.assertEqual(t.gettext("💬 Private Chats"), "💬 المحادثات الخاصة")
         self.assertEqual(t.gettext("📊 Group Report"), "📊 تقرير المجموعات")
+        self.assertEqual(t.gettext("⚠️ <b>Account invalid</b>"), "⚠️ <b>الحساب غير صالح</b>")
         self.assertEqual(t.gettext("Toggle On"), "تفعيل")
 
 

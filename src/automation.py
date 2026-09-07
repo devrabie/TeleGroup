@@ -7,7 +7,7 @@ from pyrogram import Client
 from pyrogram.errors import FloodWait, Timeout
 
 from src import config
-from src.code_monitor import build_proxy_dict, get_running_monitor_client, is_socks_auth_error
+from src.code_monitor import AUTH_ERRORS, build_proxy_dict, get_running_monitor_client, is_socks_auth_error
 from src.database import (
     get_eligible_accounts,
     get_account_stats,
@@ -15,6 +15,8 @@ from src.database import (
     get_random_proxy_id,
     log_group_creation,
     mark_proxy_as_bad,
+    mark_session_invalid,
+    mark_session_ok,
     update_account_schedule,
     apply_error_backoff,
 )
@@ -134,8 +136,15 @@ async def process_single_account(account_details: dict):
 
             await asyncio.wait_for(user_client.start(), timeout=30.0)
             log.info(f"Successfully started client for account {account_id}.")
+            mark_session_ok(account_id)
             await _create_group_on_client(user_client, account_details)
             return  # Exit the loop on success
+
+        except AUTH_ERRORS as e:
+            log.error(f"Session invalid for account {account_id} during group creation: {e}")
+            mark_session_invalid(account_id, str(e))
+            apply_error_backoff(account_id, str(e))
+            break
 
         except (asyncio.TimeoutError, Timeout, ConnectionError, OSError) as e:
             reason = "SOCKS5 authentication failed" if is_socks_auth_error(e) else type(e).__name__

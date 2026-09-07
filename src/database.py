@@ -72,6 +72,7 @@ TABLE_DEFINITIONS = {
             next_creation_time TIMESTAMP,
             backoff_level INTEGER NOT NULL DEFAULT 0,
             last_error TEXT,
+            session_status TEXT NOT NULL DEFAULT 'unknown', -- ok | invalid | unknown
             deleted_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
@@ -158,6 +159,11 @@ def initialize_database():
                 log.info("Running migration: Adding 'code_monitor_enabled' column to 'managed_accounts' table.")
                 cursor.execute(
                     "ALTER TABLE managed_accounts ADD COLUMN code_monitor_enabled BOOLEAN NOT NULL DEFAULT 0"
+                )
+            if 'session_status' not in columns:
+                log.info("Running migration: Adding 'session_status' column to 'managed_accounts' table.")
+                cursor.execute(
+                    "ALTER TABLE managed_accounts ADD COLUMN session_status TEXT NOT NULL DEFAULT 'unknown'"
                 )
 
             cursor.execute("PRAGMA table_info(plans)")
@@ -623,6 +629,7 @@ def add_managed_account(user_id: int, phone: str, session_string: str, device_pr
                         code_monitor_enabled = 0,
                         deleted_at = NULL,
                         last_error = NULL,
+                        session_status = 'ok',
                         backoff_level = 0,
                         next_creation_time = NULL
                     WHERE id = ?
@@ -635,9 +642,9 @@ def add_managed_account(user_id: int, phone: str, session_string: str, device_pr
                 insert_sql = """
                     INSERT INTO managed_accounts (
                         user_id, phone, session_string, proxy_id, device_profile_id,
-                        is_active, is_running, code_monitor_enabled
+                        is_active, is_running, code_monitor_enabled, session_status
                     )
-                    VALUES (?, ?, ?, ?, ?, 0, 0, 0)
+                    VALUES (?, ?, ?, ?, ?, 0, 0, 0, 'ok')
                 """
                 cursor.execute(insert_sql, (internal_user_id, phone, session_string, new_proxy_id, device_profile_id))
                 log.info(f"Successfully added account {phone}.")
@@ -947,6 +954,7 @@ def get_eligible_accounts():
           AND s.end_date >= datetime('now')
           AND (ma.flood_wait_until IS NULL OR ma.flood_wait_until < datetime('now'))
           AND (ma.next_creation_time IS NULL OR ma.next_creation_time < datetime('now'))
+          AND (ma.session_status IS NULL OR ma.session_status != 'invalid')
     """
     try:
         with get_db_connection() as conn:
@@ -986,6 +994,7 @@ def get_code_monitor_accounts():
           AND ma.deleted_at IS NULL
           AND s.is_active = 1
           AND s.end_date >= datetime('now')
+          AND (ma.session_status IS NULL OR ma.session_status != 'invalid')
     """
     try:
         with get_db_connection() as conn:
@@ -1167,10 +1176,105 @@ def apply_error_backoff(account_id: int, error_message: str, wait_seconds: int |
             cursor.execute(sql, (next_time, new_level, str(error_message), account_id))
             conn.commit()
             log.warning(f"Account {account_id} encountered error: '{error_message}'. Backoff level is now {new_level}. Next attempt at {next_time.strftime('%Y-%m-%d %H:%M:%S')}.")
+            if looks_like_invalid_session(error_message):
+                mark_session_invalid(account_id, error_message)
             return True
     except sqlite3.Error as e:
         log.error(f"Failed to apply backoff for account {account_id}: {e}")
         return False
+
+
+SESSION_STATUS_OK = "ok"
+SESSION_STATUS_INVALID = "invalid"
+SESSION_STATUS_UNKNOWN = "unknown"
+
+_INVALID_SESSION_MARKERS = (
+    "authkeyunregistered",
+    "sessionrevoked",
+    "userdeactivated",
+    "authkeyduplicated",
+    "sessioninvalid",
+    "session_invalid",
+    "the key is not registered",
+)
+
+
+def looks_like_invalid_session(error: object | None) -> bool:
+    """True when an exception or last_error points to a dead Telegram session."""
+    if error is None:
+        return False
+    text = str(error).strip().lower()
+    if not text:
+        return False
+    compact = "".join(ch for ch in text if ch.isalnum())
+    for marker in _INVALID_SESSION_MARKERS:
+        if marker.replace("_", "") in compact or marker in text:
+            return True
+    return False
+
+
+def session_is_invalid(account: dict | None) -> bool:
+    """True if this managed account's Telegram session is expired or revoked."""
+    if not account:
+        return False
+    if account.get("session_status") == SESSION_STATUS_INVALID:
+        return True
+    if account.get("session_status") == SESSION_STATUS_OK:
+        return False
+    return looks_like_invalid_session(account.get("last_error"))
+
+
+def mark_session_status(account_id: int, status: str, error_message: str | None = None) -> bool:
+    """Persist session health for a managed account."""
+    if account_id is None or status not in {SESSION_STATUS_OK, SESSION_STATUS_INVALID, SESSION_STATUS_UNKNOWN}:
+        return False
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            if status == SESSION_STATUS_INVALID:
+                cursor.execute(
+                    """
+                    UPDATE managed_accounts
+                    SET session_status = ?, last_error = COALESCE(?, last_error)
+                    WHERE id = ? AND deleted_at IS NULL
+                    """,
+                    (status, error_message or "SESSION_INVALID", account_id),
+                )
+            elif status == SESSION_STATUS_OK:
+                cursor.execute(
+                    """
+                    UPDATE managed_accounts
+                    SET session_status = ?,
+                        last_error = CASE
+                            WHEN last_error IS NULL THEN NULL
+                            WHEN last_error = 'SESSION_INVALID' THEN NULL
+                            ELSE last_error
+                        END
+                    WHERE id = ? AND deleted_at IS NULL
+                    """,
+                    (status, account_id),
+                )
+            else:
+                cursor.execute(
+                    "UPDATE managed_accounts SET session_status = ? WHERE id = ? AND deleted_at IS NULL",
+                    (status, account_id),
+                )
+            conn.commit()
+            return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        log.error(f"Failed to set session_status={status} for account {account_id}: {e}")
+        return False
+
+
+def mark_session_invalid(account_id: int, error_message: str | None = None) -> bool:
+    """Mark a managed account so the UI can show that re-login is needed."""
+    log.warning(f"Marking account {account_id} session as invalid: {error_message}")
+    return mark_session_status(account_id, SESSION_STATUS_INVALID, error_message)
+
+
+def mark_session_ok(account_id: int) -> bool:
+    """Clear the invalid-session flag after a successful Telegram login/connect."""
+    return mark_session_status(account_id, SESSION_STATUS_OK)
 
 
 def ui_language_from_telegram(language_code: str | None) -> str:
@@ -1263,7 +1367,7 @@ def get_user_details(telegram_id: int):
         WHERE s.user_id = ? AND s.is_active = 1
         ORDER BY s.end_date DESC LIMIT 1
     """
-    accounts_sql = "SELECT id, phone, is_active, code_monitor_enabled, last_error, next_creation_time FROM managed_accounts WHERE user_id = ? AND deleted_at IS NULL"
+    accounts_sql = "SELECT id, phone, is_active, code_monitor_enabled, last_error, session_status, next_creation_time FROM managed_accounts WHERE user_id = ? AND deleted_at IS NULL"
 
     try:
         with get_db_connection() as conn:
@@ -1306,6 +1410,7 @@ def get_account_details(account_id: int):
             ma.next_creation_time,
             ma.backoff_level,
             ma.last_error,
+            ma.session_status,
             (SELECT MAX(gcl.creation_timestamp)
              FROM group_creation_log gcl
              WHERE gcl.account_id = ma.id) as last_creation_time,

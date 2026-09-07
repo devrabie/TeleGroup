@@ -24,6 +24,8 @@ from src.database import (
     get_account_runtime_details,
     get_proxy_string,
     get_random_proxy_id,
+    mark_session_invalid,
+    mark_session_ok,
     rotate_account_proxy,
 )
 
@@ -116,9 +118,11 @@ async def _start_temp_client(details: dict) -> Client:
             await asyncio.wait_for(client.start(), timeout=45.0)
             if proxy_id and proxy_id != original_proxy_id:
                 assign_account_proxy(account_id, proxy_id)
+            mark_session_ok(account_id)
             return client
         except AUTH_ERRORS as e:
             await _safe_stop(client)
+            mark_session_invalid(account_id, str(e))
             raise TwoStepError("session_invalid") from e
         except (asyncio.TimeoutError, Timeout, ConnectionError, OSError) as e:
             last_error = e

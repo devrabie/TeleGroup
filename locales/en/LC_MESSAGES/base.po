@@ -1281,6 +1281,21 @@ msgstr "Telegram asked us to wait. Please try again in a moment."
 msgid "Unknown"
 msgstr "Unknown"
 
+msgid "invalid"
+msgstr "invalid"
+
+msgid "❌ Invalid"
+msgstr "❌ Invalid"
+
+msgid "❌ Invalid — sign in again"
+msgstr "❌ Invalid — sign in again"
+
+msgid "⚠️ <b>Account invalid</b>"
+msgstr "⚠️ <b>Account invalid</b>"
+
+msgid "This session has expired or is no longer valid. You may need to sign in again — delete the account and add it once more."
+msgstr "This session has expired or is no longer valid. You may need to sign in again — delete the account and add it once more."
+
 #~ msgstr ""
 #~ "❌ Failed to convert group. The "
 #~ "account may not have the required "

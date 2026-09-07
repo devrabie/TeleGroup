@@ -32,11 +32,11 @@ from src.database import (
     set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
     update_user_details, mark_proxy_as_bad, get_account_details, get_info_page_content,
     get_user_language, get_random_device_profile, get_device_profile_by_account_id,
-    user_owns_account,
+    session_is_invalid, user_owns_account,
 )
 from src.translation import get_translation_func_for_user
 from src.code_monitor import build_proxy_dict, code_monitor_manager, is_socks_auth_error
-from src.account_explorer import display_name, get_cached_identity
+from src.account_explorer import display_name, format_session_health_text, get_cached_identity
 from src.account_views import (
     load_identity_for_menu,
     show_conversation,
@@ -1006,7 +1006,9 @@ async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     else:
         for acc in details['accounts']:
             status_icon = "⚪️"  # Both features off
-            if acc['last_error']:
+            if session_is_invalid(acc):
+                status_icon = "❌"
+            elif acc['last_error']:
                 status_icon = "⚠️"
             elif acc['is_active']:
                 status_icon = "🟢"
@@ -1022,6 +1024,8 @@ async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
             identity = get_cached_identity(acc['id'])
             label = display_name(identity, acc['phone'])
+            if session_is_invalid(acc):
+                label = f"{label} · {_('invalid')}"
             button_text = f"{status_icon} {label}"
             buttons.append([InlineKeyboardButton(button_text, callback_data=f"mng_select_{acc['id']}")])
 
@@ -1085,11 +1089,14 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         await context.bot.edit_message_text(chat_id=user_id, message_id=message_id, text=_("Error: Account not found or you don't have permission."))
         return
 
-    identity = await load_identity_for_menu(account_id)
+    identity = await load_identity_for_menu(account_id, acc)
+    acc = get_account_details(account_id) or acc
 
     # Determine group-creation status string
     status_str = _("⚪️ Off")
-    if acc['last_error'] and acc['is_active']:
+    if session_is_invalid(acc):
+        status_str = _("❌ Invalid")
+    elif acc['last_error'] and acc['is_active']:
         status_str = _("⚠️ Error")
     elif acc['is_active']:
         status_str = _("🟢 On")
@@ -1105,7 +1112,9 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
                 pass
 
     monitor_on = bool(acc.get('code_monitor_enabled'))
-    if monitor_on:
+    if session_is_invalid(acc):
+        monitor_str = _("❌ Invalid — sign in again")
+    elif monitor_on:
         if code_monitor_manager.is_connected(account_id):
             monitor_str = _("🟢 On (connected)")
         else:
@@ -1126,6 +1135,8 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     if identity and identity.get("is_premium"):
         text += "\n" + _("⭐ Telegram Premium")
 
+    text += format_session_health_text(acc, _)
+
     text += "\n"
     text += _("\n<b>Group Creation:</b> {status}").format(status=status_str)
     text += _("\n<b>Code Monitor:</b> {status}").format(status=monitor_str)
@@ -1145,7 +1156,7 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     text += _("\n<b>Last Group:</b> {time}").format(time=_format_datetime(acc['last_creation_time']))
     text += _("\n<b>Next Group:</b> {time}").format(time=_format_datetime(acc['next_creation_time']))
 
-    if acc['last_error']:
+    if acc['last_error'] and not session_is_invalid(acc):
         text += _("\n<b>Last Error:</b> <pre>{error}</pre>").format(error=acc['last_error'])
 
     text += _("\n\n📊 <b>Total Groups Created:</b> {count}").format(count=acc['total_groups'])
