@@ -59,5 +59,9 @@ DATA_PROXIES_FILE = "data/proxies.txt"
 DISPLAY_TIMEZONE = os.getenv("DISPLAY_TIMEZONE", "UTC")
 
 
+# --- Optional Redis cache (profile / private chats) ---
+# If unset, a short-lived in-memory cache is used instead.
+REDIS_URL = os.getenv("REDIS_URL")
+
 # --- Logging ---
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()

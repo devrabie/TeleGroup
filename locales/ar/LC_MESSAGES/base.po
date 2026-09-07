@@ -1254,4 +1254,145 @@ msgstr ""
 "\n"
 "<b>البروكسي:</b> <code>{proxy}</code>"
 
+msgid "👤 View Profile"
+msgstr "👤 الملف الشخصي"
+
+msgid "💬 Private Chats"
+msgstr "💬 المحادثات الخاصة"
+
+msgid "📊 Group Report"
+msgstr "📊 تقرير المجموعات"
+
+msgid "👤 <b>{name}</b>"
+msgstr "👤 <b>{name}</b>"
+
+msgid "🔗 @{username}"
+msgstr "🔗 @{username}"
+
+msgid "📱 <code>{phone}</code>"
+msgstr "📱 <code>{phone}</code>"
+
+msgid "🆔 <code>{user_id}</code>"
+msgstr "🆔 <code>{user_id}</code>"
+
+msgid "⭐ Telegram Premium"
+msgstr "⭐ تيليجرام بريميوم"
+
+msgid "🌐 Language: {lang}"
+msgstr "🌐 اللغة: {lang}"
+
+msgid "🎭 {status}"
+msgstr "🎭 {status}"
+
+msgid "📝 {bio}"
+msgstr "📝 {bio}"
+
+msgid "✨ <b>Collectible usernames</b>"
+msgstr "✨ <b>أسماء المستخدم القابلة للجمع</b>"
+
+msgid "🎁 <b>Gifts & collectibles</b> ({count})"
+msgstr "🎁 <b>الهدايا والمقتنيات</b> ({count})"
+
+msgid "No gifts or collectibles on this profile."
+msgstr "لا توجد هدايا أو مقتنيات على هذا الملف."
+
+msgid "Could not load gifts right now."
+msgstr "تعذر تحميل الهدايا الآن."
+
+msgid "…and {count} more"
+msgstr "…و{count} إضافية"
+
+msgid "🔄 Refresh"
+msgstr "🔄 تحديث"
+
+msgid "Loading profile…"
+msgstr "جارٍ تحميل الملف الشخصي…"
+
+msgid "Loading private chats…"
+msgstr "جارٍ تحميل المحادثات الخاصة…"
+
+msgid "Opening conversation…"
+msgstr "جارٍ فتح المحادثة…"
+
+msgid "💬 <b>Private chats</b> · {name}\n{count} conversations · page {page}/{pages}"
+msgstr "💬 <b>المحادثات الخاصة</b> · {name}\n{count} محادثة · صفحة {page}/{pages}"
+
+msgid "This account has no private conversations."
+msgstr "لا توجد محادثات خاصة على هذا الحساب."
+
+msgid "💾 Saved Messages"
+msgstr "💾 الرسائل المحفوظة"
+
+msgid "No messages in this conversation."
+msgstr "لا توجد رسائل في هذه المحادثة."
+
+msgid "💬 <b>{name}</b>\n{subtitle}\n"
+msgstr "💬 <b>{name}</b>\n{subtitle}\n"
+
+msgid "You"
+msgstr "أنت"
+
+msgid "📷 Photo"
+msgstr "📷 صورة"
+
+msgid "🎬 Video"
+msgstr "🎬 فيديو"
+
+msgid "🎤 Voice"
+msgstr "🎤 رسالة صوتية"
+
+msgid "🎧 Audio"
+msgstr "🎧 صوت"
+
+msgid "📄 File"
+msgstr "📄 ملف"
+
+msgid "😊 Sticker"
+msgstr "😊 ملصق"
+
+msgid "GIF"
+msgstr "GIF"
+
+msgid "📍 Location"
+msgstr "📍 موقع"
+
+msgid "👤 Contact"
+msgstr "👤 جهة اتصال"
+
+msgid "🔗 Link"
+msgstr "🔗 رابط"
+
+msgid "📎 Media"
+msgstr "📎 وسائط"
+
+msgid "📊 Poll"
+msgstr "📊 استطلاع"
+
+msgid "⬅️ Newer"
+msgstr "⬅️ الأحدث"
+
+msgid "Older ➡️"
+msgstr "الأقدم ➡️"
+
+msgid "🔙 Back to Chats"
+msgstr "🔙 رجوع للمحادثات"
+
+msgid "Page {page}/{pages}"
+msgstr "صفحة {page}/{pages}"
+
+msgid "This account could not connect. Check the proxy and try again."
+msgstr "تعذر الاتصال بهذا الحساب. تحقق من البروكسي ثم حاول مرة أخرى."
+
+msgid "The session is invalid or revoked. Please re-add the account."
+msgstr "الجلسة غير صالحة أو تم إلغاؤها. احذف الحساب وأضفه من جديد."
+
+msgid "An unexpected error occurred while loading this page."
+msgstr "حدث خطأ غير متوقع أثناء تحميل هذه الصفحة."
+
+msgid "Telegram asked us to wait. Please try again in a moment."
+msgstr "تيليجرام طلب الانتظار. حاول بعد لحظات."
+
+msgid "Unknown"
+msgstr "غير معروف"
+
 

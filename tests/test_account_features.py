@@ -325,6 +325,9 @@ class TranslationCatalogTests(unittest.TestCase):
         self.assertEqual(t.gettext("🔑 Two-Step Verification"), "🔑 رمز التحقق بخطوتين")
         self.assertEqual(t.gettext("🔐 Enable Code Monitor"), "🔐 تفعيل مراقبة الأكواد")
         self.assertEqual(t.gettext("▶️ Enable Group Creation"), "▶️ تفعيل إنشاء المجموعات")
+        self.assertEqual(t.gettext("👤 View Profile"), "👤 الملف الشخصي")
+        self.assertEqual(t.gettext("💬 Private Chats"), "💬 المحادثات الخاصة")
+        self.assertEqual(t.gettext("📊 Group Report"), "📊 تقرير المجموعات")
         self.assertEqual(t.gettext("Toggle On"), "تفعيل")
 
 
@@ -402,6 +405,102 @@ class ProxyParseTests(unittest.TestCase):
         self.assertFalse(is_socks_auth_error(ConnectionError("Unable to connect")))
         self.assertFalse(is_socks_auth_error(TimeoutError("timed out")))
         self.assertFalse(is_socks_auth_error(OSError("Network is unreachable")))
+
+
+class AccountExplorerFormatTests(unittest.TestCase):
+    def test_display_name_and_gift_line(self):
+        from src.account_explorer import display_name, format_gift_line
+
+        self.assertEqual(display_name(None, "+1555"), "+1555")
+        self.assertEqual(display_name({"full_name": "Ali Ahmad"}, "+1555"), "Ali Ahmad")
+        line = format_gift_line({
+            "title": "Plush Pepe",
+            "number": 1234,
+            "is_upgraded": True,
+            "is_pinned": True,
+            "from_name": "Sara",
+        })
+        self.assertIn("💎", line)
+        self.assertIn("Plush Pepe", line)
+        self.assertIn("#1234", line)
+        self.assertIn("Sara", line)
+
+    def test_dialog_button_and_message_line(self):
+        from src.account_explorer import format_dialog_button, format_message_line
+
+        button = format_dialog_button(
+            {"name": "Omar", "unread": 3, "is_bot": False, "is_self": False, "is_official": False},
+            "Saved Messages",
+        )
+        self.assertTrue(button.startswith("🔵"))
+        self.assertIn("Omar", button)
+        self.assertIn("(3)", button)
+
+        saved = format_dialog_button(
+            {"name": "me", "unread": 0, "is_self": True, "is_bot": False, "is_official": False},
+            "💾 Saved Messages",
+        )
+        self.assertIn("Saved Messages", saved)
+
+        line = format_message_line(
+            {
+                "outgoing": True,
+                "text": "hello <world>",
+                "date": "2026-09-07T18:06:42",
+                "from_name": "Ali",
+            },
+            lambda s: s,
+            "You",
+        )
+        self.assertIn("→", line)
+        self.assertIn("You", line)
+        self.assertIn("hello &lt;world&gt;", line)
+
+    def test_paginate_and_profile_text(self):
+        from src.account_explorer import format_profile_text, paginate
+
+        items, page, pages = paginate(list(range(13)), 1, 6)
+        self.assertEqual(items, [6, 7, 8, 9, 10, 11])
+        self.assertEqual(page, 1)
+        self.assertEqual(pages, 3)
+
+        text = format_profile_text(
+            {
+                "identity": {
+                    "full_name": "Ali",
+                    "username": "ali",
+                    "phone": "+1555123",
+                    "user_id": 99,
+                    "is_premium": True,
+                    "language_code": "ar",
+                    "bio": "Hello <b>",
+                    "collectible_usernames": ["ali.nft"],
+                },
+                "gifts": [
+                    {"title": "Rose", "is_upgraded": False, "from_name": "Omar"},
+                ],
+                "total_gifts": 4,
+            },
+            "+1555123",
+            lambda s: s,
+        )
+        self.assertIn("Ali", text)
+        self.assertIn("@ali", text)
+        self.assertIn("99", text)
+        self.assertIn("Telegram Premium", text)
+        self.assertIn("@ali.nft", text)
+        self.assertIn("Hello &lt;b&gt;", text)
+        self.assertIn("Rose", text)
+        self.assertIn("…and 3 more", text)
+
+    def test_memory_cache_roundtrip(self):
+        from src.cache_store import CacheStore
+
+        store = CacheStore()
+        store.set_json("unit-test-key", {"ok": True}, ttl_seconds=30)
+        self.assertEqual(store.get_json("unit-test-key"), {"ok": True})
+        store.delete("unit-test-key")
+        self.assertIsNone(store.get_json("unit-test-key"))
 
 
 if __name__ == "__main__":

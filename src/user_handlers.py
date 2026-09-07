@@ -36,6 +36,13 @@ from src.database import (
 )
 from src.translation import get_translation_func_for_user
 from src.code_monitor import build_proxy_dict, code_monitor_manager, is_socks_auth_error
+from src.account_explorer import display_name, get_cached_identity
+from src.account_views import (
+    load_identity_for_menu,
+    show_conversation,
+    show_inbox,
+    show_profile,
+)
 from src.two_step import (
     TwoStepError,
     apply_two_step_password,
@@ -1013,7 +1020,9 @@ async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             if acc.get('code_monitor_enabled'):
                 status_icon = f"{status_icon}🔐"
 
-            button_text = f"{status_icon} {acc['phone']}"
+            identity = get_cached_identity(acc['id'])
+            label = display_name(identity, acc['phone'])
+            button_text = f"{status_icon} {label}"
             buttons.append([InlineKeyboardButton(button_text, callback_data=f"mng_select_{acc['id']}")])
 
     buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
@@ -1062,11 +1071,21 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
 
+    if not user_owns_account(account_id, user_id):
+        await context.bot.edit_message_text(
+            chat_id=user_id,
+            message_id=message_id,
+            text=_("Error: Account not found or you don't have permission."),
+        )
+        return
+
     acc = get_account_details(account_id)
 
     if not acc:
         await context.bot.edit_message_text(chat_id=user_id, message_id=message_id, text=_("Error: Account not found or you don't have permission."))
         return
+
+    identity = await load_identity_for_menu(account_id)
 
     # Determine group-creation status string
     status_str = _("⚪️ Off")
@@ -1094,7 +1113,20 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     else:
         monitor_str = _("⚪️ Off")
 
-    text = _("<b>Account:</b> <code>{phone}</code>").format(phone=acc['phone'])
+    from html import escape as html_escape
+
+    name = display_name(identity, acc["phone"])
+    text = _("👤 <b>{name}</b>").format(name=html_escape(name))
+    username = (identity or {}).get("username")
+    if username:
+        text += "\n" + _("🔗 @{username}").format(username=html_escape(username))
+    text += "\n" + _("📱 <code>{phone}</code>").format(phone=html_escape(str(acc["phone"])))
+    if identity and identity.get("user_id"):
+        text += "\n" + _("🆔 <code>{user_id}</code>").format(user_id=identity["user_id"])
+    if identity and identity.get("is_premium"):
+        text += "\n" + _("⭐ Telegram Premium")
+
+    text += "\n"
     text += _("\n<b>Group Creation:</b> {status}").format(status=status_str)
     text += _("\n<b>Code Monitor:</b> {status}").format(status=monitor_str)
 
@@ -1120,6 +1152,10 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     buttons = [
         [
+            InlineKeyboardButton(_("👤 View Profile"), callback_data=f"mng_profile_{acc['id']}"),
+            InlineKeyboardButton(_("💬 Private Chats"), callback_data=f"mng_inbox_{acc['id']}"),
+        ],
+        [
             InlineKeyboardButton(
                 _("▶️ Enable Group Creation") if not acc['is_active'] else _("⏹️ Disable Group Creation"),
                 callback_data=f"mng_toggle_{acc['id']}"
@@ -1140,11 +1176,9 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         ],
         [
             InlineKeyboardButton(_("📂 View Groups"), callback_data=f"mng_viewgroups_{acc['id']}"),
-            InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc['id']}"),
+            InlineKeyboardButton(_("📊 Group Report"), callback_data=f"mng_groupreport_{acc['id']}"),
         ],
-        [
-            InlineKeyboardButton(_("تقرير المجموعات"), callback_data=f"mng_groupreport_{acc['id']}"),
-        ],
+        [InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc['id']}")],
         [InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")]
     ]
     reply_markup = InlineKeyboardMarkup(buttons)
@@ -1282,9 +1316,46 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             await account_detail_menu(update, context, account_id, query.message.message_id)
             return
 
+        if action == "profile":
+            await show_profile(update, context, int(action_parts[2]))
+            return
+        if action == "prefresh":
+            await show_profile(update, context, int(action_parts[2]), force=True)
+            return
+        if action == "inbox":
+            account_id = int(action_parts[2])
+            page = int(action_parts[3]) if len(action_parts) > 3 else 0
+            await show_inbox(update, context, account_id, page)
+            return
+        if action == "irefresh":
+            await show_inbox(update, context, int(action_parts[2]), 0, force=True)
+            return
+        if action == "dm":
+            await show_conversation(
+                update,
+                context,
+                int(action_parts[2]),
+                int(action_parts[3]),
+                int(action_parts[4]) if len(action_parts) > 4 else 0,
+            )
+            return
+        if action == "drefresh":
+            await show_conversation(
+                update,
+                context,
+                int(action_parts[2]),
+                int(action_parts[3]),
+                0,
+                force=True,
+            )
+            return
+
         if action == "viewgroups":
             account_id = int(action_parts[2])
             page = int(action_parts[3]) if len(action_parts) > 3 else 0
+            if not user_owns_account(account_id, user_id):
+                await query.answer(_("Error: Account not found or you don't have permission."), show_alert=True)
+                return
             log.info(f"User {user_id} requested to view groups for account {account_id} on page {page}.")
 
             await query.edit_message_text(_("Fetching groups... Please wait."))
@@ -1563,7 +1634,8 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                             status_icon = "🟢"
                         if acc.get('code_monitor_enabled'):
                             status_icon = f"{status_icon}🔐"
-                        button_text = f"{status_icon} {acc['phone']}"
+                        label = display_name(get_cached_identity(acc['id']), acc['phone'])
+                        button_text = f"{status_icon} {label}"
                         buttons.append([InlineKeyboardButton(button_text, callback_data=f"mng_select_{acc['id']}")])
                 buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
                 reply_markup = InlineKeyboardMarkup(buttons)

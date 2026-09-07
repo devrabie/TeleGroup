@@ -1140,6 +1140,147 @@ msgstr "Monitor On"
 msgid "Monitor Off"
 msgstr "Monitor Off"
 
+msgid "👤 View Profile"
+msgstr "👤 View Profile"
+
+msgid "💬 Private Chats"
+msgstr "💬 Private Chats"
+
+msgid "📊 Group Report"
+msgstr "📊 Group Report"
+
+msgid "👤 <b>{name}</b>"
+msgstr "👤 <b>{name}</b>"
+
+msgid "🔗 @{username}"
+msgstr "🔗 @{username}"
+
+msgid "📱 <code>{phone}</code>"
+msgstr "📱 <code>{phone}</code>"
+
+msgid "🆔 <code>{user_id}</code>"
+msgstr "🆔 <code>{user_id}</code>"
+
+msgid "⭐ Telegram Premium"
+msgstr "⭐ Telegram Premium"
+
+msgid "🌐 Language: {lang}"
+msgstr "🌐 Language: {lang}"
+
+msgid "🎭 {status}"
+msgstr "🎭 {status}"
+
+msgid "📝 {bio}"
+msgstr "📝 {bio}"
+
+msgid "✨ <b>Collectible usernames</b>"
+msgstr "✨ <b>Collectible usernames</b>"
+
+msgid "🎁 <b>Gifts & collectibles</b> ({count})"
+msgstr "🎁 <b>Gifts & collectibles</b> ({count})"
+
+msgid "No gifts or collectibles on this profile."
+msgstr "No gifts or collectibles on this profile."
+
+msgid "Could not load gifts right now."
+msgstr "Could not load gifts right now."
+
+msgid "…and {count} more"
+msgstr "…and {count} more"
+
+msgid "🔄 Refresh"
+msgstr "🔄 Refresh"
+
+msgid "Loading profile…"
+msgstr "Loading profile…"
+
+msgid "Loading private chats…"
+msgstr "Loading private chats…"
+
+msgid "Opening conversation…"
+msgstr "Opening conversation…"
+
+msgid "💬 <b>Private chats</b> · {name}\n{count} conversations · page {page}/{pages}"
+msgstr "💬 <b>Private chats</b> · {name}\n{count} conversations · page {page}/{pages}"
+
+msgid "This account has no private conversations."
+msgstr "This account has no private conversations."
+
+msgid "💾 Saved Messages"
+msgstr "💾 Saved Messages"
+
+msgid "No messages in this conversation."
+msgstr "No messages in this conversation."
+
+msgid "💬 <b>{name}</b>\n{subtitle}\n"
+msgstr "💬 <b>{name}</b>\n{subtitle}\n"
+
+msgid "You"
+msgstr "You"
+
+msgid "📷 Photo"
+msgstr "📷 Photo"
+
+msgid "🎬 Video"
+msgstr "🎬 Video"
+
+msgid "🎤 Voice"
+msgstr "🎤 Voice"
+
+msgid "🎧 Audio"
+msgstr "🎧 Audio"
+
+msgid "📄 File"
+msgstr "📄 File"
+
+msgid "😊 Sticker"
+msgstr "😊 Sticker"
+
+msgid "GIF"
+msgstr "GIF"
+
+msgid "📍 Location"
+msgstr "📍 Location"
+
+msgid "👤 Contact"
+msgstr "👤 Contact"
+
+msgid "🔗 Link"
+msgstr "🔗 Link"
+
+msgid "📎 Media"
+msgstr "📎 Media"
+
+msgid "📊 Poll"
+msgstr "📊 Poll"
+
+msgid "⬅️ Newer"
+msgstr "⬅️ Newer"
+
+msgid "Older ➡️"
+msgstr "Older ➡️"
+
+msgid "🔙 Back to Chats"
+msgstr "🔙 Back to Chats"
+
+msgid "Page {page}/{pages}"
+msgstr "Page {page}/{pages}"
+
+msgid "This account could not connect. Check the proxy and try again."
+msgstr "This account could not connect. Check the proxy and try again."
+
+msgid "The session is invalid or revoked. Please re-add the account."
+msgstr "The session is invalid or revoked. Please re-add the account."
+
+msgid "An unexpected error occurred while loading this page."
+msgstr "An unexpected error occurred while loading this page."
+
+msgid "Telegram asked us to wait. Please try again in a moment."
+msgstr "Telegram asked us to wait. Please try again in a moment."
+
+msgid "Unknown"
+msgstr "Unknown"
+
 #~ msgstr ""
 #~ "❌ Failed to convert group. The "
 #~ "account may not have the required "
