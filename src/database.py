@@ -497,13 +497,18 @@ def batch_insert_proxies(proxies: list[str]):
         log.error(f"Failed to batch insert proxies: {e}")
         return 0
 
-def get_random_proxy_id():
-    """Retrieves the ID of a random, working proxy."""
-    sql = "SELECT id FROM proxies WHERE is_working = 1 ORDER BY RANDOM() LIMIT 1"
+def get_random_proxy_id(exclude_id: int | None = None):
+    """Retrieves the ID of a random, working proxy, optionally skipping one ID."""
+    sql = "SELECT id FROM proxies WHERE is_working = 1"
+    params = []
+    if exclude_id is not None:
+        sql += " AND id != ?"
+        params.append(exclude_id)
+    sql += " ORDER BY RANDOM() LIMIT 1"
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql)
+            cursor.execute(sql, params)
             proxy = cursor.fetchone()
             return proxy['id'] if proxy else None
     except sqlite3.Error as e:
@@ -712,20 +717,38 @@ def toggle_account_status(account_id: int, telegram_user_id: int):
         return None
 
 def reassign_proxy(account_id: int, telegram_user_id: int):
-    """Assigns a new random proxy to a managed account."""
-    new_proxy_id = get_random_proxy_id()
-    if new_proxy_id is None:
-        return False, "no_available_proxies"
-
-    sql = """
-        UPDATE managed_accounts
-        SET proxy_id = ?
-        WHERE id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
-    """
+    """Assigns a new random proxy to a managed account, preferring a different one."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (new_proxy_id, account_id, telegram_user_id))
+            cursor.execute(
+                """
+                SELECT proxy_id FROM managed_accounts
+                WHERE id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
+                """,
+                (account_id, telegram_user_id),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False, "db_error"
+            current_proxy_id = row["proxy_id"]
+
+        new_proxy_id = get_random_proxy_id(exclude_id=current_proxy_id)
+        if new_proxy_id is None:
+            new_proxy_id = get_random_proxy_id()
+        if new_proxy_id is None:
+            return False, "no_available_proxies"
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE managed_accounts
+                SET proxy_id = ?
+                WHERE id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
+                """,
+                (new_proxy_id, account_id, telegram_user_id),
+            )
             conn.commit()
             return cursor.rowcount > 0, "proxy_update_success"
     except sqlite3.Error as e:
@@ -1212,6 +1235,8 @@ def get_account_details(account_id: int):
             ma.phone,
             ma.is_active,
             ma.code_monitor_enabled,
+            ma.proxy_id,
+            p.proxy_string,
             ma.next_creation_time,
             ma.backoff_level,
             ma.last_error,
@@ -1222,6 +1247,7 @@ def get_account_details(account_id: int):
              FROM group_creation_log gcl
              WHERE gcl.account_id = ma.id) as total_groups
         FROM managed_accounts ma
+        LEFT JOIN proxies p ON p.id = ma.proxy_id
         WHERE ma.id = ?
     """
     try:

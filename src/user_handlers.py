@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from telegram.ext import (
     ContextTypes,
     CommandHandler,
@@ -64,6 +65,29 @@ def _format_datetime(dt_string: str | None) -> str:
         return local_time.strftime('%Y-%m-%d %H:%M')
     except (ValueError, TypeError):
         return "Invalid Date"
+
+
+def _is_message_not_modified(error: Exception) -> bool:
+    """Telegram rejects edits that do not change the message text or markup."""
+    return isinstance(error, BadRequest) and "not modified" in str(error).lower()
+
+
+async def _safe_edit_message_text(bot, *, chat_id, message_id, text, reply_markup=None, parse_mode=None):
+    """Edit a message, ignoring Telegram's 'message is not modified' error."""
+    try:
+        await bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=text,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+        )
+        return True
+    except BadRequest as e:
+        if _is_message_not_modified(e):
+            log.debug(f"Ignored unchanged message edit for chat {chat_id} message {message_id}.")
+            return False
+        raise
 
 # --- Handlers for various bot features ---
 
@@ -1060,6 +1084,17 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     text += _("\n<b>Group Creation:</b> {status}").format(status=status_str)
     text += _("\n<b>Code Monitor:</b> {status}").format(status=monitor_str)
 
+    proxy_host = None
+    if acc.get("proxy_string"):
+        proxy_host = str(acc["proxy_string"]).split(":")[0]
+    if proxy_host:
+        proxy_label = proxy_host
+    elif acc.get("proxy_id"):
+        proxy_label = f"#{acc['proxy_id']}"
+    else:
+        proxy_label = _("None")
+    text += _("\n<b>Proxy:</b> <code>{proxy}</code>").format(proxy=proxy_label)
+
     text += _("\n<b>Last Group:</b> {time}").format(time=_format_datetime(acc['last_creation_time']))
     text += _("\n<b>Next Group:</b> {time}").format(time=_format_datetime(acc['next_creation_time']))
 
@@ -1098,7 +1133,14 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         [InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")]
     ]
     reply_markup = InlineKeyboardMarkup(buttons)
-    await context.bot.edit_message_text(chat_id=user_id, message_id=message_id, text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    await _safe_edit_message_text(
+        context.bot,
+        chat_id=user_id,
+        message_id=message_id,
+        text=text,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+    )
 
 
 async def async_generate_group_report(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id: int):
@@ -1199,7 +1241,6 @@ async def async_generate_group_report(update: Update, context: ContextTypes.DEFA
 async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Main router for all management callbacks."""
     query = update.callback_query
-    await query.answer()
     user_id = query.from_user.id
     log.info(f"User {user_id} triggered manage_account_callback with data: {query.data}")
 
@@ -1207,7 +1248,9 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
         _ = get_translation_func_for_user(user_id)
         from datetime import timedelta
         action_parts = query.data.split("_")
-        action = action_parts[1]
+        action = action_parts[1] if len(action_parts) > 1 else ""
+        if action not in {"proxy", "toggle", "monitor", "deleteconfirm"}:
+            await query.answer()
 
         if action == "cancel":
             log.info(f"User {user_id} cancelled management action.")
@@ -1463,9 +1506,16 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
         elif action == "proxy":
             account_id = int(action_parts[2])
             log.info(f"User {user_id} reassigned proxy for account {account_id}.")
-            success, msg = reassign_proxy(account_id, user_id)
-            await context.bot.answer_callback_query(query.id, msg, show_alert=True)
-            # Refresh the menu
+            success, msg_key = reassign_proxy(account_id, user_id)
+            proxy_messages = {
+                "proxy_update_success": _("✅ Proxy updated."),
+                "no_available_proxies": _("No available proxies."),
+                "db_error": _("Could not update the proxy."),
+            }
+            toast = proxy_messages.get(msg_key, _("Could not update the proxy."))
+            if not success and msg_key == "proxy_update_success":
+                toast = _("Could not update the proxy.")
+            await query.answer(toast, show_alert=True)
             await account_detail_menu(update, context, account_id, query.message.message_id)
         elif action == "delete":
             account_id = int(action_parts[2])
@@ -1506,6 +1556,9 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             else:
                 await query.edit_message_text(_("❌ Could not delete account."))
     except Exception as e:
+        if _is_message_not_modified(e):
+            log.debug(f"Ignored unchanged account menu edit for user {user_id}.")
+            return
         log.error(f"Error in manage_account_callback for user {user_id} with data {query.data}: {e}", exc_info=True)
         try:
             # Try to inform the user that something went wrong

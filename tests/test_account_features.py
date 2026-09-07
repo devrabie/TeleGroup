@@ -249,6 +249,21 @@ class ManagedAccountDefaultsTests(unittest.TestCase):
         self.assertEqual(self.database.ui_language_from_telegram("en"), "en")
         self.assertEqual(self.database.ui_language_from_telegram(None), "en")
 
+    def test_reassign_proxy_prefers_a_different_proxy(self):
+        self.database.batch_insert_proxies(["10.0.0.1:1080:u:p", "10.0.0.2:1080:u:p"])
+        self.database.add_managed_account(111, "+15550004444", "session-string", self.profile["id"])
+        acc_id = self.database.get_user_details(111)["accounts"][0]["id"]
+        before = self.database.get_account_details(acc_id)
+        self.assertIsNotNone(before["proxy_id"])
+
+        seen = set()
+        for _ in range(8):
+            ok, key = self.database.reassign_proxy(acc_id, 111)
+            self.assertTrue(ok)
+            self.assertEqual(key, "proxy_update_success")
+            seen.add(self.database.get_account_details(acc_id)["proxy_id"])
+        self.assertGreaterEqual(len(seen), 2)
+
 
 class TwoStepPasswordValidationTests(unittest.IsolatedAsyncioTestCase):
     def test_validate_two_step_password(self):
@@ -282,6 +297,20 @@ class TranslationCatalogTests(unittest.TestCase):
         self.assertEqual(t.gettext("🔐 Enable Code Monitor"), "🔐 تفعيل مراقبة الأكواد")
         self.assertEqual(t.gettext("▶️ Enable Group Creation"), "▶️ تفعيل إنشاء المجموعات")
         self.assertEqual(t.gettext("Toggle On"), "تفعيل")
+
+
+class MessageEditHelperTests(unittest.TestCase):
+    def test_is_message_not_modified(self):
+        from telegram.error import BadRequest
+        from src.user_handlers import _is_message_not_modified
+
+        self.assertTrue(
+            _is_message_not_modified(
+                BadRequest("Message is not modified: specified new message content and reply markup are exactly the same")
+            )
+        )
+        self.assertFalse(_is_message_not_modified(BadRequest("Message to edit not found")))
+        self.assertFalse(_is_message_not_modified(ValueError("other")))
 
 
 class ProxyParseTests(unittest.TestCase):

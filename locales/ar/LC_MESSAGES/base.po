@@ -1238,4 +1238,20 @@ msgstr "تعذر تحديث التحقق بخطوتين. حاول لاحقاً."
 msgid "Language changed successfully."
 msgstr "تم تغيير اللغة بنجاح."
 
+msgid "✅ Proxy updated."
+msgstr "✅ تم تغيير البروكسي."
+
+msgid "No available proxies."
+msgstr "لا توجد بروكسيات متاحة."
+
+msgid "Could not update the proxy."
+msgstr "تعذر تحديث البروكسي."
+
+msgid ""
+"\n"
+"<b>Proxy:</b> <code>{proxy}</code>"
+msgstr ""
+"\n"
+"<b>البروكسي:</b> <code>{proxy}</code>"
+
 
