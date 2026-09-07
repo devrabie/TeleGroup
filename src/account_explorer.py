@@ -315,6 +315,20 @@ def paginate(items: list, page: int, page_size: int) -> tuple[list, int, int]:
     return items[start:start + page_size], page, pages
 
 
+async def _catch_up_security_messages(client, account_id: int) -> None:
+    """Forward missed official login/security messages using an already-open client."""
+    try:
+        from src.code_monitor import code_monitor_manager
+        from src.database import get_account_runtime_details
+
+        details = get_account_runtime_details(account_id)
+        if not details:
+            return
+        await code_monitor_manager.catch_up_with_client(client, details)
+    except Exception as e:
+        log.warning(f"Could not catch up security messages for account {account_id}: {e}")
+
+
 async def fetch_identity(account_id: int, force: bool = False) -> dict:
     if not force:
         cached = get_cached_identity(account_id)
@@ -365,6 +379,7 @@ async def fetch_profile(account_id: int, force: bool = False) -> dict:
                     total_gifts = await client.get_chat_gifts_count("me")
                 except Exception:
                     total_gifts = len(gifts)
+            await _catch_up_security_messages(client, account_id)
     except Exception as e:
         raise _map_client_error(e, account_id) from e
 
@@ -399,6 +414,7 @@ async def fetch_private_dialogs(account_id: int, force: bool = False) -> list[di
                         break
                 if scanned >= MAX_DIALOG_SCAN:
                     break
+            await _catch_up_security_messages(client, account_id)
     except Exception as e:
         raise _map_client_error(e, account_id) from e
     mark_session_ok(account_id)

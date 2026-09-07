@@ -79,6 +79,36 @@ def _is_message_not_modified(error: Exception) -> bool:
     return isinstance(error, BadRequest) and "not modified" in str(error).lower()
 
 
+def _is_stale_callback(error: Exception) -> bool:
+    """True when the user tapped a button too long ago for Telegram to accept an answer."""
+    if not isinstance(error, BadRequest):
+        return False
+    text = str(error).lower()
+    return (
+        "too old" in text
+        or "query id is invalid" in text
+        or "response timeout" in text
+        or "query is too old" in text
+    )
+
+
+async def _safe_answer_query(query, text: str | None = None, show_alert: bool = False) -> bool:
+    """Answer a callback query, ignoring stale/already-answered IDs."""
+    if query is None:
+        return False
+    try:
+        if text is None:
+            await query.answer()
+        else:
+            await query.answer(text, show_alert=show_alert)
+        return True
+    except BadRequest as e:
+        if _is_stale_callback(e) or "already answered" in str(e).lower():
+            log.debug(f"Ignored stale callback answer: {e}")
+            return False
+        raise
+
+
 async def _safe_edit_message_text(bot, *, chat_id, message_id, text, reply_markup=None, parse_mode=None):
     """Edit a message, ignoring Telegram's 'message is not modified' error."""
     try:
@@ -1035,7 +1065,7 @@ async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     if query:
         try:
-            await query.answer()  # Answer the callback query
+            await _safe_answer_query(query)
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
         except Exception as e:
             log.error(f"Error editing message in my_accounts_handler: {e}", exc_info=True)
@@ -1091,6 +1121,9 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     identity = await load_identity_for_menu(account_id, acc)
     acc = get_account_details(account_id) or acc
+    if acc.get("code_monitor_enabled") and not code_monitor_manager.is_connected(account_id):
+        code_monitor_manager.set_bot(context.bot)
+        asyncio.create_task(code_monitor_manager.on_enabled(account_id))
 
     # Determine group-creation status string
     status_str = _("⚪️ Off")
@@ -1310,12 +1343,12 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
         action_parts = query.data.split("_")
         action = action_parts[1] if len(action_parts) > 1 else ""
         if action not in {"proxy", "toggle", "monitor", "deleteconfirm"}:
-            await query.answer()
+            await _safe_answer_query(query)
 
         if action == "cancel":
             log.info(f"User {user_id} cancelled management action.")
             await query.message.delete()
-            await context.bot.answer_callback_query(query.id, _("Cancelled."))
+            await _safe_answer_query(query, _("Cancelled."))
             return
 
         if action == "back":
@@ -1365,7 +1398,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             account_id = int(action_parts[2])
             page = int(action_parts[3]) if len(action_parts) > 3 else 0
             if not user_owns_account(account_id, user_id):
-                await query.answer(_("Error: Account not found or you don't have permission."), show_alert=True)
+                await _safe_answer_query(query, _("Error: Account not found or you don't have permission."), show_alert=True)
                 return
             log.info(f"User {user_id} requested to view groups for account {account_id} on page {page}.")
 
@@ -1532,7 +1565,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                 await client.disconnect()
 
                 text = _("✅ Group has been successfully upgraded to a Supergroup!")
-                await context.bot.answer_callback_query(query.id, _("Success!"), show_alert=False)
+                await _safe_answer_query(query, _("Success!"))
 
             except Exception as e:
                 log.error(f"Error upgrading group {chat_id} for user {user_id}, account {account_id}: {e}", exc_info=True)
@@ -1561,44 +1594,37 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             new_status = toggle_account_status(account_id, user_id)
             if new_status is not None:
                 status_text = _("activated") if new_status else _("deactivated")
-                await context.bot.answer_callback_query(query.id, _("Group creation has been {status}.").format(status=status_text))
+                await _safe_answer_query(query, _("Group creation has been {status}.").format(status=status_text))
                 # Refresh the menu
                 await account_detail_menu(update, context, account_id, query.message.message_id)
             else:
-                await context.bot.answer_callback_query(query.id, _("Could not change status."), show_alert=True)
+                await _safe_answer_query(query, _("Could not change status."), show_alert=True)
         elif action == "monitor":
             account_id = int(action_parts[2])
             log.info(f"User {user_id} toggled code monitor for account {account_id}.")
             new_status = toggle_code_monitor(account_id, user_id)
             if new_status is None:
-                await context.bot.answer_callback_query(query.id, _("Could not change status."), show_alert=True)
+                await _safe_answer_query(query, _("Could not change status."), show_alert=True)
             elif new_status:
                 details = get_user_details(user_id)
                 has_sub = bool(details and details.get('subscription'))
                 if not has_sub:
-                    await context.bot.answer_callback_query(
-                        query.id,
+                    await _safe_answer_query(
+                        query,
                         _("Code monitor is enabled, but an active subscription is required to run it."),
                         show_alert=True,
                     )
                 else:
+                    await _safe_answer_query(
+                        query,
+                        _("Code monitor enabled. Login codes and security notices will be forwarded here."),
+                    )
                     code_monitor_manager.set_bot(context.bot)
-                    started = await code_monitor_manager.on_enabled(account_id)
-                    if started:
-                        await context.bot.answer_callback_query(
-                            query.id,
-                            _("Code monitor enabled. Login codes and security notices will be forwarded here."),
-                        )
-                    else:
-                        await context.bot.answer_callback_query(
-                            query.id,
-                            _("Code monitor is enabled, but the account could not connect yet. It will retry automatically."),
-                            show_alert=True,
-                        )
+                    asyncio.create_task(code_monitor_manager.on_enabled(account_id))
                 await account_detail_menu(update, context, account_id, query.message.message_id)
             else:
                 await code_monitor_manager.stop_account(account_id)
-                await context.bot.answer_callback_query(query.id, _("Code monitor disabled."))
+                await _safe_answer_query(query, _("Code monitor disabled."))
                 await account_detail_menu(update, context, account_id, query.message.message_id)
         elif action == "proxy":
             account_id = int(action_parts[2])
@@ -1612,7 +1638,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             toast = proxy_messages.get(msg_key, _("Could not update the proxy."))
             if not success and msg_key == "proxy_update_success":
                 toast = _("Could not update the proxy.")
-            await query.answer(toast, show_alert=True)
+            await _safe_answer_query(query, toast, show_alert=True)
             await account_detail_menu(update, context, account_id, query.message.message_id)
         elif action == "delete":
             account_id = int(action_parts[2])
@@ -1630,7 +1656,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             log.info(f"User {user_id} confirmed delete for account {account_id}.")
             await code_monitor_manager.stop_account(account_id)
             if delete_managed_account(account_id, user_id):
-                await context.bot.answer_callback_query(query.id, _("✅ Account has been deleted."))
+                await _safe_answer_query(query, _("✅ Account has been deleted."))
                 # This is a bit of code duplication, but it's safer than calling the handler
                 # and avoids state-related issues with the update object.
                 details = get_user_details(user_id)
@@ -1657,12 +1683,11 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
         if _is_message_not_modified(e):
             log.debug(f"Ignored unchanged account menu edit for user {user_id}.")
             return
+        if _is_stale_callback(e):
+            log.info(f"Ignored stale callback for user {user_id} ({query.data}).")
+            return
         log.error(f"Error in manage_account_callback for user {user_id} with data {query.data}: {e}", exc_info=True)
-        try:
-            # Try to inform the user that something went wrong
-            await context.bot.answer_callback_query(query.id, "An unexpected error occurred.", show_alert=True)
-        except Exception as inner_e:
-            log.error(f"Failed to even notify user about the error: {inner_e}")
+        await _safe_answer_query(query, "An unexpected error occurred.", show_alert=True)
 
 # --- Handler Registration ---
 user_handlers_list = [

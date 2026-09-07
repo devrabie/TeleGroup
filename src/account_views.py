@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -16,7 +15,6 @@ from src.account_explorer import (
     ExplorerError,
     dialog_title,
     display_name,
-    fetch_identity,
     fetch_private_dialogs,
     fetch_private_messages,
     fetch_profile,
@@ -27,7 +25,7 @@ from src.account_explorer import (
     paginate,
     trim_html,
 )
-from src.database import get_account_details, session_is_invalid, user_owns_account
+from src.database import get_account_details, user_owns_account
 from src.translation import get_translation_func_for_user
 
 log = logging.getLogger(__name__)
@@ -64,21 +62,8 @@ def owned_account(account_id: int, telegram_user_id: int) -> bool:
 
 
 async def load_identity_for_menu(account_id: int, account: dict | None = None) -> dict | None:
-    if account is None:
-        account = get_account_details(account_id)
-    if session_is_invalid(account):
-        return get_cached_identity(account_id)
-    cached = get_cached_identity(account_id)
-    if cached:
-        return cached
-    try:
-        return await asyncio.wait_for(fetch_identity(account_id), timeout=12)
-    except ExplorerError as e:
-        log.info(f"Could not load identity for account {account_id}: {e.code}")
-        return None
-    except Exception as e:
-        log.info(f"Identity not available yet for account {account_id}: {e}")
-        return None
+    """Return a cached Telegram name only. Never connect here — that blocks buttons."""
+    return get_cached_identity(account_id)
 
 
 async def show_profile(update, context: ContextTypes.DEFAULT_TYPE, account_id: int, *, force: bool = False):
@@ -86,7 +71,10 @@ async def show_profile(update, context: ContextTypes.DEFAULT_TYPE, account_id: i
     user_id = query.from_user.id
     _ = get_translation_func_for_user(user_id)
     if not owned_account(account_id, user_id):
-        await query.answer(_("Error: Account not found or you don't have permission."), show_alert=True)
+        try:
+            await query.answer(_("Error: Account not found or you don't have permission."), show_alert=True)
+        except BadRequest:
+            pass
         return
 
     await _safe_edit(
@@ -98,6 +86,8 @@ async def show_profile(update, context: ContextTypes.DEFAULT_TYPE, account_id: i
     acc = get_account_details(account_id)
     phone = acc["phone"] if acc else ""
     try:
+        from src.code_monitor import code_monitor_manager
+        code_monitor_manager.set_bot(context.bot)
         profile = await fetch_profile(account_id, force=force)
     except ExplorerError as e:
         buttons = [[InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")]]
@@ -140,7 +130,10 @@ async def show_inbox(
     user_id = query.from_user.id
     _ = get_translation_func_for_user(user_id)
     if not owned_account(account_id, user_id):
-        await query.answer(_("Error: Account not found or you don't have permission."), show_alert=True)
+        try:
+            await query.answer(_("Error: Account not found or you don't have permission."), show_alert=True)
+        except BadRequest:
+            pass
         return
 
     await _safe_edit(
@@ -152,13 +145,10 @@ async def show_inbox(
     acc = get_account_details(account_id)
     phone = acc["phone"] if acc else ""
     try:
+        from src.code_monitor import code_monitor_manager
+        code_monitor_manager.set_bot(context.bot)
         dialogs = await fetch_private_dialogs(account_id, force=force)
         identity = get_cached_identity(account_id)
-        if identity is None:
-            try:
-                identity = await fetch_identity(account_id)
-            except ExplorerError:
-                identity = None
     except ExplorerError as e:
         buttons = [[InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")]]
         await _safe_edit(
@@ -225,7 +215,10 @@ async def show_conversation(
     user_id = query.from_user.id
     _ = get_translation_func_for_user(user_id)
     if not owned_account(account_id, user_id):
-        await query.answer(_("Error: Account not found or you don't have permission."), show_alert=True)
+        try:
+            await query.answer(_("Error: Account not found or you don't have permission."), show_alert=True)
+        except BadRequest:
+            pass
         return
 
     await _safe_edit(

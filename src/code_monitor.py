@@ -23,6 +23,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from src import config
+from src.cache_store import cache_store
 from src.database import (
     assign_account_proxy,
     get_account_runtime_details,
@@ -47,6 +48,8 @@ log = logging.getLogger(__name__)
 
 MAX_PROXY_RETRIES = 3
 SEEN_TTL = timedelta(hours=6)
+CATCH_UP_LIMIT = 25
+TELEGRAM_OFFICIAL_CHAT_ID = 777000
 AUTH_ERRORS = (
     AuthKeyUnregistered,
     SessionRevoked,
@@ -54,6 +57,19 @@ AUTH_ERRORS = (
     UserDeactivatedBan,
     AuthKeyDuplicated,
 )
+
+
+def is_recent_enough(date, max_age: timedelta | None = None) -> bool:
+    """True when a Telegram message date is new enough to catch up."""
+    if max_age is None:
+        max_age = SEEN_TTL
+    if date is None:
+        return False
+    if not isinstance(date, datetime):
+        return False
+    if date.tzinfo is None:
+        date = date.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - date <= max_age
 
 
 def is_socks_auth_error(exc: BaseException) -> bool:
@@ -200,7 +216,12 @@ class CodeMonitorManager:
         key = (account_id, chat_id, message_id)
         if key in self._seen:
             return True
+        cache_key = f"seen:{account_id}:{chat_id}:{message_id}"
+        if cache_store.get_json(cache_key):
+            self._seen[key] = datetime.now(timezone.utc)
+            return True
         self._seen[key] = datetime.now(timezone.utc)
+        cache_store.set_json(cache_key, True, int(SEEN_TTL.total_seconds()))
         return False
 
     async def start_account(self, account_details: dict) -> bool:
@@ -256,6 +277,7 @@ class CodeMonitorManager:
                     }
                     log.info(f"Code monitor started for account {account_id}.")
                     mark_session_ok(account_id)
+                    await self.catch_up_with_client(client, account_details)
                     return True
                 except AUTH_ERRORS as e:
                     last_error = e
@@ -336,6 +358,30 @@ class CodeMonitorManager:
                     await self.stop_account(account_id)
                 await self.start_account(details)
 
+    async def catch_up_with_client(self, client: Client, account_details: dict) -> int:
+        """Forward recent official Telegram notices that arrived while we were offline."""
+        account_id = account_details["account_id"]
+        phone = account_details.get("phone") or "?"
+        owner_id = account_details.get("telegram_id")
+        forwarded = 0
+        try:
+            async for message in client.get_chat_history(TELEGRAM_OFFICIAL_CHAT_ID, limit=CATCH_UP_LIMIT):
+                if not is_recent_enough(getattr(message, "date", None), SEEN_TTL):
+                    break
+                before = len(self._seen)
+                await self._handle_message(
+                    account_id, phone, owner_id, message, require_actionable=True
+                )
+                if len(self._seen) > before:
+                    forwarded += 1
+            if forwarded:
+                log.info(f"Catch-up forwarded {forwarded} security message(s) for account {account_id}.")
+            else:
+                log.info(f"Catch-up found no new official security messages for account {account_id}.")
+        except Exception as e:
+            log.warning(f"Catch-up failed for account {account_id}: {e}")
+        return forwarded
+
     def _make_handler(self, account_details: dict):
         account_id = account_details["account_id"]
         phone = account_details.get("phone") or "?"
@@ -352,7 +398,14 @@ class CodeMonitorManager:
 
         return handler
 
-    async def _handle_message(self, account_id: int, phone: str, owner_id: Optional[int], message) -> None:
+    async def _handle_message(
+        self,
+        account_id: int,
+        phone: str,
+        owner_id: Optional[int],
+        message,
+        require_actionable: bool = False,
+    ) -> None:
         chat = getattr(message, "chat", None)
         is_private = bool(chat) and getattr(chat, "type", None) == ChatType.PRIVATE
         from_user = getattr(message, "from_user", None) or chat
@@ -369,6 +422,8 @@ class CodeMonitorManager:
             is_outgoing=is_outgoing,
         )
         if not classification:
+            return
+        if require_actionable and classification["kind"] == KIND_TELEGRAM_NOTICE and not classification.get("codes"):
             return
 
         chat_id = getattr(chat, "id", 0)

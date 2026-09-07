@@ -373,6 +373,18 @@ class MessageEditHelperTests(unittest.TestCase):
         self.assertFalse(_is_message_not_modified(BadRequest("Message to edit not found")))
         self.assertFalse(_is_message_not_modified(ValueError("other")))
 
+    def test_is_stale_callback(self):
+        from telegram.error import BadRequest
+        from src.user_handlers import _is_stale_callback
+
+        self.assertTrue(
+            _is_stale_callback(
+                BadRequest("Query is too old and response timeout expired or query id is invalid")
+            )
+        )
+        self.assertFalse(_is_stale_callback(BadRequest("Message to edit not found")))
+        self.assertFalse(_is_stale_callback(ValueError("other")))
+
 
 class ProxyParseTests(unittest.TestCase):
     def test_build_proxy_dict_parses_host_port_user_pass(self):
@@ -530,6 +542,15 @@ class AccountExplorerFormatTests(unittest.TestCase):
         self.assertEqual(store.get_json("unit-test-key"), {"ok": True})
         store.delete("unit-test-key")
         self.assertIsNone(store.get_json("unit-test-key"))
+
+    def test_is_recent_enough_for_code_catch_up(self):
+        from datetime import datetime, timedelta, timezone
+        from src.code_monitor import is_recent_enough
+
+        now = datetime.now(timezone.utc)
+        self.assertTrue(is_recent_enough(now - timedelta(minutes=10)))
+        self.assertFalse(is_recent_enough(now - timedelta(hours=7)))
+        self.assertFalse(is_recent_enough(None))
 
 
 if __name__ == "__main__":
