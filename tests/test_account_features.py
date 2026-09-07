@@ -358,6 +358,12 @@ class TranslationCatalogTests(unittest.TestCase):
         self.assertEqual(t.gettext("📊 Group Report"), "📊 تقرير المجموعات")
         self.assertEqual(t.gettext("⚠️ <b>Account invalid</b>"), "⚠️ <b>الحساب غير صالح</b>")
         self.assertEqual(t.gettext("Toggle On"), "تفعيل")
+        self.assertEqual(t.gettext("👥 Team"), "👥 الفريق")
+        self.assertEqual(t.gettext("🔗 Invite to add numbers"), "🔗 رابط إضافة الأرقام")
+        self.assertEqual(
+            t.gettext("📥 {person} added the number {phone} to your accounts."),
+            "📥 أضاف {person} الرقم {phone} إلى حساباتك.",
+        )
 
 
 class MessageEditHelperTests(unittest.TestCase):
@@ -551,6 +557,135 @@ class AccountExplorerFormatTests(unittest.TestCase):
         self.assertTrue(is_recent_enough(now - timedelta(minutes=10)))
         self.assertFalse(is_recent_enough(now - timedelta(hours=7)))
         self.assertFalse(is_recent_enough(None))
+
+
+class SharingAndManagersTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.tmp.name) / "bot.db"
+        import src.database as database
+        self.database = database
+        self.db_patch = patch.object(database, "DB_FILE", self.db_path)
+        self.db_patch.start()
+        database.initialize_database()
+
+        class Owner:
+            id = 111
+            first_name = "Owner"
+            username = "owner"
+
+        class Manager:
+            id = 222
+            first_name = "Manager"
+            username = "manager"
+
+        class Guest:
+            id = 333
+            first_name = "Guest"
+            username = "guest"
+
+        database.update_user_details(Owner())
+        database.update_user_details(Manager())
+        database.update_user_details(Guest())
+        self.profile = database.get_random_device_profile()
+        self.assertIsNotNone(self.profile)
+        self.assertTrue(
+            database.add_managed_account(111, "+15550004444", "session-owner", self.profile["id"])
+        )
+        self.acc_id = database.get_user_details(111)["accounts"][0]["id"]
+
+    def tearDown(self):
+        self.db_patch.stop()
+        self.tmp.cleanup()
+
+    def test_schema_creates_sharing_tables(self):
+        with self.database.get_db_connection() as conn:
+            tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        self.assertIn("account_managers", tables)
+        self.assertIn("sharing_tokens", tables)
+
+    def test_cannot_add_self_as_manager(self):
+        self.assertEqual(self.database.add_account_manager(111, 111), "self")
+        self.assertEqual(self.database.list_account_managers(111), [])
+
+    def test_manager_can_access_and_toggle_owner_accounts(self):
+        self.assertEqual(self.database.add_account_manager(111, 222), "ok")
+        self.assertEqual(self.database.add_account_manager(111, 222), "exists")
+        self.assertTrue(self.database.user_owns_account(self.acc_id, 111))
+        self.assertTrue(self.database.user_owns_account(self.acc_id, 222))
+        self.assertFalse(self.database.user_is_account_owner(self.acc_id, 222))
+        self.assertFalse(self.database.user_owns_account(self.acc_id, 333))
+
+        self.assertTrue(self.database.toggle_account_status(self.acc_id, 222))
+        self.assertTrue(self.database.toggle_code_monitor(self.acc_id, 222))
+        acc = self.database.get_account_details(self.acc_id)
+        self.assertEqual(acc["is_active"], 1)
+        self.assertEqual(acc["code_monitor_enabled"], 1)
+        self.assertIsNone(self.database.toggle_code_monitor(self.acc_id, 333))
+
+    def test_accessible_accounts_keep_ownership_separate(self):
+        self.database.add_account_manager(111, 222)
+        self.database.add_managed_account(222, "+15550005555", "session-manager", self.profile["id"])
+
+        owner_view = self.database.get_accessible_accounts(111)
+        self.assertEqual([acc["phone"] for acc in owner_view["own"]], ["+15550004444"])
+        self.assertEqual(owner_view["shared"], [])
+
+        manager_view = self.database.get_accessible_accounts(222)
+        self.assertEqual([acc["phone"] for acc in manager_view["own"]], ["+15550005555"])
+        self.assertEqual(len(manager_view["shared"]), 1)
+        self.assertEqual(manager_view["shared"][0]["owner_telegram_id"], 111)
+        self.assertEqual([acc["phone"] for acc in manager_view["shared"][0]["accounts"]], ["+15550004444"])
+
+        guest_details = self.database.get_user_details(333)
+        self.assertEqual(guest_details["accounts"], [])
+
+    def test_invited_number_attaches_to_owner_not_guest(self):
+        added = self.database.add_managed_account(111, "+15550006666", "session-invited", self.profile["id"])
+        self.assertTrue(added)
+        owner = self.database.get_user_details(111)
+        guest = self.database.get_user_details(333)
+        self.assertIn("+15550006666", [acc["phone"] for acc in owner["accounts"]])
+        self.assertEqual(guest["accounts"], [])
+        invited_id = next(acc["id"] for acc in owner["accounts"] if acc["phone"] == "+15550006666")
+        self.assertFalse(self.database.user_owns_account(invited_id, 333))
+
+    def test_sharing_tokens_resolve_and_rotate(self):
+        add_token = self.database.get_or_create_sharing_token(111, "add")
+        team_token = self.database.get_or_create_sharing_token(111, "team")
+        self.assertTrue(add_token)
+        self.assertTrue(team_token)
+        self.assertNotEqual(add_token, team_token)
+        self.assertEqual(self.database.get_or_create_sharing_token(111, "add"), add_token)
+
+        resolved = self.database.resolve_sharing_token(add_token)
+        self.assertEqual(resolved["kind"], "add")
+        self.assertEqual(resolved["owner_telegram_id"], 111)
+        self.assertEqual(resolved["owner_name"], "Owner")
+
+        rotated = self.database.rotate_sharing_token(111, "add")
+        self.assertTrue(rotated)
+        self.assertNotEqual(rotated, add_token)
+        self.assertIsNone(self.database.resolve_sharing_token(add_token))
+        self.assertEqual(self.database.resolve_sharing_token(rotated)["kind"], "add")
+
+    def test_remove_manager_revokes_access(self):
+        self.database.add_account_manager(111, 222)
+        self.assertTrue(self.database.remove_account_manager(111, 222))
+        self.assertFalse(self.database.user_owns_account(self.acc_id, 222))
+        self.assertEqual(self.database.list_account_managers(111), [])
+
+    def test_lookup_manager_by_username(self):
+        found = self.database.get_user_by_username("@manager")
+        self.assertEqual(found["telegram_id"], 222)
+        self.assertIsNone(self.database.get_user_by_username("missing"))
+
+    def test_format_person_label(self):
+        from src.sharing import format_person, deep_link
+
+        self.assertEqual(format_person(9, "Ali", "ali"), "Ali (@ali)")
+        self.assertEqual(format_person(9, "Ali", None), "Ali (ID: 9)")
+        self.assertEqual(deep_link("mybot", "add", "tok"), "https://t.me/mybot?start=add_tok")
 
 
 if __name__ == "__main__":

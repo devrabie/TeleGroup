@@ -1,9 +1,14 @@
 import sqlite3
 import logging
 import random
+import secrets
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from .device_profiles import DEVICES
+
+SHARE_KIND_ADD = "add"
+SHARE_KIND_TEAM = "team"
+VALID_SHARE_KINDS = (SHARE_KIND_ADD, SHARE_KIND_TEAM)
 
 # --- Configuration ---
 DB_FILE = Path(__file__).parent.parent / "data" / "bot.db"
@@ -107,6 +112,27 @@ TABLE_DEFINITIONS = {
             client_platform TEXT NOT NULL,
             api_id INTEGER,
             api_hash TEXT
+        );
+    """,
+    "account_managers": """
+        CREATE TABLE IF NOT EXISTS account_managers (
+            id INTEGER PRIMARY KEY,
+            owner_user_id INTEGER NOT NULL,
+            manager_telegram_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(owner_user_id, manager_telegram_id),
+            FOREIGN KEY (owner_user_id) REFERENCES users (id) ON DELETE CASCADE
+        );
+    """,
+    "sharing_tokens": """
+        CREATE TABLE IF NOT EXISTS sharing_tokens (
+            id INTEGER PRIMARY KEY,
+            owner_user_id INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            token TEXT NOT NULL UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(owner_user_id, kind),
+            FOREIGN KEY (owner_user_id) REFERENCES users (id) ON DELETE CASCADE
         );
     """
 }
@@ -666,17 +692,20 @@ def delete_managed_account(account_id: int, telegram_user_id: int):
     """
     Soft-deletes a managed account by setting the deleted_at timestamp.
     Also deactivates the account to pull it from any active loops.
+    Allowed for the owner or a delegated manager.
     """
+    if not user_owns_account(account_id, telegram_user_id):
+        return False
     sql = """
         UPDATE managed_accounts
         SET deleted_at = ?, is_active = 0
-        WHERE id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
+        WHERE id = ? AND deleted_at IS NULL
     """
     now_utc = datetime.now(timezone.utc)
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (now_utc, account_id, telegram_user_id))
+            cursor.execute(sql, (now_utc, account_id))
             conn.commit()
             return cursor.rowcount > 0 # Returns True if a row was updated
     except sqlite3.Error as e:
@@ -685,13 +714,19 @@ def delete_managed_account(account_id: int, telegram_user_id: int):
 
 def toggle_code_monitor(account_id: int, telegram_user_id: int):
     """
-    Toggles the code_monitor_enabled flag of a managed account owned by the user.
+    Toggles the code_monitor_enabled flag of a managed account.
+    Allowed for the owner or a delegated manager.
     Returns the new status (True/False) or None if the account was not found.
     """
+    if not user_owns_account(account_id, telegram_user_id):
+        log.warning(
+            f"User {telegram_user_id} tried to toggle code monitor on "
+            f"non-existent or unowned account {account_id}."
+        )
+        return None
     get_status_sql = """
         SELECT code_monitor_enabled FROM managed_accounts
         WHERE id = ? AND deleted_at IS NULL
-          AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
     """
     update_sql = """
         UPDATE managed_accounts SET code_monitor_enabled = ? WHERE id = ?
@@ -699,13 +734,9 @@ def toggle_code_monitor(account_id: int, telegram_user_id: int):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(get_status_sql, (account_id, telegram_user_id))
+            cursor.execute(get_status_sql, (account_id,))
             row = cursor.fetchone()
             if not row:
-                log.warning(
-                    f"User {telegram_user_id} tried to toggle code monitor on "
-                    f"non-existent or unowned account {account_id}."
-                )
                 return None
 
             new_status = not bool(row['code_monitor_enabled'])
@@ -722,16 +753,21 @@ def toggle_account_status(account_id: int, telegram_user_id: int):
     """
     Toggles the is_active status of a managed account.
     If toggled ON, it also resets the account's schedule and error state.
+    Allowed for the owner or a delegated manager.
     """
-    get_status_sql = "SELECT is_active FROM managed_accounts WHERE id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)"
+    if not user_owns_account(account_id, telegram_user_id):
+        log.warning(f"User {telegram_user_id} tried to toggle non-existent or unowned account {account_id}.")
+        return None
 
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(get_status_sql, (account_id, telegram_user_id))
+            cursor.execute(
+                "SELECT is_active FROM managed_accounts WHERE id = ? AND deleted_at IS NULL",
+                (account_id,),
+            )
             row = cursor.fetchone()
             if not row:
-                log.warning(f"User {telegram_user_id} tried to toggle non-existent or unowned account {account_id}.")
                 return None
 
             current_status = row['is_active']
@@ -763,15 +799,17 @@ def toggle_account_status(account_id: int, telegram_user_id: int):
 
 def reassign_proxy(account_id: int, telegram_user_id: int):
     """Assigns a new random proxy to a managed account, preferring a different one."""
+    if not user_owns_account(account_id, telegram_user_id):
+        return False, "db_error"
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
                 SELECT proxy_id FROM managed_accounts
-                WHERE id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
+                WHERE id = ? AND deleted_at IS NULL
                 """,
-                (account_id, telegram_user_id),
+                (account_id,),
             )
             row = cursor.fetchone()
             if not row:
@@ -790,9 +828,9 @@ def reassign_proxy(account_id: int, telegram_user_id: int):
                 """
                 UPDATE managed_accounts
                 SET proxy_id = ?
-                WHERE id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
+                WHERE id = ?
                 """,
-                (new_proxy_id, account_id, telegram_user_id),
+                (new_proxy_id, account_id),
             )
             conn.commit()
             return cursor.rowcount > 0, "proxy_update_success"
@@ -1039,8 +1077,21 @@ def get_account_runtime_details(account_id: int):
         log.error(f"Failed to get runtime details for account {account_id}: {e}")
         return None
 
-def user_owns_account(account_id: int, telegram_user_id: int) -> bool:
-    """Return True if the managed account exists, is not deleted, and belongs to the user."""
+def get_internal_user_id(telegram_id: int):
+    """Return the internal users.id for a Telegram ID, or None."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM users WHERE telegram_id = ?", (telegram_id,))
+            row = cursor.fetchone()
+            return row["id"] if row else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to resolve internal user id for {telegram_id}: {e}")
+        return None
+
+
+def user_is_account_owner(account_id: int, telegram_user_id: int) -> bool:
+    """True only if the actor is the account owner (not a delegated manager)."""
     sql = """
         SELECT 1 FROM managed_accounts
         WHERE id = ? AND deleted_at IS NULL
@@ -1053,8 +1104,282 @@ def user_owns_account(account_id: int, telegram_user_id: int) -> bool:
             cursor.execute(sql, (account_id, telegram_user_id))
             return cursor.fetchone() is not None
     except sqlite3.Error as e:
-        log.error(f"Failed to check ownership of account {account_id} for user {telegram_user_id}: {e}")
+        log.error(f"Failed to check owner of account {account_id} for user {telegram_user_id}: {e}")
         return False
+
+
+def user_owns_account(account_id: int, telegram_user_id: int) -> bool:
+    """True if the actor owns the account or is a manager of the owner."""
+    sql = """
+        SELECT 1 FROM managed_accounts ma
+        JOIN users u ON ma.user_id = u.id
+        WHERE ma.id = ? AND ma.deleted_at IS NULL
+          AND (
+            u.telegram_id = ?
+            OR EXISTS (
+                SELECT 1 FROM account_managers am
+                WHERE am.owner_user_id = ma.user_id
+                  AND am.manager_telegram_id = ?
+            )
+          )
+        LIMIT 1
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (account_id, telegram_user_id, telegram_user_id))
+            return cursor.fetchone() is not None
+    except sqlite3.Error as e:
+        log.error(f"Failed to check access to account {account_id} for user {telegram_user_id}: {e}")
+        return False
+
+
+def _new_sharing_token() -> str:
+    return secrets.token_urlsafe(12)
+
+
+def get_or_create_sharing_token(owner_telegram_id: int, kind: str):
+    """Return the owner's token for this kind, creating one if needed."""
+    if kind not in VALID_SHARE_KINDS:
+        return None
+    owner_user_id = get_internal_user_id(owner_telegram_id)
+    if owner_user_id is None:
+        return None
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT token FROM sharing_tokens WHERE owner_user_id = ? AND kind = ?",
+                (owner_user_id, kind),
+            )
+            row = cursor.fetchone()
+            if row:
+                return row["token"]
+            for _ in range(5):
+                token = _new_sharing_token()
+                try:
+                    cursor.execute(
+                        "INSERT INTO sharing_tokens (owner_user_id, kind, token) VALUES (?, ?, ?)",
+                        (owner_user_id, kind, token),
+                    )
+                    conn.commit()
+                    return token
+                except sqlite3.IntegrityError:
+                    conn.rollback()
+            return None
+    except sqlite3.Error as e:
+        log.error(f"Failed to get/create {kind} token for {owner_telegram_id}: {e}")
+        return None
+
+
+def rotate_sharing_token(owner_telegram_id: int, kind: str):
+    """Replace the owner's token so previous links stop working."""
+    if kind not in VALID_SHARE_KINDS:
+        return None
+    owner_user_id = get_internal_user_id(owner_telegram_id)
+    if owner_user_id is None:
+        return None
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            for _ in range(5):
+                token = _new_sharing_token()
+                try:
+                    cursor.execute(
+                        "SELECT id FROM sharing_tokens WHERE owner_user_id = ? AND kind = ?",
+                        (owner_user_id, kind),
+                    )
+                    row = cursor.fetchone()
+                    if row:
+                        cursor.execute(
+                            "UPDATE sharing_tokens SET token = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?",
+                            (token, row["id"]),
+                        )
+                    else:
+                        cursor.execute(
+                            "INSERT INTO sharing_tokens (owner_user_id, kind, token) VALUES (?, ?, ?)",
+                            (owner_user_id, kind, token),
+                        )
+                    conn.commit()
+                    return token
+                except sqlite3.IntegrityError:
+                    conn.rollback()
+            return None
+    except sqlite3.Error as e:
+        log.error(f"Failed to rotate {kind} token for {owner_telegram_id}: {e}")
+        return None
+
+
+def resolve_sharing_token(token: str):
+    """Return token metadata or None if the link is unknown."""
+    if not token:
+        return None
+    sql = """
+        SELECT
+            st.kind,
+            u.id AS owner_user_id,
+            u.telegram_id AS owner_telegram_id,
+            u.first_name AS owner_name,
+            u.username AS owner_username
+        FROM sharing_tokens st
+        JOIN users u ON u.id = st.owner_user_id
+        WHERE st.token = ?
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (token,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to resolve sharing token: {e}")
+        return None
+
+
+def add_account_manager(owner_telegram_id: int, manager_telegram_id: int) -> str:
+    """
+    Grant a Telegram user access to the owner's managed accounts.
+    Returns: ok | self | exists | not_found | error
+    """
+    if owner_telegram_id == manager_telegram_id:
+        return "self"
+    owner_user_id = get_internal_user_id(owner_telegram_id)
+    if owner_user_id is None:
+        return "not_found"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO account_managers (owner_user_id, manager_telegram_id) VALUES (?, ?)",
+                (owner_user_id, manager_telegram_id),
+            )
+            conn.commit()
+        return "ok"
+    except sqlite3.IntegrityError:
+        return "exists"
+    except sqlite3.Error as e:
+        log.error(f"Failed to add manager {manager_telegram_id} for {owner_telegram_id}: {e}")
+        return "error"
+
+
+def remove_account_manager(owner_telegram_id: int, manager_telegram_id: int) -> bool:
+    """Remove a manager from the owner's team. Owner-only (caller must enforce)."""
+    owner_user_id = get_internal_user_id(owner_telegram_id)
+    if owner_user_id is None:
+        return False
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM account_managers WHERE owner_user_id = ? AND manager_telegram_id = ?",
+                (owner_user_id, manager_telegram_id),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        log.error(f"Failed to remove manager {manager_telegram_id} for {owner_telegram_id}: {e}")
+        return False
+
+
+def list_account_managers(owner_telegram_id: int) -> list:
+    """Managers who can view/manage this owner's accounts."""
+    sql = """
+        SELECT
+            am.manager_telegram_id,
+            u.first_name,
+            u.username,
+            am.created_at
+        FROM account_managers am
+        LEFT JOIN users u ON u.telegram_id = am.manager_telegram_id
+        WHERE am.owner_user_id = (SELECT id FROM users WHERE telegram_id = ?)
+        ORDER BY am.created_at
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (owner_telegram_id,))
+            return [dict(row) for row in cursor.fetchall()]
+    except sqlite3.Error as e:
+        log.error(f"Failed to list managers for {owner_telegram_id}: {e}")
+        return []
+
+
+def list_owners_for_manager(manager_telegram_id: int) -> list:
+    """Owners who delegated account access to this Telegram user."""
+    sql = """
+        SELECT u.telegram_id, u.first_name, u.username
+        FROM account_managers am
+        JOIN users u ON u.id = am.owner_user_id
+        WHERE am.manager_telegram_id = ?
+        ORDER BY u.first_name
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (manager_telegram_id,))
+            return [dict(row) for row in cursor.fetchall()]
+    except sqlite3.Error as e:
+        log.error(f"Failed to list owners for manager {manager_telegram_id}: {e}")
+        return []
+
+
+def get_user_by_username(username: str):
+    """Look up a bot user by Telegram username (with or without @)."""
+    if not username:
+        return None
+    username = username.lstrip("@").strip()
+    if not username:
+        return None
+    sql = """
+        SELECT telegram_id, first_name, username
+        FROM users
+        WHERE lower(username) = lower(?)
+        LIMIT 1
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (username,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to look up username {username}: {e}")
+        return None
+
+
+def get_accessible_accounts(actor_telegram_id: int) -> dict:
+    """
+    Accounts the actor can open: their own list plus each owner's list they manage.
+    Shared groups never include the actor's own accounts.
+    """
+    result = {"own": [], "shared": []}
+    own_details = get_user_details(actor_telegram_id)
+    if own_details:
+        result["own"] = own_details["accounts"]
+
+    accounts_sql = """
+        SELECT id, phone, is_active, code_monitor_enabled, last_error, session_status, next_creation_time
+        FROM managed_accounts
+        WHERE user_id = ? AND deleted_at IS NULL
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            for owner in list_owners_for_manager(actor_telegram_id):
+                owner_user_id = get_internal_user_id(owner["telegram_id"])
+                if owner_user_id is None:
+                    continue
+                cursor.execute(accounts_sql, (owner_user_id,))
+                result["shared"].append({
+                    "owner_telegram_id": owner["telegram_id"],
+                    "owner_name": owner["first_name"],
+                    "owner_username": owner["username"],
+                    "accounts": [dict(acc) for acc in cursor.fetchall()],
+                })
+        return result
+    except sqlite3.Error as e:
+        log.error(f"Failed to list accessible accounts for {actor_telegram_id}: {e}")
+        return result
 
 
 def get_groups_created_today(account_id: int):

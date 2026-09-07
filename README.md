@@ -17,6 +17,8 @@ It uses a dual-library architecture:
 - **Proxy Management**: Automatically downloads and rotates proxies to avoid rate-limiting and bans.
 - **User Dashboard**: Users can manage their added accounts, view stats, and control automation.
 - **Account Profile & Inbox**: From account details, owners can view the Telegram name/profile (including collectible usernames and gifts when present) and browse private chats and their messages. Short-lived cache uses Redis when `REDIS_URL` is set.
+- **Team managers**: An owner can add another Telegram user as a manager (by ID, username, or a `team_` invite link). Managers can view and manage every account on the owner's list. They cannot change the team or invite links.
+- **Add-number invite**: The owner shares `https://t.me/<bot>?start=add_<token>`. Anyone who opens it can sign in a phone number. The number is stored on the **owner's** list (not the invitee's), counts against the owner's plan, and the owner is notified.
 - **Multi-Language Support**: Interface is available in English and Arabic. Translation catalogs are compiled from `.po` files automatically when the bot starts.
 
 ## Project Structure
@@ -33,6 +35,7 @@ It uses a dual-library architecture:
 │   ├── account_views.py     # Account profile / inbox Telegram screens
 │   ├── cache_store.py       # Optional Redis (or memory) TTL cache
 │   ├── security_messages.py # Classification of verification and 2FA notices
+│   ├── sharing.py           # Team managers and add-number invite links
 │   ├── config.py            # Configuration loader
 │   ├── database.py          # Database schema and interaction logic
 │   ├── main.py              # Main entry point of the bot

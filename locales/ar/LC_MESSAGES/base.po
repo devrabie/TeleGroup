@@ -475,6 +475,12 @@ msgstr "👤 حساباتي"
 msgid "➕ Add Account"
 msgstr "➕ إضافة حساب"
 
+msgid "👥 Team"
+msgstr "👥 الفريق"
+
+msgid "🔗 Invite to add numbers"
+msgstr "🔗 رابط إضافة الأرقام"
+
 #: src/user_handlers.py:69
 msgid "🌐 Language"
 msgstr "🌐 اللغة"
@@ -509,6 +515,8 @@ msgid ""
 "\n"
 "After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation, login-code monitoring, or two-step verification for each account separately.\n"
 "\n"
+"From the main menu you can add a <b>manager</b> who can view and manage your accounts, and share an <b>add-number invite</b>. Anyone who opens that link can sign in a phone number; it is added to your list (not theirs) and you get a notification.\n"
+"\n"
 "For most features, you need an active subscription. You can get one via "
 "the /subscribe command."
 msgstr ""
@@ -525,6 +533,8 @@ msgstr ""
 "<b>/language</b> - تغيير لغة عرض البوت (English/العربية).\n"
 "\n"
 "بعد إضافة حساب، يكون إنشاء المجموعات <b>متوقفاً</b> افتراضياً. افتح /my_accounts لتفعيل إنشاء المجموعات و/أو مراقبة أكواد التحقق أو رمز التحقق بخطوتين لكل حساب على حدة.\n"
+"\n"
+"من القائمة الرئيسية يمكنك إضافة <b>مدير</b> يرى ويدير حساباتك، ومشاركة <b>رابط إضافة رقم</b>. أي شخص يفتح الرابط يسجّل رقم هاتف فيُضاف إلى قائمتك وليس إلى قائمته، ويصلك إشعار.\n"
 "\n"
 "لاستخدام معظم الميزات، تحتاج إلى اشتراك نشط. يمكنك الحصول عليه عبر الأمر "
 "/subscribe."
@@ -1409,5 +1419,151 @@ msgstr "⚠️ <b>الحساب غير صالح</b>"
 
 msgid "This session has expired or is no longer valid. You may need to sign in again — delete the account and add it once more."
 msgstr "هذه الجلسة منتهية أو لم تعد صالحة. قد تحتاج إعادة تسجيل الدخول: احذف الحساب ثم أضفه من جديد."
+
+msgid "This invite link is invalid or has been replaced."
+msgstr "رابط الإضافة غير صالح أو تم استبداله."
+
+msgid "This team link is invalid or has been replaced."
+msgstr "رابط الفريق غير صالح أو تم استبداله."
+
+msgid "This is your own team link. Share it with the person you want as a manager."
+msgstr "هذا رابط فريقك. شاركه مع الشخص الذي تريد جعله مديراً."
+
+msgid "You can now view and manage {name}'s accounts from My Accounts. The numbers stay on their list, not yours."
+msgstr "يمكنك الآن عرض وإدارة حسابات {name} من «حساباتي». الأرقام تبقى في قائمته وليس في قائمتك."
+
+msgid "👥 {person} can now view and manage your accounts."
+msgstr "👥 أصبح {person} قادراً على عرض وإدارة حساباتك."
+
+msgid "You already manage {name}'s accounts."
+msgstr "أنت تدير حسابات {name} بالفعل."
+
+msgid "Could not add you as a manager."
+msgstr "تعذر إضافتك كمدير."
+
+msgid "The account owner does not have an active subscription, so this number cannot be added right now."
+msgstr "مالك الحساب لا يملك اشتراكاً نشطاً، لذلك لا يمكن إضافة هذا الرقم الآن."
+
+msgid "The account owner has reached the maximum number of accounts on their plan."
+msgstr "وصل مالك الحساب إلى الحد الأقصى لعدد الحسابات في باقته."
+
+msgid ""
+"Enter the phone number to add to {name}'s account list.\n"
+"<i>(Must be in international format, e.g., +1234567890)</i>\n"
+"\n"
+"This number will not appear in your accounts."
+msgstr ""
+"أرسل رقم الهاتف لإضافته إلى قائمة حسابات {name}.\n"
+"<i>(يجب أن يكون بالصيغة الدولية، مثل +1234567890)</i>\n"
+"\n"
+"لن يظهر هذا الرقم في حساباتك."
+
+msgid ""
+"✅ The number {phone} was added to {name}'s account list.\n"
+"\n"
+"It will not appear in your accounts."
+msgstr ""
+"✅ تمت إضافة الرقم {phone} إلى قائمة حسابات {name}.\n"
+"\n"
+"لن يظهر في حساباتك."
+
+msgid "📥 {person} added the number {phone} to your accounts."
+msgstr "📥 أضاف {person} الرقم {phone} إلى حساباتك."
+
+msgid "👥 Shared accounts belong to someone who added you as a manager."
+msgstr "👥 الحسابات المشتركة تخص شخصاً أضافك كمدير."
+
+msgid "<b>Team</b>"
+msgstr "<b>الفريق</b>"
+
+msgid "Managers can view and manage every Telegram account you added. They cannot change this team or your invite links."
+msgstr "المديرون يمكنهم عرض وإدارة كل حسابات تيليجرام التي أضفتها. لا يمكنهم تعديل هذا الفريق أو روابط الإحالة."
+
+msgid "<b>Managers</b>"
+msgstr "<b>المديرون</b>"
+
+msgid "No managers yet."
+msgstr "لا يوجد مديرون بعد."
+
+msgid "Share this link so someone can become a manager:"
+msgstr "شارك هذا الرابط ليصبح الشخص مديراً:"
+
+msgid "Could not build the team link. Make sure the bot has a public username."
+msgstr "تعذر إنشاء رابط الفريق. تأكد أن للبوت اسم مستخدم عام."
+
+msgid "<b>You manage accounts for</b>"
+msgstr "<b>أنت تدير حسابات</b>"
+
+msgid "To add a number to their list, ask them for their add-number invite link."
+msgstr "لإضافة رقم إلى قائمتهم، اطلب منهم رابط إضافة الأرقام."
+
+msgid "➕ Add manager by ID"
+msgstr "➕ إضافة مدير بالمعرّف"
+
+msgid "❌ Remove {name}"
+msgstr "❌ إزالة {name}"
+
+msgid "🔄 New team link"
+msgstr "🔄 رابط فريق جديد"
+
+msgid "<b>Add-number invite</b>"
+msgstr "<b>رابط إضافة الأرقام</b>"
+
+msgid "Anyone who opens this link can sign in a phone number. The number is added to <b>your</b> account list, it does not appear in theirs, and you get a notification."
+msgstr "أي شخص يفتح هذا الرابط يمكنه تسجيل رقم هاتف. يُضاف الرقم إلى قائمة <b>حساباتك</b> ولا يظهر عنده، ويصلك إشعار."
+
+msgid "They do not need their own subscription. The number counts against your plan limit."
+msgstr "لا يحتاجون اشتراكاً خاصاً بهم. الرقم يُحسب ضمن حد باقتك."
+
+msgid "Your invite link:"
+msgstr "رابط الإحالة:"
+
+msgid "Could not build the invite link. Make sure the bot has a public username."
+msgstr "تعذر إنشاء رابط الإحالة. تأكد أن للبوت اسم مستخدم عام."
+
+msgid "🔄 New invite link"
+msgstr "🔄 رابط إحالة جديد"
+
+msgid "New team link created. The old one no longer works."
+msgstr "تم إنشاء رابط فريق جديد. الرابط القديم لم يعد يعمل."
+
+msgid "New invite link created. The old one no longer works."
+msgstr "تم إنشاء رابط إحالة جديد. الرابط القديم لم يعد يعمل."
+
+msgid "Could not create a new link."
+msgstr "تعذر إنشاء رابط جديد."
+
+msgid "Could not remove that manager."
+msgstr "تعذر إزالة هذا المدير."
+
+msgid "Manager removed."
+msgstr "تمت إزالة المدير."
+
+msgid ""
+"Send the manager's numeric Telegram user ID, or their @username if they have already used this bot.\n"
+"\n"
+"Use /cancel to go back."
+msgstr ""
+"أرسل المعرّف الرقمي لتيليجرام الخاص بالمدير، أو @username إذا سبق له استخدام هذا البوت.\n"
+"\n"
+"استخدم /cancel للرجوع."
+
+msgid "No bot user with that username. They must press /start first, or send their numeric Telegram ID."
+msgstr "لا يوجد مستخدم بهذا الاسم. يجب أن يضغط /start أولاً، أو أرسل معرّفه الرقمي."
+
+msgid "Please send a numeric Telegram user ID or an @username."
+msgstr "أرسل معرّف تيليجرام الرقمي أو @username."
+
+msgid "You cannot add yourself as a manager."
+msgstr "لا يمكنك إضافة نفسك كمدير."
+
+msgid "That person is already a manager."
+msgstr "هذا الشخص مدير بالفعل."
+
+msgid "{name} can now view and manage your accounts."
+msgstr "أصبح {name} قادراً على عرض وإدارة حساباتك."
+
+msgid "Could not add that manager. Please try again."
+msgstr "تعذر إضافة هذا المدير. حاول مرة أخرى."
 
 

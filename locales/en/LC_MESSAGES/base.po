@@ -477,6 +477,12 @@ msgstr "👤 My Accounts"
 msgid "➕ Add Account"
 msgstr "➕ Add Account"
 
+msgid "👥 Team"
+msgstr "👥 Team"
+
+msgid "🔗 Invite to add numbers"
+msgstr "🔗 Invite to add numbers"
+
 #: src/user_handlers.py:69
 msgid "🌐 Language"
 msgstr "🌐 Language"
@@ -511,6 +517,8 @@ msgid ""
 "\n"
 "After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation, login-code monitoring, or two-step verification for each account separately.\n"
 "\n"
+"From the main menu you can add a <b>manager</b> who can view and manage your accounts, and share an <b>add-number invite</b>. Anyone who opens that link can sign in a phone number; it is added to your list (not theirs) and you get a notification.\n"
+"\n"
 "For most features, you need an active subscription. You can get one via "
 "the /subscribe command."
 msgstr ""
@@ -529,6 +537,8 @@ msgstr ""
 "(English/العربية).\n"
 "\n"
 "After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation, login-code monitoring, or two-step verification for each account separately.\n"
+"\n"
+"From the main menu you can add a <b>manager</b> who can view and manage your accounts, and share an <b>add-number invite</b>. Anyone who opens that link can sign in a phone number; it is added to your list (not theirs) and you get a notification.\n"
 "\n"
 "For most features, you need an active subscription. You can get one via "
 "the /subscribe command."
@@ -1295,6 +1305,152 @@ msgstr "⚠️ <b>Account invalid</b>"
 
 msgid "This session has expired or is no longer valid. You may need to sign in again — delete the account and add it once more."
 msgstr "This session has expired or is no longer valid. You may need to sign in again — delete the account and add it once more."
+
+msgid "This invite link is invalid or has been replaced."
+msgstr "This invite link is invalid or has been replaced."
+
+msgid "This team link is invalid or has been replaced."
+msgstr "This team link is invalid or has been replaced."
+
+msgid "This is your own team link. Share it with the person you want as a manager."
+msgstr "This is your own team link. Share it with the person you want as a manager."
+
+msgid "You can now view and manage {name}'s accounts from My Accounts. The numbers stay on their list, not yours."
+msgstr "You can now view and manage {name}'s accounts from My Accounts. The numbers stay on their list, not yours."
+
+msgid "👥 {person} can now view and manage your accounts."
+msgstr "👥 {person} can now view and manage your accounts."
+
+msgid "You already manage {name}'s accounts."
+msgstr "You already manage {name}'s accounts."
+
+msgid "Could not add you as a manager."
+msgstr "Could not add you as a manager."
+
+msgid "The account owner does not have an active subscription, so this number cannot be added right now."
+msgstr "The account owner does not have an active subscription, so this number cannot be added right now."
+
+msgid "The account owner has reached the maximum number of accounts on their plan."
+msgstr "The account owner has reached the maximum number of accounts on their plan."
+
+msgid ""
+"Enter the phone number to add to {name}'s account list.\n"
+"<i>(Must be in international format, e.g., +1234567890)</i>\n"
+"\n"
+"This number will not appear in your accounts."
+msgstr ""
+"Enter the phone number to add to {name}'s account list.\n"
+"<i>(Must be in international format, e.g., +1234567890)</i>\n"
+"\n"
+"This number will not appear in your accounts."
+
+msgid ""
+"✅ The number {phone} was added to {name}'s account list.\n"
+"\n"
+"It will not appear in your accounts."
+msgstr ""
+"✅ The number {phone} was added to {name}'s account list.\n"
+"\n"
+"It will not appear in your accounts."
+
+msgid "📥 {person} added the number {phone} to your accounts."
+msgstr "📥 {person} added the number {phone} to your accounts."
+
+msgid "👥 Shared accounts belong to someone who added you as a manager."
+msgstr "👥 Shared accounts belong to someone who added you as a manager."
+
+msgid "<b>Team</b>"
+msgstr "<b>Team</b>"
+
+msgid "Managers can view and manage every Telegram account you added. They cannot change this team or your invite links."
+msgstr "Managers can view and manage every Telegram account you added. They cannot change this team or your invite links."
+
+msgid "<b>Managers</b>"
+msgstr "<b>Managers</b>"
+
+msgid "No managers yet."
+msgstr "No managers yet."
+
+msgid "Share this link so someone can become a manager:"
+msgstr "Share this link so someone can become a manager:"
+
+msgid "Could not build the team link. Make sure the bot has a public username."
+msgstr "Could not build the team link. Make sure the bot has a public username."
+
+msgid "<b>You manage accounts for</b>"
+msgstr "<b>You manage accounts for</b>"
+
+msgid "To add a number to their list, ask them for their add-number invite link."
+msgstr "To add a number to their list, ask them for their add-number invite link."
+
+msgid "➕ Add manager by ID"
+msgstr "➕ Add manager by ID"
+
+msgid "❌ Remove {name}"
+msgstr "❌ Remove {name}"
+
+msgid "🔄 New team link"
+msgstr "🔄 New team link"
+
+msgid "<b>Add-number invite</b>"
+msgstr "<b>Add-number invite</b>"
+
+msgid "Anyone who opens this link can sign in a phone number. The number is added to <b>your</b> account list, it does not appear in theirs, and you get a notification."
+msgstr "Anyone who opens this link can sign in a phone number. The number is added to <b>your</b> account list, it does not appear in theirs, and you get a notification."
+
+msgid "They do not need their own subscription. The number counts against your plan limit."
+msgstr "They do not need their own subscription. The number counts against your plan limit."
+
+msgid "Your invite link:"
+msgstr "Your invite link:"
+
+msgid "Could not build the invite link. Make sure the bot has a public username."
+msgstr "Could not build the invite link. Make sure the bot has a public username."
+
+msgid "🔄 New invite link"
+msgstr "🔄 New invite link"
+
+msgid "New team link created. The old one no longer works."
+msgstr "New team link created. The old one no longer works."
+
+msgid "New invite link created. The old one no longer works."
+msgstr "New invite link created. The old one no longer works."
+
+msgid "Could not create a new link."
+msgstr "Could not create a new link."
+
+msgid "Could not remove that manager."
+msgstr "Could not remove that manager."
+
+msgid "Manager removed."
+msgstr "Manager removed."
+
+msgid ""
+"Send the manager's numeric Telegram user ID, or their @username if they have already used this bot.\n"
+"\n"
+"Use /cancel to go back."
+msgstr ""
+"Send the manager's numeric Telegram user ID, or their @username if they have already used this bot.\n"
+"\n"
+"Use /cancel to go back."
+
+msgid "No bot user with that username. They must press /start first, or send their numeric Telegram ID."
+msgstr "No bot user with that username. They must press /start first, or send their numeric Telegram ID."
+
+msgid "Please send a numeric Telegram user ID or an @username."
+msgstr "Please send a numeric Telegram user ID or an @username."
+
+msgid "You cannot add yourself as a manager."
+msgstr "You cannot add yourself as a manager."
+
+msgid "That person is already a manager."
+msgstr "That person is already a manager."
+
+msgid "{name} can now view and manage your accounts."
+msgstr "{name} can now view and manage your accounts."
+
+msgid "Could not add that manager. Please try again."
+msgstr "Could not add that manager. Please try again."
 
 #~ msgstr ""
 #~ "❌ Failed to convert group. The "

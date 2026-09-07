@@ -32,7 +32,8 @@ from src.database import (
     set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
     update_user_details, mark_proxy_as_bad, get_account_details, get_info_page_content,
     get_user_language, get_random_device_profile, get_device_profile_by_account_id,
-    session_is_invalid, user_owns_account,
+    session_is_invalid, user_owns_account, get_accessible_accounts, add_account_manager,
+    resolve_sharing_token,
 )
 from src.translation import get_translation_func_for_user
 from src.code_monitor import build_proxy_dict, code_monitor_manager, is_socks_auth_error
@@ -48,6 +49,14 @@ from src.two_step import (
     apply_two_step_password,
     get_two_step_status,
     validate_two_step_password,
+)
+from src.sharing import (
+    format_person,
+    invite_callback,
+    show_invite_menu,
+    show_team_menu,
+    team_add_conv_handler,
+    team_callback,
 )
 from pyrogram.enums import ChatType, ChatMemberStatus
 
@@ -138,6 +147,8 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, message_
          InlineKeyboardButton(_("👤 My Accounts"), callback_data='main_my_accounts')],
         [InlineKeyboardButton(_("➕ Add Account"), callback_data='start_add_account'),
          InlineKeyboardButton(_("🌐 Language"), callback_data='main_language')],
+        [InlineKeyboardButton(_("👥 Team"), callback_data='main_team'),
+         InlineKeyboardButton(_("🔗 Invite to add numbers"), callback_data='main_invite')],
         [InlineKeyboardButton(_("ℹ️ Information & Policies"), callback_data='main_info_policies')],
         [InlineKeyboardButton(_("❓ Help"), callback_data='main_help')]
     ]
@@ -150,11 +161,75 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, message_
     else:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
-async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Greets the user, ensures they are in the DB, and shows the main menu."""
-    # This will create the user if they don't exist, and update their name/username if they do.
-    update_user_details(update.effective_user)
+async def _disconnect_login_client(context: ContextTypes.DEFAULT_TYPE) -> None:
+    client = context.user_data.get("pyrogram_client")
+    if not client:
+        return
+    try:
+        if getattr(client, "is_connected", False):
+            await client.disconnect()
+    except Exception as e:
+        log.debug(f"Ignored login client disconnect error: {e}")
+
+
+async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Greets the user, handles invite/team deep links, and shows the main menu."""
+    user = update.effective_user
+    update_user_details(user)
+    await _disconnect_login_client(context)
+    _ = get_translation_func_for_user(user.id)
+    payload = (context.args[0] if context.args else "") or ""
+
+    if payload.startswith("add_"):
+        info = resolve_sharing_token(payload[4:])
+        context.user_data.clear()
+        if not info or info.get("kind") != "add":
+            await update.message.reply_text(_("This invite link is invalid or has been replaced."))
+            await main_menu(update, context)
+            return ConversationHandler.END
+        context.user_data["add_for_owner_id"] = info["owner_telegram_id"]
+        context.user_data["add_for_owner_name"] = info["owner_name"]
+        return await add_account_start(update, context)
+
+    if payload.startswith("team_"):
+        info = resolve_sharing_token(payload[5:])
+        context.user_data.clear()
+        if not info or info.get("kind") != "team":
+            await update.message.reply_text(_("This team link is invalid or has been replaced."))
+            await main_menu(update, context)
+            return ConversationHandler.END
+        if info["owner_telegram_id"] == user.id:
+            await update.message.reply_text(_("This is your own team link. Share it with the person you want as a manager."))
+            await main_menu(update, context)
+            return ConversationHandler.END
+        result = add_account_manager(info["owner_telegram_id"], user.id)
+        if result == "ok":
+            await update.message.reply_text(
+                _(
+                    "You can now view and manage {name}'s accounts from My Accounts. "
+                    "The numbers stay on their list, not yours."
+                ).format(name=info["owner_name"])
+            )
+            try:
+                owner_ = get_translation_func_for_user(info["owner_telegram_id"])
+                person = format_person(user.id, user.first_name, user.username)
+                await context.bot.send_message(
+                    info["owner_telegram_id"],
+                    owner_("👥 {person} can now view and manage your accounts.").format(person=person),
+                )
+            except Exception as e:
+                log.warning(f"Could not notify owner {info['owner_telegram_id']} about new manager: {e}")
+        elif result == "exists":
+            await update.message.reply_text(
+                _("You already manage {name}'s accounts.").format(name=info["owner_name"])
+            )
+        else:
+            await update.message.reply_text(_("Could not add you as a manager."))
+        await main_menu(update, context)
+        return ConversationHandler.END
+
     await main_menu(update, context)
+    return ConversationHandler.END
 
 async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -169,6 +244,10 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await my_accounts_handler(update, context)
         elif action == 'language':
             await language_handler(update, context)
+        elif action == 'team':
+            await show_team_menu(update, context)
+        elif action == 'invite':
+            await show_invite_menu(update, context)
         elif action == 'info_policies':
             await show_info_policies_menu(update, context)
         elif action == 'help':
@@ -199,6 +278,7 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "<b>/add_account</b> - Start the process of adding a new Telegram account for the bot to manage.\n"
         "<b>/language</b> - Change the display language of the bot (English/العربية).\n\n"
         "After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation, login-code monitoring, or two-step verification for each account separately.\n\n"
+        "From the main menu you can add a <b>manager</b> who can view and manage your accounts, and share an <b>add-number invite</b>. Anyone who opens that link can sign in a phone number; it is added to your list (not theirs) and you get a notification.\n\n"
         "For most features, you need an active subscription. You can get one via the /subscribe command."
     )
 
@@ -469,32 +549,64 @@ PHONE, CODE, PASSWORD = range(3)
 async def add_account_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    details = get_user_details(user_id)
 
     # Determine the message object and how to reply/edit
     query = update.callback_query
     if query:
         await query.answer()
-        message = query.message
-        # We will send a new message instead of editing, to make it clear we expect a reply.
+        # Button / command adds to the actor's own list, not a leftover invite.
+        context.user_data.pop("add_for_owner_id", None)
+        context.user_data.pop("add_for_owner_name", None)
         reply_func = context.bot.send_message
         reply_kwargs = {'chat_id': user_id}
     else:
+        message_text = (update.message.text or "") if update.message else ""
+        if message_text.startswith("/add_account"):
+            context.user_data.pop("add_for_owner_id", None)
+            context.user_data.pop("add_for_owner_name", None)
         message = update.message
         reply_func = message.reply_text
         reply_kwargs = {}
 
+    target_owner_id = context.user_data.get("add_for_owner_id") or user_id
+    is_invite = target_owner_id != user_id
+    owner_name = context.user_data.get("add_for_owner_name") or ""
+    details = get_user_details(target_owner_id)
+
     if not (details and details.get('subscription')):
-        await reply_func(text=_("You need an active subscription to add accounts. Use /subscribe to get one."), **reply_kwargs)
+        if is_invite:
+            await reply_func(
+                text=_("The account owner does not have an active subscription, so this number cannot be added right now."),
+                **reply_kwargs,
+            )
+        else:
+            await reply_func(text=_("You need an active subscription to add accounts. Use /subscribe to get one."), **reply_kwargs)
+        context.user_data.pop("add_for_owner_id", None)
+        context.user_data.pop("add_for_owner_name", None)
         return ConversationHandler.END
 
     plan = get_plan_by_id(details['subscription']['plan_id'])
     if len(details['accounts']) >= plan['max_accounts']:
-        await reply_func(text=_("You have reached the maximum of {max_accounts} accounts for your '{plan_name}' plan.").format(
-            max_accounts=plan['max_accounts'], plan_name=plan['name']), **reply_kwargs)
+        if is_invite:
+            await reply_func(
+                text=_("The account owner has reached the maximum number of accounts on their plan."),
+                **reply_kwargs,
+            )
+        else:
+            await reply_func(text=_("You have reached the maximum of {max_accounts} accounts for your '{plan_name}' plan.").format(
+                max_accounts=plan['max_accounts'], plan_name=plan['name']), **reply_kwargs)
+        context.user_data.pop("add_for_owner_id", None)
+        context.user_data.pop("add_for_owner_name", None)
         return ConversationHandler.END
 
-    text = _("Please send the phone number of the account you want to add.\n<i>(Must be in international format, e.g., +1234567890)</i>")
+    if is_invite:
+        text = _(
+            "Enter the phone number to add to {name}'s account list.\n"
+            "<i>(Must be in international format, e.g., +1234567890)</i>\n\n"
+            "This number will not appear in your accounts."
+        ).format(name=owner_name)
+    else:
+        text = _("Please send the phone number of the account you want to add.\n<i>(Must be in international format, e.g., +1234567890)</i>")
     if query:
         # If started from a button, edit the message and add a cancel button
         keyboard = [[InlineKeyboardButton(_("❌ Cancel"), callback_data='cancel_conv')]]
@@ -688,17 +800,46 @@ async def async_complete_login(context, user_id, _):
     client = context.user_data['pyrogram_client']
     phone = context.user_data['phone']
     device_profile_id = context.user_data['device_profile_id']
+    owner_id = context.user_data.get('add_for_owner_id') or user_id
+    owner_name = context.user_data.get('add_for_owner_name') or ""
     session_string = await client.export_session_string()
     await client.disconnect()
-    if add_managed_account(user_id, phone, session_string, device_profile_id):
-        await context.bot.send_message(
-            user_id,
-            _(
-                "✅ Account added successfully!\n\n"
-                "Group creation is <b>disabled</b> by default. Open /my_accounts to enable group creation or login-code monitoring for this account."
-            ),
-            parse_mode=ParseMode.HTML,
-        )
+    if add_managed_account(owner_id, phone, session_string, device_profile_id):
+        if owner_id != user_id:
+            await context.bot.send_message(
+                user_id,
+                _(
+                    "✅ The number {phone} was added to {name}'s account list.\n\n"
+                    "It will not appear in your accounts."
+                ).format(phone=phone, name=owner_name),
+            )
+            try:
+                invitee = get_user_details(user_id)
+                invitee_user = (invitee or {}).get("user") or {}
+                person = format_person(
+                    user_id,
+                    invitee_user.get("first_name"),
+                    invitee_user.get("username"),
+                )
+                owner_ = get_translation_func_for_user(owner_id)
+                await context.bot.send_message(
+                    owner_id,
+                    owner_("📥 {person} added the number {phone} to your accounts.").format(
+                        person=person,
+                        phone=phone,
+                    ),
+                )
+            except Exception as e:
+                log.warning(f"Could not notify owner {owner_id} about invited number {phone}: {e}")
+        else:
+            await context.bot.send_message(
+                user_id,
+                _(
+                    "✅ Account added successfully!\n\n"
+                    "Group creation is <b>disabled</b> by default. Open /my_accounts to enable group creation or login-code monitoring for this account."
+                ),
+                parse_mode=ParseMode.HTML,
+            )
     else:
         await context.bot.send_message(user_id, _("❌ Could not save your account to the database. It might already be registered."))
     context.user_data.clear()
@@ -725,6 +866,7 @@ async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 add_account_conv_handler = ConversationHandler(
     entry_points=[
+        CommandHandler("start", start_handler),
         CommandHandler("add_account", add_account_start),
         CallbackQueryHandler(add_account_start, pattern="^start_add_account$")
     ],
@@ -739,6 +881,7 @@ add_account_conv_handler = ConversationHandler(
     ],
     conversation_timeout=300,
     per_message=False,
+    allow_reentry=True,
 )
 
 # --- Two-Step Verification Conversation ---
@@ -1022,45 +1165,66 @@ two_step_conv_handler = ConversationHandler(
 
 # --- User Dashboard ---
 
+def _account_status_icon(acc) -> str:
+    status_icon = "⚪️"  # Both features off
+    if session_is_invalid(acc):
+        status_icon = "❌"
+    elif acc.get('last_error'):
+        status_icon = "⚠️"
+    elif acc.get('is_active'):
+        status_icon = "🟢"
+        if acc.get('next_creation_time'):
+            try:
+                next_time = datetime.fromisoformat(acc['next_creation_time'])
+                if next_time > datetime.now(timezone.utc):
+                    status_icon = "🕒"
+            except (ValueError, TypeError):
+                pass
+    if acc.get('code_monitor_enabled'):
+        status_icon = f"{status_icon}🔐"
+    return status_icon
+
+
+def _account_row_button(acc, _, owner_prefix: str | None = None) -> InlineKeyboardButton:
+    identity = get_cached_identity(acc['id'])
+    label = display_name(identity, acc['phone'])
+    if session_is_invalid(acc):
+        label = f"{label} · {_('invalid')}"
+    if owner_prefix:
+        button_text = f"{_account_status_icon(acc)} 👥 {owner_prefix} · {label}"
+    else:
+        button_text = f"{_account_status_icon(acc)} {label}"
+    if len(button_text) > 64:
+        button_text = button_text[:63] + "…"
+    return InlineKeyboardButton(button_text, callback_data=f"mng_select_{acc['id']}")
+
+
+def _accounts_menu_content(user_id: int, _):
+    accessible = get_accessible_accounts(user_id)
+    own = accessible.get("own") or []
+    shared = accessible.get("shared") or []
+    buttons = []
+    if not own and not shared:
+        text = _("You have not added any accounts yet. Use /add_account to get started.")
+    else:
+        text = _("Please select an account to manage:")
+        if shared:
+            text += "\n\n" + _("👥 Shared accounts belong to someone who added you as a manager.")
+        for acc in own:
+            buttons.append([_account_row_button(acc, _)])
+        for group in shared:
+            prefix = group.get("owner_name") or str(group.get("owner_telegram_id"))
+            for acc in group.get("accounts") or []:
+                buttons.append([_account_row_button(acc, _, owner_prefix=prefix)])
+    buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
+    return text, InlineKeyboardMarkup(buttons)
+
+
 async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Displays a list of the user's managed accounts to select from."""
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    details = get_user_details(user_id)
-
-    text = _("Please select an account to manage:")
-    buttons = []
-
-    if not details or not details['accounts']:
-        text = _("You have not added any accounts yet. Use /add_account to get started.")
-    else:
-        for acc in details['accounts']:
-            status_icon = "⚪️"  # Both features off
-            if session_is_invalid(acc):
-                status_icon = "❌"
-            elif acc['last_error']:
-                status_icon = "⚠️"
-            elif acc['is_active']:
-                status_icon = "🟢"
-                if acc['next_creation_time']:
-                    try:
-                        next_time = datetime.fromisoformat(acc['next_creation_time'])
-                        if next_time > datetime.now(timezone.utc):
-                            status_icon = "🕒"
-                    except (ValueError, TypeError):
-                        pass
-            if acc.get('code_monitor_enabled'):
-                status_icon = f"{status_icon}🔐"
-
-            identity = get_cached_identity(acc['id'])
-            label = display_name(identity, acc['phone'])
-            if session_is_invalid(acc):
-                label = f"{label} · {_('invalid')}"
-            button_text = f"{status_icon} {label}"
-            buttons.append([InlineKeyboardButton(button_text, callback_data=f"mng_select_{acc['id']}")])
-
-    buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
-    reply_markup = InlineKeyboardMarkup(buttons)
+    text, reply_markup = _accounts_menu_content(user_id, _)
 
     query = update.callback_query
     if query:
@@ -1473,6 +1637,9 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                     await client.disconnect()
         elif action == "groupreport":
             account_id = int(action_parts[2])
+            if not user_owns_account(account_id, user_id):
+                await _safe_answer_query(query, _("Error: Account not found or you don't have permission."), show_alert=True)
+                return
             log.info(f"User {user_id} requested group report for account {account_id}.")
 
             cache_key = f"group_report_cache_{account_id}"
@@ -1502,6 +1669,9 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
         elif action == "upgradegroup":
             account_id = int(action_parts[2])
             chat_id = int(action_parts[3])
+            if not user_owns_account(account_id, user_id):
+                await _safe_answer_query(query, _("Error: Account not found or you don't have permission."), show_alert=True)
+                return
             log.info(f"User {user_id} requested to upgrade group {chat_id} for account {account_id}.")
 
             await query.edit_message_text(_("Attempting to upgrade group..."))
@@ -1657,25 +1827,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             await code_monitor_manager.stop_account(account_id)
             if delete_managed_account(account_id, user_id):
                 await _safe_answer_query(query, _("✅ Account has been deleted."))
-                # This is a bit of code duplication, but it's safer than calling the handler
-                # and avoids state-related issues with the update object.
-                details = get_user_details(user_id)
-                text = _("Please select an account to manage:")
-                buttons = []
-                if not details or not details['accounts']:
-                    text = _("You have not added any accounts yet. Use /add_account to get started.")
-                else:
-                    for acc in details['accounts']:
-                        status_icon = "⚪️"
-                        if acc['is_active']:
-                            status_icon = "🟢"
-                        if acc.get('code_monitor_enabled'):
-                            status_icon = f"{status_icon}🔐"
-                        label = display_name(get_cached_identity(acc['id']), acc['phone'])
-                        button_text = f"{status_icon} {label}"
-                        buttons.append([InlineKeyboardButton(button_text, callback_data=f"mng_select_{acc['id']}")])
-                buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])
-                reply_markup = InlineKeyboardMarkup(buttons)
+                text, reply_markup = _accounts_menu_content(user_id, _)
                 await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
             else:
                 await query.edit_message_text(_("❌ Could not delete account."))
@@ -1691,7 +1843,6 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
 
 # --- Handler Registration ---
 user_handlers_list = [
-    CommandHandler("start", start_handler),
     CommandHandler("help", help_handler),
     CommandHandler("subscribe", subscribe_handler),
     CallbackQueryHandler(select_plan_handler, pattern="^select_plan_"),
@@ -1703,7 +1854,10 @@ user_handlers_list = [
     CallbackQueryHandler(set_language_callback, pattern="^set_lang_"),
     CommandHandler("my_accounts", my_accounts_handler),
     two_step_conv_handler,
+    team_add_conv_handler,
     CallbackQueryHandler(manage_account_callback, pattern="^mng_"),
+    CallbackQueryHandler(team_callback, pattern="^team_"),
+    CallbackQueryHandler(invite_callback, pattern="^invite_"),
     CallbackQueryHandler(info_page_callback, pattern="^info_"),
     CallbackQueryHandler(main_menu_callback, pattern="^main_"),
     add_account_conv_handler,
