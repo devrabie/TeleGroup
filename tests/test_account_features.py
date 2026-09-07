@@ -264,6 +264,22 @@ class ManagedAccountDefaultsTests(unittest.TestCase):
             seen.add(self.database.get_account_details(acc_id)["proxy_id"])
         self.assertGreaterEqual(len(seen), 2)
 
+    def test_rotate_account_proxy_marks_failed_and_switches(self):
+        self.database.batch_insert_proxies(["10.0.0.1:1080:u:p", "10.0.0.2:1080:u:p"])
+        self.database.add_managed_account(111, "+15550005555", "session-string", self.profile["id"])
+        acc_id = self.database.get_user_details(111)["accounts"][0]["id"]
+        failed_id = self.database.get_account_details(acc_id)["proxy_id"]
+        self.assertIsNotNone(failed_id)
+
+        new_id = self.database.rotate_account_proxy(acc_id, failed_id)
+        self.assertIsNotNone(new_id)
+        self.assertNotEqual(new_id, failed_id)
+        self.assertEqual(self.database.get_account_details(acc_id)["proxy_id"], new_id)
+
+        with self.database.get_db_connection() as conn:
+            row = conn.execute("SELECT is_working FROM proxies WHERE id = ?", (failed_id,)).fetchone()
+        self.assertEqual(row["is_working"], 0)
+
 
 class TwoStepPasswordValidationTests(unittest.IsolatedAsyncioTestCase):
     def test_validate_two_step_password(self):
@@ -315,29 +331,64 @@ class MessageEditHelperTests(unittest.TestCase):
 
 class ProxyParseTests(unittest.TestCase):
     def test_build_proxy_dict_parses_host_port_user_pass(self):
-        with patch.dict(os.environ, {
-            "BOT_TOKEN": "1:test",
-            "API_ID": "1",
-            "API_HASH": "hash",
-            "ADMIN_IDS": "1",
-        }, clear=False):
-            # Import after env is set so config can load if needed.
-            from src.code_monitor import build_proxy_dict
+        from src.code_monitor import build_proxy_dict
+        with patch("src.code_monitor.config.PROXY_USERNAME", None), patch(
+            "src.code_monitor.config.PROXY_PASSWORD", None
+        ):
             parsed = build_proxy_dict("10.0.0.1:1080:user:pass")
-            self.assertEqual(parsed["scheme"], "socks5")
-            self.assertEqual(parsed["hostname"], "10.0.0.1")
-            self.assertEqual(parsed["port"], 1080)
-            self.assertIn(parsed["username"], ("user", None, os.getenv("PROXY_USERNAME")))
+        self.assertEqual(parsed["scheme"], "socks5")
+        self.assertEqual(parsed["hostname"], "10.0.0.1")
+        self.assertEqual(parsed["port"], 1080)
+        self.assertEqual(parsed["username"], "user")
+        self.assertEqual(parsed["password"], "pass")
+
+    def test_string_credentials_win_over_env(self):
+        from src.code_monitor import build_proxy_dict
+        with patch("src.code_monitor.config.PROXY_USERNAME", "envuser"), patch(
+            "src.code_monitor.config.PROXY_PASSWORD", "envpass"
+        ):
+            parsed = build_proxy_dict("10.0.0.1:1080:user:pass")
+        self.assertEqual(parsed["username"], "user")
+        self.assertEqual(parsed["password"], "pass")
+
+    def test_env_used_only_when_string_has_no_auth(self):
+        from src.code_monitor import build_proxy_dict
+        with patch("src.code_monitor.config.PROXY_USERNAME", "envuser"), patch(
+            "src.code_monitor.config.PROXY_PASSWORD", "envpass"
+        ):
+            parsed = build_proxy_dict("10.0.0.1:1080")
+        self.assertEqual(parsed["username"], "envuser")
+        self.assertEqual(parsed["password"], "envpass")
+
+    def test_user_pass_at_host_and_url_formats(self):
+        from src.code_monitor import build_proxy_dict
+        with patch("src.code_monitor.config.PROXY_USERNAME", None), patch(
+            "src.code_monitor.config.PROXY_PASSWORD", None
+        ):
+            at_form = build_proxy_dict("user:p:ass@10.0.0.1:1080")
+            url_form = build_proxy_dict("socks5://user:pass@10.0.0.1:1080")
+            colon_pass = build_proxy_dict("10.0.0.1:1080:user:p:ass")
+        self.assertEqual(at_form["username"], "user")
+        self.assertEqual(at_form["password"], "p:ass")
+        self.assertEqual(url_form["username"], "user")
+        self.assertEqual(url_form["password"], "pass")
+        self.assertEqual(colon_pass["password"], "p:ass")
 
     def test_invalid_proxy_returns_none(self):
-        with patch.dict(os.environ, {
-            "BOT_TOKEN": "1:test",
-            "API_ID": "1",
-            "API_HASH": "hash",
-            "ADMIN_IDS": "1",
-        }, clear=False):
-            from src.code_monitor import build_proxy_dict
-            self.assertIsNone(build_proxy_dict("not-a-proxy"))
+        from src.code_monitor import build_proxy_dict
+        self.assertIsNone(build_proxy_dict("not-a-proxy"))
+        self.assertIsNone(build_proxy_dict(""))
+        self.assertIsNone(build_proxy_dict(None))
+
+    def test_is_socks_auth_error(self):
+        from src.code_monitor import is_socks_auth_error
+        self.assertTrue(is_socks_auth_error(OSError("Socket error: SOCKS5 authentication failed")))
+        wrapped = ConnectionError("Unable to connect")
+        wrapped.__cause__ = OSError("Socket error: SOCKS5 authentication failed")
+        self.assertTrue(is_socks_auth_error(wrapped))
+        self.assertFalse(is_socks_auth_error(ConnectionError("Unable to connect")))
+        self.assertFalse(is_socks_auth_error(TimeoutError("timed out")))
+        self.assertFalse(is_socks_auth_error(OSError("Network is unreachable")))
 
 
 if __name__ == "__main__":

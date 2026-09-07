@@ -18,12 +18,13 @@ from pyrogram.errors import (
 )
 
 from src import config
-from src.code_monitor import AUTH_ERRORS, build_proxy_dict, get_running_monitor_client
+from src.code_monitor import AUTH_ERRORS, build_proxy_dict, get_running_monitor_client, is_socks_auth_error
 from src.database import (
+    assign_account_proxy,
     get_account_runtime_details,
     get_proxy_string,
     get_random_proxy_id,
-    mark_proxy_as_bad,
+    rotate_account_proxy,
 )
 
 log = logging.getLogger(__name__)
@@ -89,13 +90,13 @@ async def _start_temp_client(details: dict) -> Client:
 
     last_error = None
     account_id = details["account_id"]
+    original_proxy_id = details.get("proxy_id")
+    proxy_id = original_proxy_id or get_random_proxy_id()
     for attempt in range(MAX_PROXY_RETRIES):
-        proxy_id = details.get("proxy_id") or get_random_proxy_id()
         proxy_string = get_proxy_string(proxy_id) if proxy_id else None
         proxy_dict = build_proxy_dict(proxy_string) if proxy_string else None
         if proxy_string and proxy_dict is None:
-            if proxy_id:
-                mark_proxy_as_bad(proxy_id)
+            proxy_id = rotate_account_proxy(account_id, proxy_id)
             continue
 
         client = Client(
@@ -113,6 +114,8 @@ async def _start_temp_client(details: dict) -> Client:
         )
         try:
             await asyncio.wait_for(client.start(), timeout=45.0)
+            if proxy_id and proxy_id != original_proxy_id:
+                assign_account_proxy(account_id, proxy_id)
             return client
         except AUTH_ERRORS as e:
             await _safe_stop(client)
@@ -120,14 +123,24 @@ async def _start_temp_client(details: dict) -> Client:
         except (asyncio.TimeoutError, Timeout, ConnectionError, OSError) as e:
             last_error = e
             await _safe_stop(client)
-            if proxy_id:
-                mark_proxy_as_bad(proxy_id)
+            reason = "SOCKS5 authentication failed" if is_socks_auth_error(e) else str(e)
             log.warning(
                 f"Two-step client connect failed for account {account_id} "
-                f"(attempt {attempt + 1}/{MAX_PROXY_RETRIES}): {e}"
+                f"(attempt {attempt + 1}/{MAX_PROXY_RETRIES}, proxy {proxy_id}): {reason}"
             )
+            proxy_id = rotate_account_proxy(account_id, proxy_id)
             await asyncio.sleep(1)
         except Exception as e:
+            if is_socks_auth_error(e):
+                last_error = e
+                await _safe_stop(client)
+                log.warning(
+                    f"SOCKS5 authentication failed for two-step client on account {account_id} "
+                    f"(attempt {attempt + 1}/{MAX_PROXY_RETRIES}, proxy {proxy_id})"
+                )
+                proxy_id = rotate_account_proxy(account_id, proxy_id)
+                await asyncio.sleep(1)
+                continue
             await _safe_stop(client)
             raise _map_pyrogram_error(e) from e
 

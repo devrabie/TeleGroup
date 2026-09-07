@@ -24,11 +24,12 @@ from telegram.ext import ContextTypes
 
 from src import config
 from src.database import (
+    assign_account_proxy,
     get_account_runtime_details,
     get_code_monitor_accounts,
     get_proxy_string,
     get_random_proxy_id,
-    mark_proxy_as_bad,
+    rotate_account_proxy,
 )
 from src.security_messages import (
     KIND_LOGIN_CODE,
@@ -53,25 +54,83 @@ AUTH_ERRORS = (
 )
 
 
+def is_socks_auth_error(exc: BaseException) -> bool:
+    """True when a SOCKS5 proxy rejected the username/password."""
+    parts = []
+    seen: set[int] = set()
+    current: Optional[BaseException] = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        parts.append(str(current))
+        current = current.__cause__ or getattr(current, "__context__", None)
+    text = " ".join(parts).lower()
+    if "socks5 authentication failed" in text or "socks authentication failed" in text:
+        return True
+    return "authentication failed" in text and "socks" in text
+
+
+def _parse_proxy_string(raw: str) -> tuple[str, int, Optional[str], Optional[str]]:
+    """Return hostname, port, username, password from a proxy string."""
+    if "://" in raw:
+        raw = raw.split("://", 1)[1]
+
+    username = None
+    password = None
+
+    if "@" in raw:
+        auth, hostport = raw.rsplit("@", 1)
+        if ":" in auth:
+            username, password = auth.split(":", 1)
+        elif auth:
+            username = auth
+        if ":" not in hostport:
+            raise ValueError("missing port")
+        hostname, port_s = hostport.rsplit(":", 1)
+        if not hostname:
+            raise ValueError("missing host")
+        return hostname, int(port_s), username or None, password or None
+
+    parts = raw.split(":")
+    if len(parts) < 2:
+        raise ValueError("expected host:port")
+    hostname, port_s = parts[0], parts[1]
+    if not hostname:
+        raise ValueError("missing host")
+    if len(parts) >= 4:
+        username = parts[2] or None
+        password = ":".join(parts[3:]) or None
+    elif len(parts) == 3:
+        username = parts[2] or None
+    return hostname, int(port_s), username, password
+
+
 def build_proxy_dict(proxy_string: Optional[str]) -> Optional[dict]:
-    """Parse a host:port:user:pass proxy string into a Pyrogram proxy dict."""
-    if not proxy_string:
+    """
+    Parse a proxy string into a Pyrogram SOCKS5 proxy dict.
+
+    Credentials embedded in the string always win. PROXY_USERNAME / PROXY_PASSWORD
+    are used only when the string has no username or password (e.g. host:port).
+    """
+    if not proxy_string or not str(proxy_string).strip():
         return None
     try:
-        parts = proxy_string.split(":")
-        hostname, port = parts[0], parts[1]
-        username = config.PROXY_USERNAME or parts[2]
-        password = config.PROXY_PASSWORD or parts[3]
-        return {
-            "scheme": "socks5",
-            "hostname": hostname,
-            "port": int(port),
-            "username": username,
-            "password": password,
-        }
+        hostname, port, username, password = _parse_proxy_string(str(proxy_string).strip())
     except (ValueError, IndexError) as e:
         log.error(f"Invalid proxy format '{proxy_string}': {e}")
         return None
+
+    if not username:
+        username = getattr(config, "PROXY_USERNAME", None)
+    if not password:
+        password = getattr(config, "PROXY_PASSWORD", None)
+
+    return {
+        "scheme": "socks5",
+        "hostname": hostname,
+        "port": port,
+        "username": username,
+        "password": password,
+    }
 
 
 def message_text_from_update(message) -> str:
@@ -157,13 +216,13 @@ class CodeMonitorManager:
                 return False
 
             last_error = None
+            original_proxy_id = account_details.get("proxy_id")
+            proxy_id = original_proxy_id or get_random_proxy_id()
             for attempt in range(MAX_PROXY_RETRIES):
-                proxy_id = account_details.get("proxy_id") or get_random_proxy_id()
                 proxy_string = get_proxy_string(proxy_id) if proxy_id else None
                 proxy_dict = build_proxy_dict(proxy_string)
                 if proxy_string and proxy_dict is None:
-                    if proxy_id:
-                        mark_proxy_as_bad(proxy_id)
+                    proxy_id = rotate_account_proxy(account_id, proxy_id)
                     continue
 
                 client_name = f"monitor_{account_id}_{random.randint(1000, 9999)}"
@@ -186,6 +245,8 @@ class CodeMonitorManager:
 
                 try:
                     await asyncio.wait_for(client.start(), timeout=45.0)
+                    if proxy_id and proxy_id != original_proxy_id:
+                        assign_account_proxy(account_id, proxy_id)
                     self._clients[account_id] = client
                     self._meta[account_id] = {
                         "phone": account_details.get("phone"),
@@ -205,16 +266,25 @@ class CodeMonitorManager:
                     return False
                 except (asyncio.TimeoutError, ConnectionError, OSError) as e:
                     last_error = e
+                    reason = "SOCKS5 authentication failed" if is_socks_auth_error(e) else str(e)
                     log.warning(
                         f"Connection error starting code monitor for account {account_id} "
-                        f"(attempt {attempt + 1}/{MAX_PROXY_RETRIES}): {e}"
+                        f"(attempt {attempt + 1}/{MAX_PROXY_RETRIES}, proxy {proxy_id}): {reason}"
                     )
                     await self._safe_stop(client)
-                    if proxy_id:
-                        mark_proxy_as_bad(proxy_id)
+                    proxy_id = rotate_account_proxy(account_id, proxy_id)
                     await asyncio.sleep(1)
                 except Exception as e:
                     last_error = e
+                    if is_socks_auth_error(e):
+                        log.warning(
+                            f"SOCKS5 authentication failed for account {account_id} "
+                            f"(attempt {attempt + 1}/{MAX_PROXY_RETRIES}, proxy {proxy_id})"
+                        )
+                        await self._safe_stop(client)
+                        proxy_id = rotate_account_proxy(account_id, proxy_id)
+                        await asyncio.sleep(1)
+                        continue
                     log.error(
                         f"Unexpected error starting code monitor for account {account_id}: {e}",
                         exc_info=True,

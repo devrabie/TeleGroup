@@ -7,7 +7,7 @@ from pyrogram import Client
 from pyrogram.errors import FloodWait, Timeout
 
 from src import config
-from src.code_monitor import build_proxy_dict, get_running_monitor_client
+from src.code_monitor import build_proxy_dict, get_running_monitor_client, is_socks_auth_error
 from src.database import (
     get_eligible_accounts,
     get_account_stats,
@@ -137,8 +137,9 @@ async def process_single_account(account_details: dict):
             await _create_group_on_client(user_client, account_details)
             return  # Exit the loop on success
 
-        except (asyncio.TimeoutError, Timeout, ConnectionError) as e:
-            log.warning(f"Connection/Timeout error for account {account_id} on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. Proxy ID: {proxy_id}. Error: {type(e).__name__}")
+        except (asyncio.TimeoutError, Timeout, ConnectionError, OSError) as e:
+            reason = "SOCKS5 authentication failed" if is_socks_auth_error(e) else type(e).__name__
+            log.warning(f"Connection/Timeout error for account {account_id} on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. Proxy ID: {proxy_id}. Error: {reason}")
             if proxy_id:
                 mark_proxy_as_bad(proxy_id)
             if attempt >= MAX_PROXY_RETRIES - 1:
@@ -153,6 +154,18 @@ async def process_single_account(account_details: dict):
             break
 
         except Exception as e:
+            if is_socks_auth_error(e):
+                log.warning(
+                    f"SOCKS5 authentication failed for account {account_id} "
+                    f"on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. Proxy ID: {proxy_id}."
+                )
+                if proxy_id:
+                    mark_proxy_as_bad(proxy_id)
+                if attempt >= MAX_PROXY_RETRIES - 1:
+                    apply_error_backoff(account_id, f"SOCKS5 authentication failed after {MAX_PROXY_RETRIES} attempts")
+                    break
+                await asyncio.sleep(1)
+                continue
             log.error(f"An unexpected error occurred while processing account {account_id}: {e}", exc_info=True)
             apply_error_backoff(account_id, str(e))
             break

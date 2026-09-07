@@ -822,6 +822,34 @@ def mark_proxy_as_bad(proxy_id: int):
         log.error(f"Failed to mark proxy {proxy_id} as bad: {e}")
 
 
+def assign_account_proxy(account_id: int, proxy_id: int | None) -> bool:
+    """Set the proxy assigned to a managed account."""
+    if account_id is None:
+        return False
+    sql = "UPDATE managed_accounts SET proxy_id = ? WHERE id = ? AND deleted_at IS NULL"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (proxy_id, account_id))
+            conn.commit()
+            return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        log.error(f"Failed to assign proxy {proxy_id} to account {account_id}: {e}")
+        return False
+
+
+def rotate_account_proxy(account_id: int, failed_proxy_id: int | None = None) -> int | None:
+    """Mark a failed proxy bad and assign a different working proxy to the account."""
+    if failed_proxy_id is not None:
+        mark_proxy_as_bad(failed_proxy_id)
+    new_proxy_id = get_random_proxy_id(exclude_id=failed_proxy_id)
+    if new_proxy_id is None:
+        new_proxy_id = get_random_proxy_id()
+    if new_proxy_id is not None:
+        assign_account_proxy(account_id, new_proxy_id)
+    return new_proxy_id
+
+
 def set_account_flood_wait(account_id: int, wait_until_timestamp: datetime):
     """Sets the flood wait time for a managed account."""
     sql = "UPDATE managed_accounts SET flood_wait_until = ? WHERE id = ?"

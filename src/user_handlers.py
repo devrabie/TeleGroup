@@ -35,7 +35,7 @@ from src.database import (
     user_owns_account,
 )
 from src.translation import get_translation_func_for_user
-from src.code_monitor import code_monitor_manager
+from src.code_monitor import build_proxy_dict, code_monitor_manager, is_socks_auth_error
 from src.two_step import (
     TwoStepError,
     apply_two_step_password,
@@ -496,20 +496,16 @@ async def async_send_code(phone, context, user_id, _):
 
         # --- Prepare Proxy ---
         if proxy_string:
-            try:
-                parts = proxy_string.split(':')
-                hostname, port = parts[0], parts[1]
-                username = config.PROXY_USERNAME or parts[2]
-                password = config.PROXY_PASSWORD or parts[3]
-                proxy_dict = {
-                    "scheme": "socks5", "hostname": hostname, "port": int(port),
-                    "username": username, "password": password
-                }
-                log.info(f"Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: User {user_id} using proxy {hostname} and device '{device_profile['device_model']}'")
-            except (ValueError, IndexError) as e:
-                log.error(f"Invalid proxy format: '{proxy_string}'. Error: {e}")
-                if proxy_id: mark_proxy_as_bad(proxy_id)
-                continue # Try next attempt
+            proxy_dict = build_proxy_dict(proxy_string)
+            if proxy_dict is None:
+                log.error(f"Invalid proxy format: '{proxy_string}'.")
+                if proxy_id:
+                    mark_proxy_as_bad(proxy_id)
+                continue
+            log.info(
+                f"Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: User {user_id} using proxy "
+                f"{proxy_dict['hostname']} and device '{device_profile['device_model']}'"
+            )
         else:
             log.warning(f"Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: No proxy available for user {user_id}. Proceeding without proxy.")
 
@@ -556,8 +552,12 @@ async def async_send_code(phone, context, user_id, _):
                 await client.disconnect()
             return # Stop the process
 
-        except (Timeout, ConnectionError) as e:
-            log.warning(f"Proxy/Connection failed for user {user_id} on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. Proxy ID: {proxy_id}. Error: {e}")
+        except (Timeout, ConnectionError, OSError) as e:
+            reason = "SOCKS5 authentication failed" if is_socks_auth_error(e) else str(e)
+            log.warning(
+                f"Proxy/Connection failed for user {user_id} on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. "
+                f"Proxy ID: {proxy_id}. Error: {reason}"
+            )
             if proxy_id:
                 mark_proxy_as_bad(proxy_id)
             if client and client.is_connected:
@@ -574,6 +574,20 @@ async def async_send_code(phone, context, user_id, _):
             return
 
         except Exception as e:
+            if is_socks_auth_error(e):
+                log.warning(
+                    f"SOCKS5 authentication failed for user {user_id} on attempt "
+                    f"{attempt + 1}/{MAX_PROXY_RETRIES}. Proxy ID: {proxy_id}."
+                )
+                if proxy_id:
+                    mark_proxy_as_bad(proxy_id)
+                if client and getattr(client, "is_connected", False):
+                    await client.disconnect()
+                if attempt < MAX_PROXY_RETRIES - 1:
+                    await asyncio.sleep(1)
+                    continue
+                await context.bot.send_message(user_id, _("Failed to connect to Telegram after multiple attempts. Please check proxy settings and try again later."))
+                return
             log.error(f"An unexpected error occurred while sending code for user {user_id}: {e}", exc_info=True)
             await context.bot.send_message(user_id, _("An unexpected error occurred. Please try again."))
             if client and client.is_connected:
@@ -1086,7 +1100,8 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     proxy_host = None
     if acc.get("proxy_string"):
-        proxy_host = str(acc["proxy_string"]).split(":")[0]
+        parsed_proxy = build_proxy_dict(acc["proxy_string"])
+        proxy_host = parsed_proxy["hostname"] if parsed_proxy else str(acc["proxy_string"]).split(":")[0]
     if proxy_host:
         proxy_label = proxy_host
     elif acc.get("proxy_id"):
