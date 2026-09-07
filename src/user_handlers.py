@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import re
 import threading
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -544,81 +545,206 @@ async def set_language_callback(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
 # --- Add Account Conversation ---
-PHONE, CODE, PASSWORD = range(3)
+CHOOSE_OWNER, TARGET_USER_ID, PHONE, CODE, PASSWORD = range(5)
 
-async def add_account_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+PHONE_NUMBER_RE = re.compile(r'^\+[1-9]\d{7,14}$')
+
+
+def normalize_phone_number(raw: str) -> str:
+    """Strip common separators so validation can run on a clean E.164-like value."""
+    return re.sub(r'[\s\-()]', '', (raw or '').strip())
+
+
+def is_valid_phone_number(phone: str) -> bool:
+    """Return True if the value looks like an international phone number before API calls."""
+    return bool(PHONE_NUMBER_RE.fullmatch(normalize_phone_number(phone)))
+
+
+def _owner_display_name(details: dict | None, telegram_id: int) -> str:
+    user = (details or {}).get("user") or {}
+    return format_person(telegram_id, user.get("first_name"), user.get("username"))
+
+
+async def prompt_add_account_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Ask for the phone number after owner/invite target is known."""
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
 
-    # Determine the message object and how to reply/edit
     query = update.callback_query
     if query:
-        await query.answer()
-        # Button / command adds to the actor's own list, not a leftover invite.
-        context.user_data.pop("add_for_owner_id", None)
-        context.user_data.pop("add_for_owner_name", None)
+        reply_edit = True
+        reply_func = None
+        reply_kwargs = {}
+    elif update.message:
+        reply_edit = False
+        reply_func = update.message.reply_text
+        reply_kwargs = {}
+    else:
+        reply_edit = False
         reply_func = context.bot.send_message
         reply_kwargs = {'chat_id': user_id}
-    else:
-        message_text = (update.message.text or "") if update.message else ""
-        if message_text.startswith("/add_account"):
-            context.user_data.pop("add_for_owner_id", None)
-            context.user_data.pop("add_for_owner_name", None)
-        message = update.message
-        reply_func = message.reply_text
-        reply_kwargs = {}
 
     target_owner_id = context.user_data.get("add_for_owner_id") or user_id
-    is_invite = target_owner_id != user_id
+    is_for_other = target_owner_id != user_id
     owner_name = context.user_data.get("add_for_owner_name") or ""
     details = get_user_details(target_owner_id)
 
     if not (details and details.get('subscription')):
-        if is_invite:
-            await reply_func(
-                text=_("The account owner does not have an active subscription, so this number cannot be added right now."),
-                **reply_kwargs,
-            )
+        if is_for_other:
+            text = _("The account owner does not have an active subscription, so this number cannot be added right now.")
         else:
-            await reply_func(text=_("You need an active subscription to add accounts. Use /subscribe to get one."), **reply_kwargs)
+            text = _("You need an active subscription to add accounts. Use /subscribe to get one.")
+        if reply_edit:
+            await query.edit_message_text(text=text)
+        else:
+            await reply_func(text=text, **reply_kwargs)
         context.user_data.pop("add_for_owner_id", None)
         context.user_data.pop("add_for_owner_name", None)
         return ConversationHandler.END
 
     plan = get_plan_by_id(details['subscription']['plan_id'])
-    if len(details['accounts']) >= plan['max_accounts']:
-        if is_invite:
-            await reply_func(
-                text=_("The account owner has reached the maximum number of accounts on their plan."),
-                **reply_kwargs,
-            )
+    if not plan or len(details['accounts']) >= plan['max_accounts']:
+        if is_for_other:
+            text = _("The account owner has reached the maximum number of accounts on their plan.")
         else:
-            await reply_func(text=_("You have reached the maximum of {max_accounts} accounts for your '{plan_name}' plan.").format(
-                max_accounts=plan['max_accounts'], plan_name=plan['name']), **reply_kwargs)
+            text = _("You have reached the maximum of {max_accounts} accounts for your '{plan_name}' plan.").format(
+                max_accounts=plan['max_accounts'] if plan else 0,
+                plan_name=plan['name'] if plan else 'N/A',
+            )
+        if reply_edit:
+            await query.edit_message_text(text=text)
+        else:
+            await reply_func(text=text, **reply_kwargs)
         context.user_data.pop("add_for_owner_id", None)
         context.user_data.pop("add_for_owner_name", None)
         return ConversationHandler.END
 
-    if is_invite:
+    if is_for_other:
         text = _(
             "Enter the phone number to add to {name}'s account list.\n"
             "<i>(Must be in international format, e.g., +1234567890)</i>\n\n"
             "This number will not appear in your accounts."
         ).format(name=owner_name)
     else:
-        text = _("Please send the phone number of the account you want to add.\n<i>(Must be in international format, e.g., +1234567890)</i>")
-    if query:
-        # If started from a button, edit the message and add a cancel button
-        keyboard = [[InlineKeyboardButton(_("❌ Cancel"), callback_data='cancel_conv')]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        text = _(
+            "Please send the phone number of the account you want to add.\n"
+            "<i>(Must be in international format, e.g., +1234567890)</i>"
+        )
+
+    keyboard = [[InlineKeyboardButton(_("❌ Cancel"), callback_data='cancel_conv')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    if reply_edit:
         await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
     else:
-        await reply_func(
-            text=text,
-            parse_mode=ParseMode.HTML,
-            **reply_kwargs
-        )
+        await reply_func(text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML, **reply_kwargs)
     return PHONE
+
+
+async def add_account_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+
+    query = update.callback_query
+    if query:
+        await query.answer()
+        # Button starts a fresh choice — not a leftover invite.
+        context.user_data.pop("add_for_owner_id", None)
+        context.user_data.pop("add_for_owner_name", None)
+    else:
+        message_text = (update.message.text or "") if update.message else ""
+        if message_text.startswith("/add_account"):
+            context.user_data.pop("add_for_owner_id", None)
+            context.user_data.pop("add_for_owner_name", None)
+
+    # Invite deep links already set add_for_owner_id — go straight to the phone step.
+    if context.user_data.get("add_for_owner_id"):
+        return await prompt_add_account_phone(update, context)
+
+    text = _(
+        "Who should this account be added for?\n\n"
+        "• <b>For myself</b>: the account will appear in your own list.\n"
+        "• <b>For someone else</b>: the account will be added to another user's account in this bot "
+        "(not yours). You will need their Telegram numeric ID."
+    )
+    keyboard = [
+        [InlineKeyboardButton(_("👤 Add for myself"), callback_data='add_for_self')],
+        [InlineKeyboardButton(_("👥 Add for someone else"), callback_data='add_for_other')],
+        [InlineKeyboardButton(_("❌ Cancel"), callback_data='cancel_conv')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if query:
+        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    else:
+        await update.message.reply_text(text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    return CHOOSE_OWNER
+
+
+async def add_account_choose_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+
+    if query.data == 'add_for_self':
+        context.user_data.pop("add_for_owner_id", None)
+        context.user_data.pop("add_for_owner_name", None)
+        return await prompt_add_account_phone(update, context)
+
+    text = _(
+        "<b>Add for someone else</b>\n\n"
+        "This means the Telegram account you are about to log in will be linked to "
+        "<b>another person's</b> profile in this bot — it will appear in <b>their</b> "
+        "\"My Accounts\" list, not yours.\n\n"
+        "Please send that person's Telegram numeric ID now.\n"
+        "<i>(They must have used this bot before and have an active subscription with free slots.)</i>"
+    )
+    keyboard = [[InlineKeyboardButton(_("❌ Cancel"), callback_data='cancel_conv')]]
+    await query.edit_message_text(
+        text=text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode=ParseMode.HTML,
+    )
+    return TARGET_USER_ID
+
+
+async def receive_target_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    raw_id = (update.message.text or '').strip()
+
+    if not raw_id.isdigit():
+        await update.message.reply_text(
+            _("Invalid ID. Please send a numeric Telegram user ID, or /cancel to stop.")
+        )
+        return TARGET_USER_ID
+
+    target_id = int(raw_id)
+    if target_id == user_id:
+        await update.message.reply_text(
+            _("That is your own ID. Choose \"Add for myself\", or send another person's ID.")
+        )
+        return TARGET_USER_ID
+
+    target_details = get_user_details(target_id)
+    if not target_details:
+        await update.message.reply_text(
+            _(
+                "No user with ID <code>{user_id}</code> was found in this bot. "
+                "They must start the bot first."
+            ).format(user_id=target_id),
+            parse_mode=ParseMode.HTML,
+        )
+        return TARGET_USER_ID
+
+    owner_name = _owner_display_name(target_details, target_id)
+    context.user_data['add_for_owner_id'] = target_id
+    context.user_data['add_for_owner_name'] = owner_name
+    await update.message.reply_text(
+        _("OK. The account will be added for {name}.").format(name=owner_name),
+        parse_mode=ParseMode.HTML,
+    )
+    return await prompt_add_account_phone(update, context)
 
 MAX_PROXY_RETRIES = 3
 
@@ -746,7 +872,19 @@ async def async_send_code(phone, context, user_id, _):
 async def receive_phone_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    phone_number = update.message.text
+    phone_number = normalize_phone_number(update.message.text)
+
+    if not is_valid_phone_number(phone_number):
+        await update.message.reply_text(
+            _(
+                "This does not look like a valid phone number.\n"
+                "Please send it in international format, e.g. <code>+1234567890</code> "
+                "(starts with +, digits only, no letters)."
+            ),
+            parse_mode=ParseMode.HTML,
+        )
+        return PHONE
+
     context.user_data['phone'] = phone_number
     await update.message.reply_text(_("Processing... Please wait."))
     asyncio.create_task(async_send_code(phone_number, context, user_id, _))
@@ -871,6 +1009,10 @@ add_account_conv_handler = ConversationHandler(
         CallbackQueryHandler(add_account_start, pattern="^start_add_account$")
     ],
     states={
+        CHOOSE_OWNER: [
+            CallbackQueryHandler(add_account_choose_owner, pattern="^add_for_(self|other)$"),
+        ],
+        TARGET_USER_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_target_user_id)],
         PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_phone_number)],
         CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_phone_code)],
         PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_password)],
