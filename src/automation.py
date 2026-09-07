@@ -1,12 +1,13 @@
 import asyncio
 import logging
 import random
-from datetime import datetime, timedelta
+from datetime import datetime
 from telegram.ext import ContextTypes
 from pyrogram import Client
 from pyrogram.errors import FloodWait, Timeout
 
 from src import config
+from src.code_monitor import build_proxy_dict, get_running_monitor_client
 from src.database import (
     get_eligible_accounts,
     get_account_stats,
@@ -14,7 +15,6 @@ from src.database import (
     get_random_proxy_id,
     log_group_creation,
     mark_proxy_as_bad,
-    reassign_proxy,
     update_account_schedule,
     apply_error_backoff,
 )
@@ -51,13 +51,54 @@ async def run_group_creation_cycle(context: ContextTypes.DEFAULT_TYPE):
 
 MAX_PROXY_RETRIES = 3
 
+
+async def _create_group_on_client(user_client: Client, account_details: dict) -> None:
+    """Create one supergroup on an already-started client. Does not stop the client."""
+    account_id = account_details['account_id']
+    total_groups_created = get_account_stats(account_id)
+    now = datetime.now()
+    date_str = now.strftime("%Y-%m")
+    new_group_name = f"Group {total_groups_created + 1} {date_str}"
+
+    new_group = await asyncio.wait_for(
+        user_client.create_supergroup(title=new_group_name, description=""),
+        timeout=30.0
+    )
+    log.info(f"Account {account_id} created supergroup '{new_group_name}' (ID: {new_group.id}).")
+
+    log_group_creation(account_id, new_group.id, new_group_name)
+    update_account_schedule(account_id, account_details['daily_group_limit'])
+
+    await user_client.send_message(new_group.id, f"Hello, group {new_group_name} is ready.")
+    log.info(f"Successfully processed group creation for account {account_id}.")
+
+
 async def process_single_account(account_details: dict):
     """
     Handles the group creation for a single managed account.
-    Retries with a new proxy if the connection fails.
+    Reuses a running code-monitor client when available to avoid session conflicts.
+    Otherwise retries with a new proxy if the connection fails.
     """
     account_id = account_details['account_id']
     session_string = account_details['session_string']
+
+    monitor_client = get_running_monitor_client(account_id)
+    if monitor_client is not None:
+        try:
+            await _create_group_on_client(monitor_client, account_details)
+            return
+        except FloodWait as e:
+            log.warning(f"Account {account_id} is flood-waited for {e.value} seconds. Applying backoff.")
+            apply_error_backoff(account_id, str(e), e.value)
+            return
+        except (asyncio.TimeoutError, Timeout, ConnectionError) as e:
+            log.warning(f"Timeout/connection error using monitor client for account {account_id}: {e}")
+            apply_error_backoff(account_id, f"Group creation failed on monitor client: {e}")
+            return
+        except Exception as e:
+            log.error(f"Group creation failed on monitor client for account {account_id}: {e}", exc_info=True)
+            apply_error_backoff(account_id, str(e))
+            return
 
     for attempt in range(MAX_PROXY_RETRIES):
         user_client = None
@@ -66,26 +107,12 @@ async def process_single_account(account_details: dict):
         proxy_dict = None
 
         if proxy_string:
-            try:
-                parts = proxy_string.split(':')
-                hostname, port = parts[0], parts[1]
-
-                # Use credentials from env vars if they exist, otherwise use from proxy string
-                username = config.PROXY_USERNAME or parts[2]
-                password = config.PROXY_PASSWORD or parts[3]
-
-                proxy_dict = {
-                    "scheme": "socks5",
-                    "hostname": hostname,
-                    "port": int(port),
-                    "username": username,
-                    "password": password
-                }
-                log.info(f"Account {account_id} | Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: Using proxy {hostname}")
-            except (ValueError, IndexError) as e:
-                log.error(f"Invalid proxy format for account {account_id}: '{proxy_string}'. Error: {e}")
-                if proxy_id: mark_proxy_as_bad(proxy_id)
+            proxy_dict = build_proxy_dict(proxy_string)
+            if proxy_dict is None:
+                if proxy_id:
+                    mark_proxy_as_bad(proxy_id)
                 continue
+            log.info(f"Account {account_id} | Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: Using proxy {proxy_dict['hostname']}")
         else:
             log.warning(f"Account {account_id} | Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: No proxy available. Proceeding without proxy.")
 
@@ -101,29 +128,13 @@ async def process_single_account(account_details: dict):
                 app_version=account_details.get('app_version'),
                 lang_code=account_details.get('lang_code'),
                 in_memory=True,
+                no_updates=True,
                 proxy=proxy_dict
             )
 
             await asyncio.wait_for(user_client.start(), timeout=30.0)
             log.info(f"Successfully started client for account {account_id}.")
-
-            total_groups_created = get_account_stats(account_id)
-            now = datetime.now()
-            date_str = now.strftime("%Y-%m")
-            new_group_name = f"Group {total_groups_created + 1} {date_str}"
-
-            new_group = await asyncio.wait_for(
-                user_client.create_supergroup(title=new_group_name, description=""),
-                timeout=30.0
-            )
-            log.info(f"Account {account_id} created supergroup '{new_group_name}' (ID: {new_group.id}).")
-
-            # Log the creation and immediately update the schedule for the next run
-            log_group_creation(account_id, new_group.id, new_group_name)
-            update_account_schedule(account_id, account_details['daily_group_limit'])
-
-            await user_client.send_message(new_group.id, f"Hello, group {new_group_name} is ready.")
-            log.info(f"Successfully processed group creation for account {account_id}.")
+            await _create_group_on_client(user_client, account_details)
             return  # Exit the loop on success
 
         except (asyncio.TimeoutError, Timeout, ConnectionError) as e:

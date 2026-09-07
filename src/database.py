@@ -65,8 +65,9 @@ TABLE_DEFINITIONS = {
             phone TEXT NOT NULL UNIQUE,
             session_string TEXT NOT NULL,
             proxy_id INTEGER,
-            is_active BOOLEAN NOT NULL DEFAULT 1, -- User-controlled activation
+            is_active BOOLEAN NOT NULL DEFAULT 0, -- Group creation off by default
             is_running BOOLEAN NOT NULL DEFAULT 0, -- System-controlled running state
+            code_monitor_enabled BOOLEAN NOT NULL DEFAULT 0, -- Forward login/2FA notices
             flood_wait_until TIMESTAMP,
             next_creation_time TIMESTAMP,
             backoff_level INTEGER NOT NULL DEFAULT 0,
@@ -153,6 +154,11 @@ def initialize_database():
             if 'deleted_at' not in columns:
                 log.info("Running migration: Adding 'deleted_at' column to 'managed_accounts' table.")
                 cursor.execute("ALTER TABLE managed_accounts ADD COLUMN deleted_at TIMESTAMP")
+            if 'code_monitor_enabled' not in columns:
+                log.info("Running migration: Adding 'code_monitor_enabled' column to 'managed_accounts' table.")
+                cursor.execute(
+                    "ALTER TABLE managed_accounts ADD COLUMN code_monitor_enabled BOOLEAN NOT NULL DEFAULT 0"
+                )
 
             cursor.execute("PRAGMA table_info(plans)")
             plan_columns = [info[1] for info in cursor.fetchall()]
@@ -570,7 +576,8 @@ def add_managed_account(user_id: int, phone: str, session_string: str, device_pr
                     SET session_string = ?,
                         proxy_id = ?,
                         device_profile_id = ?,
-                        is_active = 1,
+                        is_active = 0,
+                        code_monitor_enabled = 0,
                         deleted_at = NULL,
                         last_error = NULL,
                         backoff_level = 0,
@@ -583,8 +590,11 @@ def add_managed_account(user_id: int, phone: str, session_string: str, device_pr
                 # --- Insert new account ---
                 log.info(f"Adding new account for phone {phone}.")
                 insert_sql = """
-                    INSERT INTO managed_accounts (user_id, phone, session_string, proxy_id, device_profile_id, is_active, is_running)
-                    VALUES (?, ?, ?, ?, ?, 1, 0)
+                    INSERT INTO managed_accounts (
+                        user_id, phone, session_string, proxy_id, device_profile_id,
+                        is_active, is_running, code_monitor_enabled
+                    )
+                    VALUES (?, ?, ?, ?, ?, 0, 0, 0)
                 """
                 cursor.execute(insert_sql, (internal_user_id, phone, session_string, new_proxy_id, device_profile_id))
                 log.info(f"Successfully added account {phone}.")
@@ -622,6 +632,41 @@ def delete_managed_account(account_id: int, telegram_user_id: int):
     except sqlite3.Error as e:
         log.error(f"Failed to soft-delete account {account_id} for user {telegram_user_id}: {e}")
         return False
+
+def toggle_code_monitor(account_id: int, telegram_user_id: int):
+    """
+    Toggles the code_monitor_enabled flag of a managed account owned by the user.
+    Returns the new status (True/False) or None if the account was not found.
+    """
+    get_status_sql = """
+        SELECT code_monitor_enabled FROM managed_accounts
+        WHERE id = ? AND deleted_at IS NULL
+          AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
+    """
+    update_sql = """
+        UPDATE managed_accounts SET code_monitor_enabled = ? WHERE id = ?
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(get_status_sql, (account_id, telegram_user_id))
+            row = cursor.fetchone()
+            if not row:
+                log.warning(
+                    f"User {telegram_user_id} tried to toggle code monitor on "
+                    f"non-existent or unowned account {account_id}."
+                )
+                return None
+
+            new_status = not bool(row['code_monitor_enabled'])
+            cursor.execute(update_sql, (1 if new_status else 0, account_id))
+            conn.commit()
+            log.info(f"Account {account_id} code monitor toggled to {new_status}.")
+            return new_status
+    except sqlite3.Error as e:
+        log.error(f"Failed to toggle code monitor for account {account_id}: {e}")
+        return None
+
 
 def toggle_account_status(account_id: int, telegram_user_id: int):
     """
@@ -823,6 +868,78 @@ def get_eligible_accounts():
     except sqlite3.Error as e:
         log.error(f"Failed to retrieve eligible accounts: {e}")
         return []
+
+
+def get_code_monitor_accounts():
+    """
+    Accounts whose login-code monitor should be running:
+    enabled, not deleted, and owned by a user with an active subscription.
+    """
+    sql = """
+        SELECT
+            ma.id as account_id,
+            ma.phone,
+            ma.session_string,
+            ma.proxy_id,
+            u.telegram_id,
+            dp.device_model,
+            dp.system_version,
+            dp.app_version,
+            dp.lang_code,
+            dp.api_id,
+            dp.api_hash
+        FROM managed_accounts ma
+        JOIN users u ON ma.user_id = u.id
+        JOIN subscriptions s ON u.id = s.user_id
+        JOIN plans p ON s.plan_id = p.id
+        LEFT JOIN device_profiles dp ON ma.device_profile_id = dp.id
+        WHERE ma.code_monitor_enabled = 1
+          AND ma.deleted_at IS NULL
+          AND s.is_active = 1
+          AND s.end_date >= datetime('now')
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            accounts = cursor.fetchall()
+            return [dict(acc) for acc in accounts]
+    except sqlite3.Error as e:
+        log.error(f"Failed to retrieve code-monitor accounts: {e}")
+        return []
+
+
+def get_account_runtime_details(account_id: int):
+    """Runtime details needed to start a Pyrogram client for one managed account."""
+    sql = """
+        SELECT
+            ma.id as account_id,
+            ma.phone,
+            ma.session_string,
+            ma.proxy_id,
+            ma.code_monitor_enabled,
+            ma.is_active,
+            u.telegram_id,
+            dp.device_model,
+            dp.system_version,
+            dp.app_version,
+            dp.lang_code,
+            dp.api_id,
+            dp.api_hash
+        FROM managed_accounts ma
+        JOIN users u ON ma.user_id = u.id
+        LEFT JOIN device_profiles dp ON ma.device_profile_id = dp.id
+        WHERE ma.id = ? AND ma.deleted_at IS NULL
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (account_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to get runtime details for account {account_id}: {e}")
+        return None
 
 def get_groups_created_today(account_id: int):
     """Counts the number of groups created by an account in the last 24 hours."""
@@ -1029,7 +1146,7 @@ def get_user_details(telegram_id: int):
         WHERE s.user_id = ? AND s.is_active = 1
         ORDER BY s.end_date DESC LIMIT 1
     """
-    accounts_sql = "SELECT id, phone, is_active, last_error, next_creation_time FROM managed_accounts WHERE user_id = ? AND deleted_at IS NULL"
+    accounts_sql = "SELECT id, phone, is_active, code_monitor_enabled, last_error, next_creation_time FROM managed_accounts WHERE user_id = ? AND deleted_at IS NULL"
 
     try:
         with get_db_connection() as conn:
@@ -1066,6 +1183,7 @@ def get_account_details(account_id: int):
             ma.id,
             ma.phone,
             ma.is_active,
+            ma.code_monitor_enabled,
             ma.next_creation_time,
             ma.backoff_level,
             ma.last_error,

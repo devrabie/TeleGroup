@@ -507,6 +507,8 @@ msgid ""
 "<b>/language</b> - Change the display language of the bot "
 "(English/العربية).\n"
 "\n"
+"After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation and/or login-code monitoring for each account separately.\n"
+"\n"
 "For most features, you need an active subscription. You can get one via "
 "the /subscribe command."
 msgstr ""
@@ -521,6 +523,8 @@ msgstr ""
 "<b>/add_account</b> - بدء عملية إضافة حساب تليجرام جديد لإدارته عبر "
 "البوت.\n"
 "<b>/language</b> - تغيير لغة عرض البوت (English/العربية).\n"
+"\n"
+"بعد إضافة حساب، يكون إنشاء المجموعات <b>متوقفاً</b> افتراضياً. افتح /my_accounts لتفعيل إنشاء المجموعات و/أو مراقبة أكواد التحقق لكل حساب على حدة.\n"
 "\n"
 "لاستخدام معظم الميزات، تحتاج إلى اشتراك نشط. يمكنك الحصول عليه عبر الأمر "
 "/subscribe."
@@ -1004,3 +1008,137 @@ msgstr "❌ فشل تحديث المحتوى لـ '<b>{page_key} ({lang})</b>'."
 #: src/user_handlers.py:516
 msgid "Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number."
 msgstr "لقد حظر تليجرام محاولة تسجيل الدخول هذه بواسطة اختبار CAPTCHA. قد يكون هذا بسبب رقم الهاتف أو عنوان IP الخاص بالخادم. يرجى المحاولة مرة أخرى لاحقًا أو باستخدام رقم هاتف مختلف."
+
+msgid ""
+"✅ Account added successfully!\n\n"
+"Group creation is <b>disabled</b> by default. Open /my_accounts to enable group creation or login-code monitoring for this account."
+msgstr ""
+"✅ تمت إضافة الحساب بنجاح!\n\n"
+"إنشاء المجموعات <b>معطّل</b> افتراضياً. افتح /my_accounts لتفعيل إنشاء المجموعات أو مراقبة أكواد التحقق لهذا الحساب."
+
+msgid "⚪️ Off"
+msgstr "⚪️ متوقف"
+
+msgid "⚠️ Error"
+msgstr "⚠️ خطأ"
+
+msgid "🟢 On"
+msgstr "🟢 يعمل"
+
+msgid "🕒 Waiting"
+msgstr "🕒 في الانتظار"
+
+msgid "🟢 On (connected)"
+msgstr "🟢 يعمل (متصل)"
+
+msgid "🟡 On (connecting)"
+msgstr "🟡 يعمل (جارٍ الاتصال)"
+
+msgid "<b>Account:</b> <code>{phone}</code>"
+msgstr "<b>الحساب:</b> <code>{phone}</code>"
+
+msgid ""
+"\n"
+"<b>Group Creation:</b> {status}"
+msgstr ""
+"\n"
+"<b>إنشاء المجموعات:</b> {status}"
+
+msgid ""
+"\n"
+"<b>Code Monitor:</b> {status}"
+msgstr ""
+"\n"
+"<b>مراقبة الأكواد:</b> {status}"
+
+msgid "▶️ Enable Group Creation"
+msgstr "▶️ تفعيل إنشاء المجموعات"
+
+msgid "⏹️ Disable Group Creation"
+msgstr "⏹️ إيقاف إنشاء المجموعات"
+
+msgid "🔐 Enable Code Monitor"
+msgstr "🔐 تفعيل مراقبة الأكواد"
+
+msgid "🔓 Disable Code Monitor"
+msgstr "🔓 إيقاف مراقبة الأكواد"
+
+msgid "Group creation has been {status}."
+msgstr "تم {status} إنشاء المجموعات."
+
+msgid "Code monitor is enabled, but an active subscription is required to run it."
+msgstr "تم تفعيل مراقبة الأكواد، لكن يلزم اشتراك نشط لتشغيلها."
+
+msgid "Code monitor enabled. Login codes and security notices will be forwarded here."
+msgstr "تم تفعيل مراقبة الأكواد. سيتم إرسال أكواد الدخول والتنبيهات الأمنية إلى هنا."
+
+msgid "Code monitor is enabled, but the account could not connect yet. It will retry automatically."
+msgstr "تم تفعيل مراقبة الأكواد، لكن تعذر الاتصال بالحساب الآن. ستتم إعادة المحاولة تلقائياً."
+
+msgid "Code monitor disabled."
+msgstr "تم إيقاف مراقبة الأكواد."
+
+msgid "Groups On"
+msgstr "المجموعات تعمل"
+
+msgid "Groups Off"
+msgstr "المجموعات متوقفة"
+
+msgid "Monitor On"
+msgstr "المراقبة تعمل"
+
+msgid "Monitor Off"
+msgstr "المراقبة متوقفة"
+
+msgid "  - <code>{phone}</code> ({group_status}, {monitor_status})\n"
+msgstr "  - <code>{phone}</code> ({group_status}، {monitor_status})\n"
+
+msgid "Login / verification code"
+msgstr "رمز دخول / تحقق"
+
+msgid "Two-step verification change"
+msgstr "تغيير التحقق بخطوتين"
+
+msgid "New login / new device"
+msgstr "تسجيل دخول جديد / جهاز جديد"
+
+msgid "Telegram security notice"
+msgstr "إشعار أمني من تليجرام"
+
+msgid "Verification notice"
+msgstr "إشعار تحقق"
+
+msgid "Security notice"
+msgstr "إشعار أمني"
+
+msgid "🔐 <b>Security alert</b>\n"
+msgstr "🔐 <b>تنبيه أمني</b>\n"
+
+msgid "Account: <code>{phone}</code>\n"
+msgstr "الحساب: <code>{phone}</code>\n"
+
+msgid "Source: {source}\n"
+msgstr "المصدر: {source}\n"
+
+msgid "Type: {kind}\n"
+msgstr "النوع: {kind}\n"
+
+msgid "Code: {codes}\n"
+msgstr "الرمز: {codes}\n"
+
+msgid ""
+"\n"
+"{body}"
+msgstr ""
+"\n"
+"{body}"
+
+msgid "(no text)"
+msgstr "(لا يوجد نص)"
+
+msgid "⚠️ Code monitor could not start for <code>{phone}</code> because the session is invalid or revoked. Please delete and re-add the account."
+msgstr "⚠️ تعذر تشغيل مراقبة الأكواد للحساب <code>{phone}</code> لأن الجلسة غير صالحة أو تم إلغاؤها. يرجى حذف الحساب وإضافته من جديد."
+
+msgid "⚠️ Code monitor failed for <code>{phone}</code>."
+msgstr "⚠️ فشلت مراقبة الأكواد للحساب <code>{phone}</code>."
+

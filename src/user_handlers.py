@@ -27,12 +27,13 @@ from pyrogram.errors import (
 from src import config
 from src.database import (
     get_all_plans, get_plan_by_id, grant_subscription, get_user_details, add_managed_account,
-    delete_managed_account, toggle_account_status, reassign_proxy, get_account_stats,
+    delete_managed_account, toggle_account_status, toggle_code_monitor, reassign_proxy, get_account_stats,
     set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
     update_user_details, mark_proxy_as_bad, get_account_details, get_info_page_content,
     get_user_language, get_random_device_profile, get_device_profile_by_account_id
 )
 from src.translation import get_translation_func_for_user
+from src.code_monitor import code_monitor_manager
 from pyrogram.enums import ChatType, ChatMemberStatus
 
 log = logging.getLogger(__name__)
@@ -129,6 +130,7 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "<b>/my_accounts</b> - View and manage your connected Telegram accounts.\n"
         "<b>/add_account</b> - Start the process of adding a new Telegram account for the bot to manage.\n"
         "<b>/language</b> - Change the display language of the bot (English/العربية).\n\n"
+        "After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation and/or login-code monitoring for each account separately.\n\n"
         "For most features, you need an active subscription. You can get one via the /subscribe command."
     )
 
@@ -607,7 +609,14 @@ async def async_complete_login(context, user_id, _):
     session_string = await client.export_session_string()
     await client.disconnect()
     if add_managed_account(user_id, phone, session_string, device_profile_id):
-        await context.bot.send_message(user_id, _("✅ Account added successfully!"))
+        await context.bot.send_message(
+            user_id,
+            _(
+                "✅ Account added successfully!\n\n"
+                "Group creation is <b>disabled</b> by default. Open /my_accounts to enable group creation or login-code monitoring for this account."
+            ),
+            parse_mode=ParseMode.HTML,
+        )
     else:
         await context.bot.send_message(user_id, _("❌ Could not save your account to the database. It might already be registered."))
     context.user_data.clear()
@@ -665,19 +674,20 @@ async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         text = _("You have not added any accounts yet. Use /add_account to get started.")
     else:
         for acc in details['accounts']:
-            status_icon = "🟢"  # Default: Ready to work
+            status_icon = "⚪️"  # Both features off
             if acc['last_error']:
-                status_icon = "⚠️"  # Error state
-            elif not acc['is_active']:
-                status_icon = "🔴"  # Deactivated by user
-            elif acc['next_creation_time']:
-                try:
-                    next_time = datetime.fromisoformat(acc['next_creation_time'])
-                    if next_time > datetime.now(timezone.utc):
-                        status_icon = "🕒"  # Waiting for next scheduled run
-                except (ValueError, TypeError):
-                    # Handle case where timestamp is invalid or None
-                    pass # Keep default icon
+                status_icon = "⚠️"
+            elif acc['is_active']:
+                status_icon = "🟢"
+                if acc['next_creation_time']:
+                    try:
+                        next_time = datetime.fromisoformat(acc['next_creation_time'])
+                        if next_time > datetime.now(timezone.utc):
+                            status_icon = "🕒"
+                    except (ValueError, TypeError):
+                        pass
+            if acc.get('code_monitor_enabled'):
+                status_icon = f"{status_icon}🔐"
 
             button_text = f"{status_icon} {acc['phone']}"
             buttons.append([InlineKeyboardButton(button_text, callback_data=f"mng_select_{acc['id']}")])
@@ -734,24 +744,35 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         await context.bot.edit_message_text(chat_id=user_id, message_id=message_id, text=_("Error: Account not found or you don't have permission."))
         return
 
-    # Determine status string
-    status_str = "🟢 Ready"
-    if acc['last_error']:
-        status_str = f"⚠️ Error"
-    elif not acc['is_active']:
-        status_str = "🔴 Inactive"
-    elif acc['next_creation_time']:
-        try:
-            # We still need to parse it to see if it's in the future for the status
-            next_time = datetime.fromisoformat(acc['next_creation_time'])
-            if next_time.tzinfo is None:
-                next_time = next_time.replace(tzinfo=timezone.utc)
-            if next_time > datetime.now(timezone.utc):
-                status_str = "🕒 Waiting"
-        except (ValueError, TypeError):
-            pass
+    # Determine group-creation status string
+    status_str = _("⚪️ Off")
+    if acc['last_error'] and acc['is_active']:
+        status_str = _("⚠️ Error")
+    elif acc['is_active']:
+        status_str = _("🟢 On")
+        if acc['next_creation_time']:
+            try:
+                # We still need to parse it to see if it's in the future for the status
+                next_time = datetime.fromisoformat(acc['next_creation_time'])
+                if next_time.tzinfo is None:
+                    next_time = next_time.replace(tzinfo=timezone.utc)
+                if next_time > datetime.now(timezone.utc):
+                    status_str = _("🕒 Waiting")
+            except (ValueError, TypeError):
+                pass
 
-    text = _("<b>Account:</b> <code>{phone}</code>\n<b>Status:</b> {status}").format(phone=acc['phone'], status=status_str)
+    monitor_on = bool(acc.get('code_monitor_enabled'))
+    if monitor_on:
+        if code_monitor_manager.is_connected(account_id):
+            monitor_str = _("🟢 On (connected)")
+        else:
+            monitor_str = _("🟡 On (connecting)")
+    else:
+        monitor_str = _("⚪️ Off")
+
+    text = _("<b>Account:</b> <code>{phone}</code>").format(phone=acc['phone'])
+    text += _("\n<b>Group Creation:</b> {status}").format(status=status_str)
+    text += _("\n<b>Code Monitor:</b> {status}").format(status=monitor_str)
 
     text += _("\n<b>Last Group:</b> {time}").format(time=_format_datetime(acc['last_creation_time']))
     text += _("\n<b>Next Group:</b> {time}").format(time=_format_datetime(acc['next_creation_time']))
@@ -763,8 +784,17 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     buttons = [
         [
-            InlineKeyboardButton(_("Toggle On") if not acc['is_active'] else _("Toggle Off"), callback_data=f"mng_toggle_{acc['id']}"),
+            InlineKeyboardButton(
+                _("▶️ Enable Group Creation") if not acc['is_active'] else _("⏹️ Disable Group Creation"),
+                callback_data=f"mng_toggle_{acc['id']}"
+            ),
             InlineKeyboardButton(_("🔄 Change Proxy"), callback_data=f"mng_proxy_{acc['id']}"),
+        ],
+        [
+            InlineKeyboardButton(
+                _("🔐 Enable Code Monitor") if not monitor_on else _("🔓 Disable Code Monitor"),
+                callback_data=f"mng_monitor_{acc['id']}"
+            ),
         ],
         [
             InlineKeyboardButton(_("📂 View Groups"), callback_data=f"mng_viewgroups_{acc['id']}"),
@@ -1099,11 +1129,45 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             new_status = toggle_account_status(account_id, user_id)
             if new_status is not None:
                 status_text = _("activated") if new_status else _("deactivated")
-                await context.bot.answer_callback_query(query.id, _("Account has been {status}.").format(status=status_text))
+                await context.bot.answer_callback_query(query.id, _("Group creation has been {status}.").format(status=status_text))
                 # Refresh the menu
                 await account_detail_menu(update, context, account_id, query.message.message_id)
             else:
                 await context.bot.answer_callback_query(query.id, _("Could not change status."), show_alert=True)
+        elif action == "monitor":
+            account_id = int(action_parts[2])
+            log.info(f"User {user_id} toggled code monitor for account {account_id}.")
+            new_status = toggle_code_monitor(account_id, user_id)
+            if new_status is None:
+                await context.bot.answer_callback_query(query.id, _("Could not change status."), show_alert=True)
+            elif new_status:
+                details = get_user_details(user_id)
+                has_sub = bool(details and details.get('subscription'))
+                if not has_sub:
+                    await context.bot.answer_callback_query(
+                        query.id,
+                        _("Code monitor is enabled, but an active subscription is required to run it."),
+                        show_alert=True,
+                    )
+                else:
+                    code_monitor_manager.set_bot(context.bot)
+                    started = await code_monitor_manager.on_enabled(account_id)
+                    if started:
+                        await context.bot.answer_callback_query(
+                            query.id,
+                            _("Code monitor enabled. Login codes and security notices will be forwarded here."),
+                        )
+                    else:
+                        await context.bot.answer_callback_query(
+                            query.id,
+                            _("Code monitor is enabled, but the account could not connect yet. It will retry automatically."),
+                            show_alert=True,
+                        )
+                await account_detail_menu(update, context, account_id, query.message.message_id)
+            else:
+                await code_monitor_manager.stop_account(account_id)
+                await context.bot.answer_callback_query(query.id, _("Code monitor disabled."))
+                await account_detail_menu(update, context, account_id, query.message.message_id)
         elif action == "proxy":
             account_id = int(action_parts[2])
             log.info(f"User {user_id} reassigned proxy for account {account_id}.")
@@ -1125,6 +1189,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
         elif action == "deleteconfirm":
             account_id = int(action_parts[2])
             log.info(f"User {user_id} confirmed delete for account {account_id}.")
+            await code_monitor_manager.stop_account(account_id)
             if delete_managed_account(account_id, user_id):
                 await context.bot.answer_callback_query(query.id, _("✅ Account has been deleted."))
                 # This is a bit of code duplication, but it's safer than calling the handler
@@ -1136,7 +1201,11 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                     text = _("You have not added any accounts yet. Use /add_account to get started.")
                 else:
                     for acc in details['accounts']:
-                        status_icon = "🟢" if acc['is_active'] else "🔴"
+                        status_icon = "⚪️"
+                        if acc['is_active']:
+                            status_icon = "🟢"
+                        if acc.get('code_monitor_enabled'):
+                            status_icon = f"{status_icon}🔐"
                         button_text = f"{status_icon} {acc['phone']}"
                         buttons.append([InlineKeyboardButton(button_text, callback_data=f"mng_select_{acc['id']}")])
                 buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data='main_back')])

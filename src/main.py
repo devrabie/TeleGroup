@@ -14,6 +14,7 @@ from src.admin_handlers import admin_handlers_list
 from src.user_handlers import user_handlers_list
 from src.proxy_manager import update_proxies_from_url
 from src.automation import run_group_creation_cycle
+from src.code_monitor import code_monitor_manager, run_code_monitor_sync
 
 
 # --- Logging Setup ---
@@ -155,6 +156,7 @@ async def main() -> None:
         # Start background jobs
         application.job_queue.run_repeating(update_proxies_from_url, interval=86400, first=10)
         application.job_queue.run_repeating(run_group_creation_cycle, interval=300, first=20)
+        application.job_queue.run_repeating(run_code_monitor_sync, interval=60, first=25)
         await application.start()
         log.info("Bot and job queue started in webhook mode.")
 
@@ -168,6 +170,7 @@ async def main() -> None:
         # Add jobs to the queue. They will start when application.start() is called.
         application.job_queue.run_repeating(update_proxies_from_url, interval=86400, first=10)
         application.job_queue.run_repeating(run_group_creation_cycle, interval=300, first=20)
+        application.job_queue.run_repeating(run_code_monitor_sync, interval=60, first=25)
 
         # Start the job queue
         await application.start()
@@ -180,6 +183,7 @@ async def main() -> None:
 
         # Gracefully stop the bot
         log.info("Shutting down bot...")
+        await code_monitor_manager.stop_all()
         await application.updater.stop()
         await application.stop()
         await application.shutdown()

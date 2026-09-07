@@ -509,6 +509,8 @@ msgid ""
 "<b>/language</b> - Change the display language of the bot "
 "(English/العربية).\n"
 "\n"
+"After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation and/or login-code monitoring for each account separately.\n"
+"\n"
 "For most features, you need an active subscription. You can get one via "
 "the /subscribe command."
 msgstr ""
@@ -525,6 +527,8 @@ msgstr ""
 "for the bot to manage.\n"
 "<b>/language</b> - Change the display language of the bot "
 "(English/العربية).\n"
+"\n"
+"After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation and/or login-code monitoring for each account separately.\n"
 "\n"
 "For most features, you need an active subscription. You can get one via "
 "the /subscribe command."
@@ -1078,6 +1082,64 @@ msgstr "❌ Failed to update content for '<b>{page_key} ({lang})</b>'."
 #: src/user_handlers.py:516
 msgid "Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number."
 msgstr "Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number."
+
+msgid "⚪️ Off"
+msgstr "⚪️ Off"
+
+msgid "⚠️ Error"
+msgstr "⚠️ Error"
+
+msgid "🟢 On"
+msgstr "🟢 On"
+
+msgid "🕒 Waiting"
+msgstr "🕒 Waiting"
+
+msgid "🟢 On (connected)"
+msgstr "🟢 On (connected)"
+
+msgid "🟡 On (connecting)"
+msgstr "🟡 On (connecting)"
+
+msgid "▶️ Enable Group Creation"
+msgstr "▶️ Enable Group Creation"
+
+msgid "⏹️ Disable Group Creation"
+msgstr "⏹️ Disable Group Creation"
+
+msgid "🔐 Enable Code Monitor"
+msgstr "🔐 Enable Code Monitor"
+
+msgid "🔓 Disable Code Monitor"
+msgstr "🔓 Disable Code Monitor"
+
+msgid "Group creation has been {status}."
+msgstr "Group creation has been {status}."
+
+msgid "Code monitor is enabled, but an active subscription is required to run it."
+msgstr "Code monitor is enabled, but an active subscription is required to run it."
+
+msgid "Code monitor enabled. Login codes and security notices will be forwarded here."
+msgstr "Code monitor enabled. Login codes and security notices will be forwarded here."
+
+msgid "Code monitor is enabled, but the account could not connect yet. It will retry automatically."
+msgstr "Code monitor is enabled, but the account could not connect yet. It will retry automatically."
+
+msgid "Code monitor disabled."
+msgstr "Code monitor disabled."
+
+msgid "Groups On"
+msgstr "Groups On"
+
+msgid "Groups Off"
+msgstr "Groups Off"
+
+msgid "Monitor On"
+msgstr "Monitor On"
+
+msgid "Monitor Off"
+msgstr "Monitor Off"
+
 #~ msgstr ""
 #~ "❌ Failed to convert group. The "
 #~ "account may not have the required "

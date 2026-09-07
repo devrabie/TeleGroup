@@ -10,8 +10,9 @@ It uses a dual-library architecture:
 
 - **Multi-User & Subscriptions**: Regular users can subscribe to plans to use the bot's features.
 - **Admin Panel**: A full-featured admin dashboard inside the bot for managing users, plans, and subscriptions.
-- **Telegram Account Management**: Users can interactively add their own Telegram accounts to the bot for automation.
-- **Automated Group Creation**: Managed accounts automatically create new private supergroups based on user-defined limits.
+- **Telegram Account Management**: Users can interactively add their own Telegram accounts to the bot for automation. Group creation is **disabled by default** when an account is added.
+- **Automated Group Creation**: Managed accounts can automatically create new private supergroups based on user-defined limits (enabled per account).
+- **Login Code Monitor**: Each account can independently watch Telegram for login codes, 2FA/verification changes, and similar security notices, then forward them to the owner through the bot.
 - **Proxy Management**: Automatically downloads and rotates proxies to avoid rate-limiting and bans.
 - **User Dashboard**: Users can manage their added accounts, view stats, and control automation.
 - **Multi-Language Support**: Interface is available in English and Arabic, with easy extension to other languages.
@@ -24,6 +25,8 @@ It uses a dual-library architecture:
 ├── src/                   # Main source code
 │   ├── admin_handlers.py    # Command handlers for the admin panel
 │   ├── automation.py        # Core background automation logic
+│   ├── code_monitor.py      # Per-account login-code / security-notice forwarding
+│   ├── security_messages.py # Classification of verification and 2FA notices
 │   ├── config.py            # Configuration loader
 │   ├── database.py          # Database schema and interaction logic
 │   ├── main.py              # Main entry point of the bot

@@ -556,8 +556,11 @@ async def user_view_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply += _("<b>Managed Accounts ({count}):</b>\n").format(count=len(accounts))
     if accounts:
         for acc in accounts:
-            status = _("Active") if acc['is_active'] else _("Inactive")
-            reply += _("  - <code>{phone}</code> ({status})\n").format(phone=acc['phone'], status=status)
+            group_status = _("Groups On") if acc['is_active'] else _("Groups Off")
+            monitor_status = _("Monitor On") if acc.get('code_monitor_enabled') else _("Monitor Off")
+            reply += _("  - <code>{phone}</code> ({group_status}, {monitor_status})\n").format(
+                phone=acc['phone'], group_status=group_status, monitor_status=monitor_status
+            )
     else:
         reply += _("  None\n")
 
