@@ -507,7 +507,7 @@ msgid ""
 "<b>/language</b> - Change the display language of the bot "
 "(English/العربية).\n"
 "\n"
-"After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation and/or login-code monitoring for each account separately.\n"
+"After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation, login-code monitoring, or two-step verification for each account separately.\n"
 "\n"
 "For most features, you need an active subscription. You can get one via "
 "the /subscribe command."
@@ -524,7 +524,7 @@ msgstr ""
 "البوت.\n"
 "<b>/language</b> - تغيير لغة عرض البوت (English/العربية).\n"
 "\n"
-"بعد إضافة حساب، يكون إنشاء المجموعات <b>متوقفاً</b> افتراضياً. افتح /my_accounts لتفعيل إنشاء المجموعات و/أو مراقبة أكواد التحقق لكل حساب على حدة.\n"
+"بعد إضافة حساب، يكون إنشاء المجموعات <b>متوقفاً</b> افتراضياً. افتح /my_accounts لتفعيل إنشاء المجموعات و/أو مراقبة أكواد التحقق أو رمز التحقق بخطوتين لكل حساب على حدة.\n"
 "\n"
 "لاستخدام معظم الميزات، تحتاج إلى اشتراك نشط. يمكنك الحصول عليه عبر الأمر "
 "/subscribe."
@@ -1141,4 +1141,98 @@ msgstr "⚠️ تعذر تشغيل مراقبة الأكواد للحساب <cod
 
 msgid "⚠️ Code monitor failed for <code>{phone}</code>."
 msgstr "⚠️ فشلت مراقبة الأكواد للحساب <code>{phone}</code>."
+
+msgid "🔑 Two-Step Verification"
+msgstr "🔑 رمز التحقق بخطوتين"
+
+msgid "Checking two-step verification status for <code>{phone}</code>..."
+msgstr "جارٍ التحقق من حالة التحقق بخطوتين للحساب <code>{phone}</code>..."
+
+msgid ""
+"<b>Two-Step Verification</b> is already enabled for <code>{phone}</code>.{hint_line}\n\n"
+"Send the <b>current</b> password to change it, or tap Cancel."
+msgstr ""
+"<b>التحقق بخطوتين</b> مفعّل مسبقاً للحساب <code>{phone}</code>.{hint_line}\n\n"
+"أرسل كلمة المرور <b>الحالية</b> لتغييرها، أو اضغط إلغاء."
+
+msgid ""
+"\n"
+"Current hint: <code>{hint}</code>"
+msgstr ""
+"\n"
+"التلميح الحالي: <code>{hint}</code>"
+
+msgid ""
+"<b>Two-Step Verification</b> is not enabled for <code>{phone}</code>.\n\n"
+"Send the new password you want to set (at least 4 characters)."
+msgstr ""
+"<b>التحقق بخطوتين</b> غير مفعّل للحساب <code>{phone}</code>.\n\n"
+"أرسل كلمة المرور الجديدة التي تريد تعيينها (4 أحرف على الأقل)."
+
+msgid "Please send the same password again to confirm."
+msgstr "أرسل كلمة المرور نفسها مرة أخرى للتأكيد."
+
+msgid "Please send the same new password again to confirm."
+msgstr "أرسل كلمة المرور الجديدة نفسها مرة أخرى للتأكيد."
+
+msgid "The passwords do not match. Please send the new password again."
+msgstr "كلمتا المرور غير متطابقتين. أرسل كلمة المرور الجديدة مرة أخرى."
+
+msgid "Send the <b>new</b> password (at least 4 characters)."
+msgstr "أرسل كلمة المرور <b>الجديدة</b> (4 أحرف على الأقل)."
+
+msgid "Updating two-step verification, please wait..."
+msgstr "جارٍ تحديث التحقق بخطوتين، الرجاء الانتظار..."
+
+msgid "✅ Two-step verification password updated for <code>{phone}</code>."
+msgstr "✅ تم تحديث كلمة مرور التحقق بخطوتين للحساب <code>{phone}</code>."
+
+msgid "✅ Two-step verification password enabled for <code>{phone}</code>."
+msgstr "✅ تم تفعيل كلمة مرور التحقق بخطوتين للحساب <code>{phone}</code>."
+
+msgid "Two-step verification update cancelled."
+msgstr "تم إلغاء تحديث التحقق بخطوتين."
+
+msgid "Please send a non-empty password."
+msgstr "أرسل كلمة مرور غير فارغة."
+
+msgid "The password must be at least 4 characters."
+msgstr "يجب أن تتكون كلمة المرور من 4 أحرف على الأقل."
+
+msgid "The password is too long. Please choose a shorter one."
+msgstr "كلمة المرور طويلة جداً. اختر كلمة أقصر."
+
+msgid "That password is not valid. Please send it as a single line of text."
+msgstr "كلمة المرور غير صالحة. أرسلها في سطر واحد."
+
+msgid "The current password is incorrect. Please try again."
+msgstr "كلمة المرور الحالية غير صحيحة. حاول مرة أخرى."
+
+msgid "Telegram temporarily blocked changing this password. Please try again later."
+msgstr "تليجرام منع تغيير كلمة المرور مؤقتاً. حاول لاحقاً."
+
+msgid "Telegram asked us to wait. Please try again in a few minutes."
+msgstr "طلب تليجرام الانتظار. حاول بعد بضع دقائق."
+
+msgid "Telegram asked us to wait {seconds} seconds. Please try again later."
+msgstr "طلب تليجرام الانتظار {seconds} ثانية. حاول لاحقاً."
+
+msgid "The account session is invalid or revoked. Please delete and re-add the account."
+msgstr "جلسة الحساب غير صالحة أو تم إلغاؤها. احذف الحساب وأضفه من جديد."
+
+msgid "Two-step verification is already enabled. Send the current password to change it."
+msgstr "التحقق بخطوتين مفعّل مسبقاً. أرسل كلمة المرور الحالية لتغييرها."
+
+msgid "Two-step verification is not enabled on this account yet."
+msgstr "التحقق بخطوتين غير مفعّل على هذا الحساب بعد."
+
+msgid "This account already has a password. Send the current password first."
+msgstr "هذا الحساب لديه كلمة مرور مسبقاً. أرسل كلمة المرور الحالية أولاً."
+
+msgid "Failed to connect to Telegram. Please try again later."
+msgstr "تعذر الاتصال بتليجرام. حاول لاحقاً."
+
+msgid "Could not update two-step verification. Please try again later."
+msgstr "تعذر تحديث التحقق بخطوتين. حاول لاحقاً."
+
 

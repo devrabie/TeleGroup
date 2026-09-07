@@ -229,6 +229,30 @@ class ManagedAccountDefaultsTests(unittest.TestCase):
                 columns = [row[1] for row in conn.execute("PRAGMA table_info(managed_accounts)")]
         self.assertIn("code_monitor_enabled", columns)
 
+    def test_user_owns_account(self):
+        self.database.add_managed_account(111, "+15550003333", "session-string", self.profile["id"])
+        acc_id = self.database.get_user_details(111)["accounts"][0]["id"]
+        self.assertTrue(self.database.user_owns_account(acc_id, 111))
+        self.assertFalse(self.database.user_owns_account(acc_id, 999))
+        self.assertFalse(self.database.user_owns_account(999999, 111))
+
+
+class TwoStepPasswordValidationTests(unittest.IsolatedAsyncioTestCase):
+    def test_validate_two_step_password(self):
+        from src.two_step import validate_two_step_password
+        self.assertEqual(validate_two_step_password(""), "empty")
+        self.assertEqual(validate_two_step_password(None), "empty")
+        self.assertEqual(validate_two_step_password("abc"), "too_short")
+        self.assertEqual(validate_two_step_password("abcd"), None)
+        self.assertEqual(validate_two_step_password("pass\nword"), "invalid")
+        self.assertEqual(validate_two_step_password("x" * 257), "too_long")
+
+    async def test_apply_rejects_short_password_without_connecting(self):
+        from src.two_step import TwoStepError, apply_two_step_password
+        with self.assertRaises(TwoStepError) as ctx:
+            await apply_two_step_password(1, "ab")
+        self.assertEqual(ctx.exception.code, "too_short")
+
 
 class ProxyParseTests(unittest.TestCase):
     def test_build_proxy_dict_parses_host_port_user_pass(self):

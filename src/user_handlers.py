@@ -30,10 +30,17 @@ from src.database import (
     delete_managed_account, toggle_account_status, toggle_code_monitor, reassign_proxy, get_account_stats,
     set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
     update_user_details, mark_proxy_as_bad, get_account_details, get_info_page_content,
-    get_user_language, get_random_device_profile, get_device_profile_by_account_id
+    get_user_language, get_random_device_profile, get_device_profile_by_account_id,
+    user_owns_account,
 )
 from src.translation import get_translation_func_for_user
 from src.code_monitor import code_monitor_manager
+from src.two_step import (
+    TwoStepError,
+    apply_two_step_password,
+    get_two_step_status,
+    validate_two_step_password,
+)
 from pyrogram.enums import ChatType, ChatMemberStatus
 
 log = logging.getLogger(__name__)
@@ -130,7 +137,7 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "<b>/my_accounts</b> - View and manage your connected Telegram accounts.\n"
         "<b>/add_account</b> - Start the process of adding a new Telegram account for the bot to manage.\n"
         "<b>/language</b> - Change the display language of the bot (English/العربية).\n\n"
-        "After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation and/or login-code monitoring for each account separately.\n\n"
+        "After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation, login-code monitoring, or two-step verification for each account separately.\n\n"
         "For most features, you need an active subscription. You can get one via the /subscribe command."
     )
 
@@ -659,6 +666,285 @@ add_account_conv_handler = ConversationHandler(
     per_message=False,
 )
 
+# --- Two-Step Verification Conversation ---
+TWO_STEP_NEW, TWO_STEP_CONFIRM, TWO_STEP_CURRENT, TWO_STEP_NEW_CHANGE, TWO_STEP_CONFIRM_CHANGE = range(10, 15)
+
+
+def _clear_two_step_data(context: ContextTypes.DEFAULT_TYPE) -> None:
+    for key in list(context.user_data.keys()):
+        if str(key).startswith("two_step_"):
+            context.user_data.pop(key, None)
+
+
+def _two_step_error_text(code: str, _, detail: str | None = None) -> str:
+    messages = {
+        "empty": _("Please send a non-empty password."),
+        "too_short": _("The password must be at least 4 characters."),
+        "too_long": _("The password is too long. Please choose a shorter one."),
+        "invalid": _("That password is not valid. Please send it as a single line of text."),
+        "wrong_current": _("The current password is incorrect. Please try again."),
+        "too_fresh": _("Telegram temporarily blocked changing this password. Please try again later."),
+        "flood_wait": _("Telegram asked us to wait. Please try again in a few minutes."),
+        "session_invalid": _("The account session is invalid or revoked. Please delete and re-add the account."),
+        "already_enabled": _("Two-step verification is already enabled. Send the current password to change it."),
+        "not_enabled": _("Two-step verification is not enabled on this account yet."),
+        "current_required": _("This account already has a password. Send the current password first."),
+        "account_unavailable": _("Error: Account not found or you don't have permission."),
+        "connect_failed": _("Failed to connect to Telegram. Please try again later."),
+    }
+    text = messages.get(code, _("Could not update two-step verification. Please try again later."))
+    if code == "flood_wait" and detail:
+        text = _("Telegram asked us to wait {seconds} seconds. Please try again later.").format(seconds=detail)
+    return text
+
+
+def _two_step_back_markup(account_id: int, _):
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")]]
+    )
+
+
+async def two_step_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+
+    try:
+        account_id = int(query.data.split("_")[2])
+    except (IndexError, ValueError):
+        await query.edit_message_text(_("Error: Account not found or you don't have permission."))
+        return ConversationHandler.END
+
+    if not user_owns_account(account_id, user_id):
+        await query.edit_message_text(_("Error: Account not found or you don't have permission."))
+        return ConversationHandler.END
+
+    acc = get_account_details(account_id)
+    phone = acc["phone"] if acc else "?"
+    _clear_two_step_data(context)
+    context.user_data["two_step_account_id"] = account_id
+    context.user_data["two_step_phone"] = phone
+
+    cancel_markup = InlineKeyboardMarkup(
+        [[InlineKeyboardButton(_("❌ Cancel"), callback_data="cancel_2fa")]]
+    )
+    await query.edit_message_text(
+        _("Checking two-step verification status for <code>{phone}</code>...").format(phone=phone),
+        parse_mode=ParseMode.HTML,
+    )
+
+    try:
+        status = await get_two_step_status(account_id)
+    except TwoStepError as e:
+        await query.edit_message_text(
+            _two_step_error_text(e.code, _, e.detail),
+            reply_markup=_two_step_back_markup(account_id, _),
+        )
+        _clear_two_step_data(context)
+        return ConversationHandler.END
+
+    context.user_data["two_step_has_password"] = status["has_password"]
+    hint = status.get("hint") or ""
+
+    if status["has_password"]:
+        hint_line = _("\nCurrent hint: <code>{hint}</code>").format(hint=hint) if hint else ""
+        await query.edit_message_text(
+            _(
+                "<b>Two-Step Verification</b> is already enabled for <code>{phone}</code>.{hint_line}\n\n"
+                "Send the <b>current</b> password to change it, or tap Cancel."
+            ).format(phone=phone, hint_line=hint_line),
+            reply_markup=cancel_markup,
+            parse_mode=ParseMode.HTML,
+        )
+        return TWO_STEP_CURRENT
+
+    await query.edit_message_text(
+        _(
+            "<b>Two-Step Verification</b> is not enabled for <code>{phone}</code>.\n\n"
+            "Send the new password you want to set (at least 4 characters)."
+        ).format(phone=phone),
+        reply_markup=cancel_markup,
+        parse_mode=ParseMode.HTML,
+    )
+    return TWO_STEP_NEW
+
+
+async def two_step_receive_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    password = update.message.text or ""
+    error = validate_two_step_password(password)
+    if error:
+        await update.message.reply_text(_two_step_error_text(error, _))
+        return TWO_STEP_NEW
+    context.user_data["two_step_new"] = password
+    await update.message.reply_text(
+        _("Please send the same password again to confirm."),
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton(_("❌ Cancel"), callback_data="cancel_2fa")]]
+        ),
+    )
+    return TWO_STEP_CONFIRM
+
+
+async def two_step_receive_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    confirm = update.message.text or ""
+    expected = context.user_data.get("two_step_new")
+    if confirm != expected:
+        context.user_data.pop("two_step_new", None)
+        await update.message.reply_text(
+            _("The passwords do not match. Please send the new password again.")
+        )
+        return TWO_STEP_NEW
+    return await _two_step_apply_and_finish(update, context, current_password=None)
+
+
+async def two_step_receive_current(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    current = update.message.text or ""
+    if current == "":
+        await update.message.reply_text(_("Please send a non-empty password."))
+        return TWO_STEP_CURRENT
+    context.user_data["two_step_current"] = current
+    await update.message.reply_text(
+        _("Send the <b>new</b> password (at least 4 characters)."),
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton(_("❌ Cancel"), callback_data="cancel_2fa")]]
+        ),
+    )
+    return TWO_STEP_NEW_CHANGE
+
+
+async def two_step_receive_new_change(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    password = update.message.text or ""
+    error = validate_two_step_password(password)
+    if error:
+        await update.message.reply_text(_two_step_error_text(error, _))
+        return TWO_STEP_NEW_CHANGE
+    context.user_data["two_step_new"] = password
+    await update.message.reply_text(_("Please send the same new password again to confirm."))
+    return TWO_STEP_CONFIRM_CHANGE
+
+
+async def two_step_receive_confirm_change(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    confirm = update.message.text or ""
+    expected = context.user_data.get("two_step_new")
+    if confirm != expected:
+        context.user_data.pop("two_step_new", None)
+        await update.message.reply_text(
+            _("The passwords do not match. Please send the new password again.")
+        )
+        return TWO_STEP_NEW_CHANGE
+    return await _two_step_apply_and_finish(
+        update, context, current_password=context.user_data.get("two_step_current")
+    )
+
+
+async def _two_step_apply_and_finish(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, current_password: str | None
+) -> int:
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    account_id = context.user_data.get("two_step_account_id")
+    new_password = context.user_data.get("two_step_new")
+    phone = context.user_data.get("two_step_phone") or "?"
+
+    if not account_id or not new_password:
+        await update.message.reply_text(_("Could not update two-step verification. Please try again later."))
+        _clear_two_step_data(context)
+        return ConversationHandler.END
+
+    await update.message.reply_text(_("Updating two-step verification, please wait..."))
+    try:
+        action = await apply_two_step_password(
+            account_id, new_password, current_password=current_password
+        )
+    except TwoStepError as e:
+        if e.code == "wrong_current":
+            context.user_data.pop("two_step_current", None)
+            context.user_data.pop("two_step_new", None)
+            await update.message.reply_text(_two_step_error_text(e.code, _, e.detail))
+            return TWO_STEP_CURRENT
+        await update.message.reply_text(
+            _two_step_error_text(e.code, _, e.detail),
+            reply_markup=_two_step_back_markup(account_id, _),
+        )
+        _clear_two_step_data(context)
+        return ConversationHandler.END
+
+    if action == "changed":
+        text = _("✅ Two-step verification password updated for <code>{phone}</code>.").format(phone=phone)
+    else:
+        text = _("✅ Two-step verification password enabled for <code>{phone}</code>.").format(phone=phone)
+
+    await update.message.reply_text(
+        text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=_two_step_back_markup(account_id, _),
+    )
+    _clear_two_step_data(context)
+    return ConversationHandler.END
+
+
+async def two_step_timeout(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    _clear_two_step_data(context)
+    try:
+        chat = update.effective_chat if update else None
+        user = update.effective_user if update else None
+        if chat and user:
+            _ = get_translation_func_for_user(user.id)
+            await context.bot.send_message(chat.id, _("Two-step verification update cancelled."))
+    except Exception:
+        log.debug("Could not notify user about two-step conversation timeout.", exc_info=True)
+    return ConversationHandler.END
+
+
+async def cancel_two_step(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    account_id = context.user_data.get("two_step_account_id")
+    _clear_two_step_data(context)
+
+    query = update.callback_query
+    text = _("Two-step verification update cancelled.")
+    markup = _two_step_back_markup(account_id, _) if account_id else None
+    if query:
+        await query.answer()
+        await query.edit_message_text(text, reply_markup=markup)
+    else:
+        await update.message.reply_text(text, reply_markup=markup)
+    return ConversationHandler.END
+
+
+two_step_conv_handler = ConversationHandler(
+    entry_points=[
+        CallbackQueryHandler(two_step_start, pattern=r"^mng_2fa_\d+$"),
+    ],
+    states={
+        TWO_STEP_NEW: [MessageHandler(filters.TEXT & ~filters.COMMAND, two_step_receive_new)],
+        TWO_STEP_CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, two_step_receive_confirm)],
+        TWO_STEP_CURRENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, two_step_receive_current)],
+        TWO_STEP_NEW_CHANGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, two_step_receive_new_change)],
+        TWO_STEP_CONFIRM_CHANGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, two_step_receive_confirm_change)],
+        ConversationHandler.TIMEOUT: [MessageHandler(filters.ALL, two_step_timeout)],
+    },
+    fallbacks=[
+        CommandHandler("cancel", cancel_two_step),
+        CallbackQueryHandler(cancel_two_step, pattern="^cancel_2fa$"),
+    ],
+    conversation_timeout=300,
+    per_message=False,
+)
+
 # --- User Dashboard ---
 
 async def my_accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -794,6 +1080,12 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
             InlineKeyboardButton(
                 _("🔐 Enable Code Monitor") if not monitor_on else _("🔓 Disable Code Monitor"),
                 callback_data=f"mng_monitor_{acc['id']}"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                _("🔑 Two-Step Verification"),
+                callback_data=f"mng_2fa_{acc['id']}"
             ),
         ],
         [
@@ -1234,6 +1526,7 @@ user_handlers_list = [
     CommandHandler("language", language_handler),
     CallbackQueryHandler(set_language_callback, pattern="^set_lang_"),
     CommandHandler("my_accounts", my_accounts_handler),
+    two_step_conv_handler,
     CallbackQueryHandler(manage_account_callback, pattern="^mng_"),
     CallbackQueryHandler(info_page_callback, pattern="^info_"),
     CallbackQueryHandler(main_menu_callback, pattern="^main_"),

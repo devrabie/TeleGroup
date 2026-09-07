@@ -941,6 +941,24 @@ def get_account_runtime_details(account_id: int):
         log.error(f"Failed to get runtime details for account {account_id}: {e}")
         return None
 
+def user_owns_account(account_id: int, telegram_user_id: int) -> bool:
+    """Return True if the managed account exists, is not deleted, and belongs to the user."""
+    sql = """
+        SELECT 1 FROM managed_accounts
+        WHERE id = ? AND deleted_at IS NULL
+          AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
+        LIMIT 1
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (account_id, telegram_user_id))
+            return cursor.fetchone() is not None
+    except sqlite3.Error as e:
+        log.error(f"Failed to check ownership of account {account_id} for user {telegram_user_id}: {e}")
+        return False
+
+
 def get_groups_created_today(account_id: int):
     """Counts the number of groups created by an account in the last 24 hours."""
     sql = """
