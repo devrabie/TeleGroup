@@ -475,6 +475,12 @@ msgstr "👤 حساباتي"
 msgid "➕ Add Account"
 msgstr "➕ إضافة حساب"
 
+msgid "👥 Team"
+msgstr "👥 الفريق"
+
+msgid "🔗 Invite to add numbers"
+msgstr "🔗 رابط إضافة الأرقام"
+
 #: src/user_handlers.py:69
 msgid "🌐 Language"
 msgstr "🌐 اللغة"
@@ -507,6 +513,10 @@ msgid ""
 "<b>/language</b> - Change the display language of the bot "
 "(English/العربية).\n"
 "\n"
+"After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation, login-code monitoring, or two-step verification for each account separately.\n"
+"\n"
+"From the main menu you can add a <b>manager</b> who can view and manage your accounts, and share an <b>add-number invite</b>. Anyone who opens that link can sign in a phone number; it is added to your list (not theirs) and you get a notification.\n"
+"\n"
 "For most features, you need an active subscription. You can get one via "
 "the /subscribe command."
 msgstr ""
@@ -521,6 +531,10 @@ msgstr ""
 "<b>/add_account</b> - بدء عملية إضافة حساب تليجرام جديد لإدارته عبر "
 "البوت.\n"
 "<b>/language</b> - تغيير لغة عرض البوت (English/العربية).\n"
+"\n"
+"بعد إضافة حساب، يكون إنشاء المجموعات <b>متوقفاً</b> افتراضياً. افتح /my_accounts لتفعيل إنشاء المجموعات و/أو مراقبة أكواد التحقق أو رمز التحقق بخطوتين لكل حساب على حدة.\n"
+"\n"
+"من القائمة الرئيسية يمكنك إضافة <b>مدير</b> يرى ويدير حساباتك، ومشاركة <b>رابط إضافة رقم</b>. أي شخص يفتح الرابط يسجّل رقم هاتف فيُضاف إلى قائمتك وليس إلى قائمته، ويصلك إشعار.\n"
 "\n"
 "لاستخدام معظم الميزات، تحتاج إلى اشتراك نشط. يمكنك الحصول عليه عبر الأمر "
 "/subscribe."
@@ -1004,3 +1018,614 @@ msgstr "❌ فشل تحديث المحتوى لـ '<b>{page_key} ({lang})</b>'."
 #: src/user_handlers.py:516
 msgid "Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number."
 msgstr "لقد حظر تليجرام محاولة تسجيل الدخول هذه بواسطة اختبار CAPTCHA. قد يكون هذا بسبب رقم الهاتف أو عنوان IP الخاص بالخادم. يرجى المحاولة مرة أخرى لاحقًا أو باستخدام رقم هاتف مختلف."
+
+msgid ""
+"✅ Account added successfully!\n\n"
+"Group creation is <b>disabled</b> by default. Open /my_accounts to enable group creation or login-code monitoring for this account."
+msgstr ""
+"✅ تمت إضافة الحساب بنجاح!\n\n"
+"إنشاء المجموعات <b>معطّل</b> افتراضياً. افتح /my_accounts لتفعيل إنشاء المجموعات أو مراقبة أكواد التحقق لهذا الحساب."
+
+msgid "⚪️ Off"
+msgstr "⚪️ متوقف"
+
+msgid "⚠️ Error"
+msgstr "⚠️ خطأ"
+
+msgid "🟢 On"
+msgstr "🟢 يعمل"
+
+msgid "🕒 Waiting"
+msgstr "🕒 في الانتظار"
+
+msgid "🟢 On (connected)"
+msgstr "🟢 يعمل (متصل)"
+
+msgid "🟡 On (connecting)"
+msgstr "🟡 يعمل (جارٍ الاتصال)"
+
+msgid "<b>Account:</b> <code>{phone}</code>"
+msgstr "<b>الحساب:</b> <code>{phone}</code>"
+
+msgid ""
+"\n"
+"<b>Group Creation:</b> {status}"
+msgstr ""
+"\n"
+"<b>إنشاء المجموعات:</b> {status}"
+
+msgid ""
+"\n"
+"<b>Code Monitor:</b> {status}"
+msgstr ""
+"\n"
+"<b>مراقبة الأكواد:</b> {status}"
+
+msgid "▶️ Enable Group Creation"
+msgstr "▶️ تفعيل إنشاء المجموعات"
+
+msgid "⏹️ Disable Group Creation"
+msgstr "⏹️ إيقاف إنشاء المجموعات"
+
+msgid "🔐 Enable Code Monitor"
+msgstr "🔐 تفعيل مراقبة الأكواد"
+
+msgid "🔓 Disable Code Monitor"
+msgstr "🔓 إيقاف مراقبة الأكواد"
+
+msgid "Group creation has been {status}."
+msgstr "تم {status} إنشاء المجموعات."
+
+msgid "Code monitor is enabled, but an active subscription is required to run it."
+msgstr "تم تفعيل مراقبة الأكواد، لكن يلزم اشتراك نشط لتشغيلها."
+
+msgid "Code monitor enabled. Login codes and security notices will be forwarded here."
+msgstr "تم تفعيل مراقبة الأكواد. سيتم إرسال أكواد الدخول والتنبيهات الأمنية إلى هنا."
+
+msgid "Code monitor is enabled, but the account could not connect yet. It will retry automatically."
+msgstr "تم تفعيل مراقبة الأكواد، لكن تعذر الاتصال بالحساب الآن. ستتم إعادة المحاولة تلقائياً."
+
+msgid "Code monitor disabled."
+msgstr "تم إيقاف مراقبة الأكواد."
+
+msgid "Groups On"
+msgstr "المجموعات تعمل"
+
+msgid "Groups Off"
+msgstr "المجموعات متوقفة"
+
+msgid "Monitor On"
+msgstr "المراقبة تعمل"
+
+msgid "Monitor Off"
+msgstr "المراقبة متوقفة"
+
+msgid "  - <code>{phone}</code> ({group_status}, {monitor_status})\n"
+msgstr "  - <code>{phone}</code> ({group_status}، {monitor_status})\n"
+
+msgid "Login / verification code"
+msgstr "رمز دخول / تحقق"
+
+msgid "Two-step verification change"
+msgstr "تغيير التحقق بخطوتين"
+
+msgid "New login / new device"
+msgstr "تسجيل دخول جديد / جهاز جديد"
+
+msgid "Telegram security notice"
+msgstr "إشعار أمني من تليجرام"
+
+msgid "Verification notice"
+msgstr "إشعار تحقق"
+
+msgid "Security notice"
+msgstr "إشعار أمني"
+
+msgid "🔐 <b>Security alert</b>\n"
+msgstr "🔐 <b>تنبيه أمني</b>\n"
+
+msgid "Account: <code>{phone}</code>\n"
+msgstr "الحساب: <code>{phone}</code>\n"
+
+msgid "Source: {source}\n"
+msgstr "المصدر: {source}\n"
+
+msgid "Type: {kind}\n"
+msgstr "النوع: {kind}\n"
+
+msgid "Code: {codes}\n"
+msgstr "الرمز: {codes}\n"
+
+msgid ""
+"\n"
+"{body}"
+msgstr ""
+"\n"
+"{body}"
+
+msgid "(no text)"
+msgstr "(لا يوجد نص)"
+
+msgid "⚠️ Code monitor could not start for <code>{phone}</code> because the session is invalid or revoked. Please delete and re-add the account."
+msgstr "⚠️ تعذر تشغيل مراقبة الأكواد للحساب <code>{phone}</code> لأن الجلسة غير صالحة أو تم إلغاؤها. يرجى حذف الحساب وإضافته من جديد."
+
+msgid "⚠️ Code monitor failed for <code>{phone}</code>."
+msgstr "⚠️ فشلت مراقبة الأكواد للحساب <code>{phone}</code>."
+
+msgid "🔑 Two-Step Verification"
+msgstr "🔑 رمز التحقق بخطوتين"
+
+msgid "Checking two-step verification status for <code>{phone}</code>..."
+msgstr "جارٍ التحقق من حالة التحقق بخطوتين للحساب <code>{phone}</code>..."
+
+msgid ""
+"<b>Two-Step Verification</b> is already enabled for <code>{phone}</code>.{hint_line}\n\n"
+"Send the <b>current</b> password to change it, or tap Cancel."
+msgstr ""
+"<b>التحقق بخطوتين</b> مفعّل مسبقاً للحساب <code>{phone}</code>.{hint_line}\n\n"
+"أرسل كلمة المرور <b>الحالية</b> لتغييرها، أو اضغط إلغاء."
+
+msgid ""
+"\n"
+"Current hint: <code>{hint}</code>"
+msgstr ""
+"\n"
+"التلميح الحالي: <code>{hint}</code>"
+
+msgid ""
+"<b>Two-Step Verification</b> is not enabled for <code>{phone}</code>.\n\n"
+"Send the new password you want to set (at least 4 characters)."
+msgstr ""
+"<b>التحقق بخطوتين</b> غير مفعّل للحساب <code>{phone}</code>.\n\n"
+"أرسل كلمة المرور الجديدة التي تريد تعيينها (4 أحرف على الأقل)."
+
+msgid "Please send the same password again to confirm."
+msgstr "أرسل كلمة المرور نفسها مرة أخرى للتأكيد."
+
+msgid "Please send the same new password again to confirm."
+msgstr "أرسل كلمة المرور الجديدة نفسها مرة أخرى للتأكيد."
+
+msgid "The passwords do not match. Please send the new password again."
+msgstr "كلمتا المرور غير متطابقتين. أرسل كلمة المرور الجديدة مرة أخرى."
+
+msgid "Send the <b>new</b> password (at least 4 characters)."
+msgstr "أرسل كلمة المرور <b>الجديدة</b> (4 أحرف على الأقل)."
+
+msgid "Updating two-step verification, please wait..."
+msgstr "جارٍ تحديث التحقق بخطوتين، الرجاء الانتظار..."
+
+msgid "✅ Two-step verification password updated for <code>{phone}</code>."
+msgstr "✅ تم تحديث كلمة مرور التحقق بخطوتين للحساب <code>{phone}</code>."
+
+msgid "✅ Two-step verification password enabled for <code>{phone}</code>."
+msgstr "✅ تم تفعيل كلمة مرور التحقق بخطوتين للحساب <code>{phone}</code>."
+
+msgid "Two-step verification update cancelled."
+msgstr "تم إلغاء تحديث التحقق بخطوتين."
+
+msgid "Please send a non-empty password."
+msgstr "أرسل كلمة مرور غير فارغة."
+
+msgid "The password must be at least 4 characters."
+msgstr "يجب أن تتكون كلمة المرور من 4 أحرف على الأقل."
+
+msgid "The password is too long. Please choose a shorter one."
+msgstr "كلمة المرور طويلة جداً. اختر كلمة أقصر."
+
+msgid "That password is not valid. Please send it as a single line of text."
+msgstr "كلمة المرور غير صالحة. أرسلها في سطر واحد."
+
+msgid "The current password is incorrect. Please try again."
+msgstr "كلمة المرور الحالية غير صحيحة. حاول مرة أخرى."
+
+msgid "Telegram temporarily blocked changing this password. Please try again later."
+msgstr "تليجرام منع تغيير كلمة المرور مؤقتاً. حاول لاحقاً."
+
+msgid "Telegram asked us to wait. Please try again in a few minutes."
+msgstr "طلب تليجرام الانتظار. حاول بعد بضع دقائق."
+
+msgid "Telegram asked us to wait {seconds} seconds. Please try again later."
+msgstr "طلب تليجرام الانتظار {seconds} ثانية. حاول لاحقاً."
+
+msgid "The account session is invalid or revoked. Please delete and re-add the account."
+msgstr "جلسة الحساب غير صالحة أو تم إلغاؤها. احذف الحساب وأضفه من جديد."
+
+msgid "Two-step verification is already enabled. Send the current password to change it."
+msgstr "التحقق بخطوتين مفعّل مسبقاً. أرسل كلمة المرور الحالية لتغييرها."
+
+msgid "Two-step verification is not enabled on this account yet."
+msgstr "التحقق بخطوتين غير مفعّل على هذا الحساب بعد."
+
+msgid "This account already has a password. Send the current password first."
+msgstr "هذا الحساب لديه كلمة مرور مسبقاً. أرسل كلمة المرور الحالية أولاً."
+
+msgid "Failed to connect to Telegram. Please try again later."
+msgstr "تعذر الاتصال بتليجرام. حاول لاحقاً."
+
+msgid "Could not update two-step verification. Please try again later."
+msgstr "تعذر تحديث التحقق بخطوتين. حاول لاحقاً."
+
+msgid "Language changed successfully."
+msgstr "تم تغيير اللغة بنجاح."
+
+msgid "✅ Proxy updated."
+msgstr "✅ تم تغيير البروكسي."
+
+msgid "No available proxies."
+msgstr "لا توجد بروكسيات متاحة."
+
+msgid "Could not update the proxy."
+msgstr "تعذر تحديث البروكسي."
+
+msgid ""
+"\n"
+"<b>Proxy:</b> <code>{proxy}</code>"
+msgstr ""
+"\n"
+"<b>البروكسي:</b> <code>{proxy}</code>"
+
+msgid "👤 View Profile"
+msgstr "👤 الملف الشخصي"
+
+msgid "💬 Private Chats"
+msgstr "💬 المحادثات الخاصة"
+
+msgid "📊 Group Report"
+msgstr "📊 تقرير المجموعات"
+
+msgid "👤 <b>{name}</b>"
+msgstr "👤 <b>{name}</b>"
+
+msgid "🔗 @{username}"
+msgstr "🔗 @{username}"
+
+msgid "📱 <code>{phone}</code>"
+msgstr "📱 <code>{phone}</code>"
+
+msgid "🆔 <code>{user_id}</code>"
+msgstr "🆔 <code>{user_id}</code>"
+
+msgid "⭐ Telegram Premium"
+msgstr "⭐ تيليجرام بريميوم"
+
+msgid "🌐 Language: {lang}"
+msgstr "🌐 اللغة: {lang}"
+
+msgid "🎭 {status}"
+msgstr "🎭 {status}"
+
+msgid "📝 {bio}"
+msgstr "📝 {bio}"
+
+msgid "✨ <b>Collectible usernames</b>"
+msgstr "✨ <b>أسماء المستخدم القابلة للجمع</b>"
+
+msgid "🎁 <b>Gifts & collectibles</b> ({count})"
+msgstr "🎁 <b>الهدايا والمقتنيات</b> ({count})"
+
+msgid "No gifts or collectibles on this profile."
+msgstr "لا توجد هدايا أو مقتنيات على هذا الملف."
+
+msgid "Could not load gifts right now."
+msgstr "تعذر تحميل الهدايا الآن."
+
+msgid "…and {count} more"
+msgstr "…و{count} إضافية"
+
+msgid "🔄 Refresh"
+msgstr "🔄 تحديث"
+
+msgid "Loading profile…"
+msgstr "جارٍ تحميل الملف الشخصي…"
+
+msgid "Loading private chats…"
+msgstr "جارٍ تحميل المحادثات الخاصة…"
+
+msgid "Opening conversation…"
+msgstr "جارٍ فتح المحادثة…"
+
+msgid "💬 <b>Private chats</b> · {name}\n{count} conversations · page {page}/{pages}"
+msgstr "💬 <b>المحادثات الخاصة</b> · {name}\n{count} محادثة · صفحة {page}/{pages}"
+
+msgid "This account has no private conversations."
+msgstr "لا توجد محادثات خاصة على هذا الحساب."
+
+msgid "💾 Saved Messages"
+msgstr "💾 الرسائل المحفوظة"
+
+msgid "No messages in this conversation."
+msgstr "لا توجد رسائل في هذه المحادثة."
+
+msgid "💬 <b>{name}</b>\n{subtitle}\n"
+msgstr "💬 <b>{name}</b>\n{subtitle}\n"
+
+msgid "You"
+msgstr "أنت"
+
+msgid "📷 Photo"
+msgstr "📷 صورة"
+
+msgid "🎬 Video"
+msgstr "🎬 فيديو"
+
+msgid "🎤 Voice"
+msgstr "🎤 رسالة صوتية"
+
+msgid "🎧 Audio"
+msgstr "🎧 صوت"
+
+msgid "📄 File"
+msgstr "📄 ملف"
+
+msgid "😊 Sticker"
+msgstr "😊 ملصق"
+
+msgid "GIF"
+msgstr "GIF"
+
+msgid "📍 Location"
+msgstr "📍 موقع"
+
+msgid "👤 Contact"
+msgstr "👤 جهة اتصال"
+
+msgid "🔗 Link"
+msgstr "🔗 رابط"
+
+msgid "📎 Media"
+msgstr "📎 وسائط"
+
+msgid "📊 Poll"
+msgstr "📊 استطلاع"
+
+msgid "⬅️ Newer"
+msgstr "⬅️ الأحدث"
+
+msgid "Older ➡️"
+msgstr "الأقدم ➡️"
+
+msgid "🔙 Back to Chats"
+msgstr "🔙 رجوع للمحادثات"
+
+msgid "Page {page}/{pages}"
+msgstr "صفحة {page}/{pages}"
+
+msgid "This account could not connect. Check the proxy and try again."
+msgstr "تعذر الاتصال بهذا الحساب. تحقق من البروكسي ثم حاول مرة أخرى."
+
+msgid "The session is invalid or revoked. Please re-add the account."
+msgstr "الجلسة غير صالحة أو تم إلغاؤها. احذف الحساب وأضفه من جديد."
+
+msgid "An unexpected error occurred while loading this page."
+msgstr "حدث خطأ غير متوقع أثناء تحميل هذه الصفحة."
+
+msgid "Telegram asked us to wait. Please try again in a moment."
+msgstr "تيليجرام طلب الانتظار. حاول بعد لحظات."
+
+msgid "Unknown"
+msgstr "غير معروف"
+
+msgid "invalid"
+msgstr "غير صالح"
+
+msgid "❌ Invalid"
+msgstr "❌ غير صالح"
+
+msgid "❌ Invalid — sign in again"
+msgstr "❌ غير صالح — أعد تسجيل الدخول"
+
+msgid "⚠️ <b>Account invalid</b>"
+msgstr "⚠️ <b>الحساب غير صالح</b>"
+
+msgid "This session has expired or is no longer valid. You may need to sign in again — delete the account and add it once more."
+msgstr "هذه الجلسة منتهية أو لم تعد صالحة. قد تحتاج إعادة تسجيل الدخول: احذف الحساب ثم أضفه من جديد."
+
+msgid "This invite link is invalid or has been replaced."
+msgstr "رابط الإضافة غير صالح أو تم استبداله."
+
+msgid "This team link is invalid or has been replaced."
+msgstr "رابط الفريق غير صالح أو تم استبداله."
+
+msgid "This is your own team link. Share it with the person you want as a manager."
+msgstr "هذا رابط فريقك. شاركه مع الشخص الذي تريد جعله مديراً."
+
+msgid "You can now view and manage {name}'s accounts from My Accounts. The numbers stay on their list, not yours."
+msgstr "يمكنك الآن عرض وإدارة حسابات {name} من «حساباتي». الأرقام تبقى في قائمته وليس في قائمتك."
+
+msgid "👥 {person} can now view and manage your accounts."
+msgstr "👥 أصبح {person} قادراً على عرض وإدارة حساباتك."
+
+msgid "You already manage {name}'s accounts."
+msgstr "أنت تدير حسابات {name} بالفعل."
+
+msgid "Could not add you as a manager."
+msgstr "تعذر إضافتك كمدير."
+
+msgid "The account owner does not have an active subscription, so this number cannot be added right now."
+msgstr "مالك الحساب لا يملك اشتراكاً نشطاً، لذلك لا يمكن إضافة هذا الرقم الآن."
+
+msgid "The account owner has reached the maximum number of accounts on their plan."
+msgstr "وصل مالك الحساب إلى الحد الأقصى لعدد الحسابات في باقته."
+
+msgid ""
+"Enter the phone number to add to {name}'s account list.\n"
+"<i>(Must be in international format, e.g., +1234567890)</i>\n"
+"\n"
+"This number will not appear in your accounts."
+msgstr ""
+"أرسل رقم الهاتف لإضافته إلى قائمة حسابات {name}.\n"
+"<i>(يجب أن يكون بالصيغة الدولية، مثل +1234567890)</i>\n"
+"\n"
+"لن يظهر هذا الرقم في حساباتك."
+
+msgid ""
+"✅ The number {phone} was added to {name}'s account list.\n"
+"\n"
+"It will not appear in your accounts."
+msgstr ""
+"✅ تمت إضافة الرقم {phone} إلى قائمة حسابات {name}.\n"
+"\n"
+"لن يظهر في حساباتك."
+
+msgid "📥 {person} added the number {phone} to your accounts."
+msgstr "📥 أضاف {person} الرقم {phone} إلى حساباتك."
+
+msgid "👥 Shared accounts belong to someone who added you as a manager."
+msgstr "👥 الحسابات المشتركة تخص شخصاً أضافك كمدير."
+
+msgid "<b>Team</b>"
+msgstr "<b>الفريق</b>"
+
+msgid "Managers can view and manage every Telegram account you added. They cannot change this team or your invite links."
+msgstr "المديرون يمكنهم عرض وإدارة كل حسابات تيليجرام التي أضفتها. لا يمكنهم تعديل هذا الفريق أو روابط الإحالة."
+
+msgid "<b>Managers</b>"
+msgstr "<b>المديرون</b>"
+
+msgid "No managers yet."
+msgstr "لا يوجد مديرون بعد."
+
+msgid "Share this link so someone can become a manager:"
+msgstr "شارك هذا الرابط ليصبح الشخص مديراً:"
+
+msgid "Could not build the team link. Make sure the bot has a public username."
+msgstr "تعذر إنشاء رابط الفريق. تأكد أن للبوت اسم مستخدم عام."
+
+msgid "<b>You manage accounts for</b>"
+msgstr "<b>أنت تدير حسابات</b>"
+
+msgid "To add a number to their list, ask them for their add-number invite link."
+msgstr "لإضافة رقم إلى قائمتهم، اطلب منهم رابط إضافة الأرقام."
+
+msgid "➕ Add manager by ID"
+msgstr "➕ إضافة مدير بالمعرّف"
+
+msgid "❌ Remove {name}"
+msgstr "❌ إزالة {name}"
+
+msgid "🔄 New team link"
+msgstr "🔄 رابط فريق جديد"
+
+msgid "<b>Add-number invite</b>"
+msgstr "<b>رابط إضافة الأرقام</b>"
+
+msgid "Anyone who opens this link can sign in a phone number. The number is added to <b>your</b> account list, it does not appear in theirs, and you get a notification."
+msgstr "أي شخص يفتح هذا الرابط يمكنه تسجيل رقم هاتف. يُضاف الرقم إلى قائمة <b>حساباتك</b> ولا يظهر عنده، ويصلك إشعار."
+
+msgid "They do not need their own subscription. The number counts against your plan limit."
+msgstr "لا يحتاجون اشتراكاً خاصاً بهم. الرقم يُحسب ضمن حد باقتك."
+
+msgid "Your invite link:"
+msgstr "رابط الإحالة:"
+
+msgid "Could not build the invite link. Make sure the bot has a public username."
+msgstr "تعذر إنشاء رابط الإحالة. تأكد أن للبوت اسم مستخدم عام."
+
+msgid "🔄 New invite link"
+msgstr "🔄 رابط إحالة جديد"
+
+msgid "New team link created. The old one no longer works."
+msgstr "تم إنشاء رابط فريق جديد. الرابط القديم لم يعد يعمل."
+
+msgid "New invite link created. The old one no longer works."
+msgstr "تم إنشاء رابط إحالة جديد. الرابط القديم لم يعد يعمل."
+
+msgid "Could not create a new link."
+msgstr "تعذر إنشاء رابط جديد."
+
+msgid "Could not remove that manager."
+msgstr "تعذر إزالة هذا المدير."
+
+msgid "Manager removed."
+msgstr "تمت إزالة المدير."
+
+msgid ""
+"Send the manager's numeric Telegram user ID, or their @username if they have already used this bot.\n"
+"\n"
+"Use /cancel to go back."
+msgstr ""
+"أرسل المعرّف الرقمي لتيليجرام الخاص بالمدير، أو @username إذا سبق له استخدام هذا البوت.\n"
+"\n"
+"استخدم /cancel للرجوع."
+
+msgid "No bot user with that username. They must press /start first, or send their numeric Telegram ID."
+msgstr "لا يوجد مستخدم بهذا الاسم. يجب أن يضغط /start أولاً، أو أرسل معرّفه الرقمي."
+
+msgid "Please send a numeric Telegram user ID or an @username."
+msgstr "أرسل معرّف تيليجرام الرقمي أو @username."
+
+msgid "You cannot add yourself as a manager."
+msgstr "لا يمكنك إضافة نفسك كمدير."
+
+msgid "That person is already a manager."
+msgstr "هذا الشخص مدير بالفعل."
+
+msgid "{name} can now view and manage your accounts."
+msgstr "أصبح {name} قادراً على عرض وإدارة حساباتك."
+
+msgid "Could not add that manager. Please try again."
+msgstr "تعذر إضافة هذا المدير. حاول مرة أخرى."
+
+msgid ""
+"Who should this account be added for?\n"
+"\n"
+"• <b>For myself</b>: the account will appear in your own list.\n"
+"• <b>For someone else</b>: the account will be added to another user's account in this bot "
+"(not yours). You will need their Telegram numeric ID."
+msgstr ""
+"لمن تريد إضافة هذا الحساب؟\n"
+"\n"
+"• <b>لي</b>: سيظهر الحساب في قائمتك أنت.\n"
+"• <b>لشخص آخر</b>: سيُضاف الحساب إلى حساب مستخدم آخر في هذا البوت "
+"(وليس حسابك). ستحتاج إلى معرّف تليجرام الرقمي الخاص به."
+
+msgid "👤 Add for myself"
+msgstr "👤 إضافة لي"
+
+msgid "👥 Add for someone else"
+msgstr "👥 إضافة لشخص آخر"
+
+msgid ""
+"<b>Add for someone else</b>\n"
+"\n"
+"This means the Telegram account you are about to log in will be linked to "
+"<b>another person's</b> profile in this bot — it will appear in <b>their</b> "
+"\"My Accounts\" list, not yours.\n"
+"\n"
+"Please send that person's Telegram numeric ID now.\n"
+"<i>(They must have used this bot before and have an active subscription with free slots.)</i>"
+msgstr ""
+"<b>إضافة لشخص آخر</b>\n"
+"\n"
+"هذا يعني أن حساب تليجرام الذي ستسجّل الدخول إليه سيُربط بملف "
+"<b>شخص آخر</b> في هذا البوت — وسيظهر في قائمة <b>\"حساباتي\" الخاصة به</b>، وليس بك.\n"
+"\n"
+"أرسل الآن معرّف تليجرام الرقمي لذلك الشخص.\n"
+"<i>(يجب أن يكون قد استخدم البوت من قبل ولديه اشتراك نشط ومساحة لحسابات إضافية.)</i>"
+
+msgid "Invalid ID. Please send a numeric Telegram user ID, or /cancel to stop."
+msgstr "معرّف غير صالح. أرسل معرّف مستخدم تليجرام رقميًا، أو /cancel للإيقاف."
+
+msgid "That is your own ID. Choose \"Add for myself\", or send another person's ID."
+msgstr "هذا معرّفك أنت. اختر \"إضافة لي\"، أو أرسل معرّف شخص آخر."
+
+msgid ""
+"No user with ID <code>{user_id}</code> was found in this bot. "
+"They must start the bot first."
+msgstr ""
+"لم يتم العثور على مستخدم بالمعرّف <code>{user_id}</code> في هذا البوت. "
+"يجب أن يبدأ استخدام البوت أولًا."
+
+msgid "OK. The account will be added for {name}."
+msgstr "حسنًا. سيتم إضافة الحساب لـ {name}."
+
+msgid ""
+"This does not look like a valid phone number.\n"
+"Please send it in international format, e.g. <code>+1234567890</code> "
+"(starts with +, digits only, no letters)."
+msgstr ""
+"هذا لا يبدو رقم هاتف صالحًا.\n"
+"أرسله بالصيغة الدولية، مثال: <code>+1234567890</code> "
+"(يبدأ بـ +، أرقام فقط، بدون حروف)."
+
+

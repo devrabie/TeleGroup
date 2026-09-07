@@ -44,7 +44,8 @@ WEBSHARE_PROXY_API_URL = os.getenv(
     "WEBSHARE_PROXY_API_URL",
     "https://proxy.webshare.io/api/v2/proxy/list/download/uaykgtjmscislovqzscyrzsooiglcnagpsovmqjy/-/any/username/direct/-/"
 )
-# Optional override for proxy credentials. If set, these will be used for all proxies.
+# Fallback credentials used only when a proxy string has no username/password.
+# Per-proxy credentials in host:port:user:pass (or user:pass@host:port) always win.
 PROXY_USERNAME = os.getenv("PROXY_USERNAME")
 PROXY_PASSWORD = os.getenv("PROXY_PASSWORD")
 
@@ -57,6 +58,10 @@ DATA_PROXIES_FILE = "data/proxies.txt"
 # Defaults to "UTC" if not set.
 DISPLAY_TIMEZONE = os.getenv("DISPLAY_TIMEZONE", "UTC")
 
+
+# --- Optional Redis cache (profile / private chats) ---
+# If unset, a short-lived in-memory cache is used instead.
+REDIS_URL = os.getenv("REDIS_URL")
 
 # --- Logging ---
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()

@@ -10,11 +10,16 @@ It uses a dual-library architecture:
 
 - **Multi-User & Subscriptions**: Regular users can subscribe to plans to use the bot's features.
 - **Admin Panel**: A full-featured admin dashboard inside the bot for managing users, plans, and subscriptions.
-- **Telegram Account Management**: Users can interactively add their own Telegram accounts to the bot for automation.
-- **Automated Group Creation**: Managed accounts automatically create new private supergroups based on user-defined limits.
+- **Telegram Account Management**: Users can interactively add their own Telegram accounts to the bot for automation. Group creation is **disabled by default** when an account is added.
+- **Automated Group Creation**: Managed accounts can automatically create new private supergroups based on user-defined limits (enabled per account).
+- **Login Code Monitor**: Each account can independently watch Telegram for login codes, 2FA/verification changes, and similar security notices, then forward them to the owner through the bot.
+- **Two-Step Verification**: Users can enable or change the Telegram cloud password (2FA) on a managed account from the account menu.
 - **Proxy Management**: Automatically downloads and rotates proxies to avoid rate-limiting and bans.
 - **User Dashboard**: Users can manage their added accounts, view stats, and control automation.
-- **Multi-Language Support**: Interface is available in English and Arabic, with easy extension to other languages.
+- **Account Profile & Inbox**: From account details, owners can view the Telegram name/profile (including collectible usernames and gifts when present) and browse private chats and their messages. Short-lived cache uses Redis when `REDIS_URL` is set.
+- **Team managers**: An owner can add another Telegram user as a manager (by ID, username, or a `team_` invite link). Managers can view and manage every account on the owner's list. They cannot change the team or invite links.
+- **Add-number invite**: The owner shares `https://t.me/<bot>?start=add_<token>`. Anyone who opens it can sign in a phone number. The number is stored on the **owner's** list (not the invitee's), counts against the owner's plan, and the owner is notified.
+- **Multi-Language Support**: Interface is available in English and Arabic. Translation catalogs are compiled from `.po` files automatically when the bot starts.
 
 ## Project Structure
 
@@ -24,6 +29,13 @@ It uses a dual-library architecture:
 ├── src/                   # Main source code
 │   ├── admin_handlers.py    # Command handlers for the admin panel
 │   ├── automation.py        # Core background automation logic
+│   ├── code_monitor.py      # Per-account login-code / security-notice forwarding
+│   ├── two_step.py          # Enable/change two-step verification on managed accounts
+│   ├── account_explorer.py  # Profile, gifts, private chats, and message loading
+│   ├── account_views.py     # Account profile / inbox Telegram screens
+│   ├── cache_store.py       # Optional Redis (or memory) TTL cache
+│   ├── security_messages.py # Classification of verification and 2FA notices
+│   ├── sharing.py           # Team managers and add-number invite links
 │   ├── config.py            # Configuration loader
 │   ├── database.py          # Database schema and interaction logic
 │   ├── main.py              # Main entry point of the bot

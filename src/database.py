@@ -1,9 +1,14 @@
 import sqlite3
 import logging
 import random
+import secrets
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from .device_profiles import DEVICES
+
+SHARE_KIND_ADD = "add"
+SHARE_KIND_TEAM = "team"
+VALID_SHARE_KINDS = (SHARE_KIND_ADD, SHARE_KIND_TEAM)
 
 # --- Configuration ---
 DB_FILE = Path(__file__).parent.parent / "data" / "bot.db"
@@ -65,12 +70,14 @@ TABLE_DEFINITIONS = {
             phone TEXT NOT NULL UNIQUE,
             session_string TEXT NOT NULL,
             proxy_id INTEGER,
-            is_active BOOLEAN NOT NULL DEFAULT 1, -- User-controlled activation
+            is_active BOOLEAN NOT NULL DEFAULT 0, -- Group creation off by default
             is_running BOOLEAN NOT NULL DEFAULT 0, -- System-controlled running state
+            code_monitor_enabled BOOLEAN NOT NULL DEFAULT 0, -- Forward login/2FA notices
             flood_wait_until TIMESTAMP,
             next_creation_time TIMESTAMP,
             backoff_level INTEGER NOT NULL DEFAULT 0,
             last_error TEXT,
+            session_status TEXT NOT NULL DEFAULT 'unknown', -- ok | invalid | unknown
             deleted_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
@@ -105,6 +112,27 @@ TABLE_DEFINITIONS = {
             client_platform TEXT NOT NULL,
             api_id INTEGER,
             api_hash TEXT
+        );
+    """,
+    "account_managers": """
+        CREATE TABLE IF NOT EXISTS account_managers (
+            id INTEGER PRIMARY KEY,
+            owner_user_id INTEGER NOT NULL,
+            manager_telegram_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(owner_user_id, manager_telegram_id),
+            FOREIGN KEY (owner_user_id) REFERENCES users (id) ON DELETE CASCADE
+        );
+    """,
+    "sharing_tokens": """
+        CREATE TABLE IF NOT EXISTS sharing_tokens (
+            id INTEGER PRIMARY KEY,
+            owner_user_id INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            token TEXT NOT NULL UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(owner_user_id, kind),
+            FOREIGN KEY (owner_user_id) REFERENCES users (id) ON DELETE CASCADE
         );
     """
 }
@@ -153,6 +181,16 @@ def initialize_database():
             if 'deleted_at' not in columns:
                 log.info("Running migration: Adding 'deleted_at' column to 'managed_accounts' table.")
                 cursor.execute("ALTER TABLE managed_accounts ADD COLUMN deleted_at TIMESTAMP")
+            if 'code_monitor_enabled' not in columns:
+                log.info("Running migration: Adding 'code_monitor_enabled' column to 'managed_accounts' table.")
+                cursor.execute(
+                    "ALTER TABLE managed_accounts ADD COLUMN code_monitor_enabled BOOLEAN NOT NULL DEFAULT 0"
+                )
+            if 'session_status' not in columns:
+                log.info("Running migration: Adding 'session_status' column to 'managed_accounts' table.")
+                cursor.execute(
+                    "ALTER TABLE managed_accounts ADD COLUMN session_status TEXT NOT NULL DEFAULT 'unknown'"
+                )
 
             cursor.execute("PRAGMA table_info(plans)")
             plan_columns = [info[1] for info in cursor.fetchall()]
@@ -469,13 +507,14 @@ def grant_subscription(telegram_id: int, plan_id: int, duration_days: int):
 def batch_insert_proxies(proxies: list[str]):
     """
     Inserts a list of proxy strings into the database, ignoring duplicates.
+    Also reactivates listed proxies that were previously marked not working.
     Returns the number of newly inserted proxies.
     """
     if not proxies:
         return 0
 
     sql = "INSERT OR IGNORE INTO proxies (proxy_string) VALUES (?)"
-    data = [(proxy,) for proxy in proxies if proxy.strip()] # Ensure no empty strings
+    data = [(proxy.strip(),) for proxy in proxies if proxy.strip()] # Ensure no empty strings
 
     if not data:
         return 0
@@ -484,20 +523,62 @@ def batch_insert_proxies(proxies: list[str]):
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.executemany(sql, data)
+            inserted = cursor.rowcount
+            cursor.executemany(
+                "UPDATE proxies SET is_working = 1, last_checked = CURRENT_TIMESTAMP WHERE proxy_string = ?",
+                data,
+            )
             conn.commit()
-            log.info(f"Batch inserted proxies. {cursor.rowcount} new proxies were added.")
-            return cursor.rowcount
+            log.info(f"Batch inserted proxies. {inserted} new proxies were added.")
+            return inserted
     except sqlite3.Error as e:
         log.error(f"Failed to batch insert proxies: {e}")
         return 0
 
-def get_random_proxy_id():
-    """Retrieves the ID of a random, working proxy."""
-    sql = "SELECT id FROM proxies WHERE is_working = 1 ORDER BY RANDOM() LIMIT 1"
+
+def count_working_proxies() -> int:
+    """Return how many proxies are currently marked working."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql)
+            cursor.execute("SELECT COUNT(*) AS n FROM proxies WHERE is_working = 1")
+            row = cursor.fetchone()
+            return int(row["n"] if row else 0)
+    except sqlite3.Error as e:
+        log.error(f"Failed to count working proxies: {e}")
+        return 0
+
+
+def warn_if_no_working_proxies() -> None:
+    """Log a clear error if every stored proxy is marked bad."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) AS n FROM proxies")
+            total = int(cursor.fetchone()["n"])
+            cursor.execute("SELECT COUNT(*) AS n FROM proxies WHERE is_working = 1")
+            working = int(cursor.fetchone()["n"])
+        if total > 0 and working == 0:
+            log.error(
+                "All %s stored proxies are marked not working. "
+                "Refresh the proxy list or run: UPDATE proxies SET is_working = 1;",
+                total,
+            )
+    except sqlite3.Error as e:
+        log.error(f"Failed to check proxy health: {e}")
+
+def get_random_proxy_id(exclude_id: int | None = None):
+    """Retrieves the ID of a random, working proxy, optionally skipping one ID."""
+    sql = "SELECT id FROM proxies WHERE is_working = 1"
+    params = []
+    if exclude_id is not None:
+        sql += " AND id != ?"
+        params.append(exclude_id)
+    sql += " ORDER BY RANDOM() LIMIT 1"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
             proxy = cursor.fetchone()
             return proxy['id'] if proxy else None
     except sqlite3.Error as e:
@@ -570,9 +651,11 @@ def add_managed_account(user_id: int, phone: str, session_string: str, device_pr
                     SET session_string = ?,
                         proxy_id = ?,
                         device_profile_id = ?,
-                        is_active = 1,
+                        is_active = 0,
+                        code_monitor_enabled = 0,
                         deleted_at = NULL,
                         last_error = NULL,
+                        session_status = 'ok',
                         backoff_level = 0,
                         next_creation_time = NULL
                     WHERE id = ?
@@ -583,8 +666,11 @@ def add_managed_account(user_id: int, phone: str, session_string: str, device_pr
                 # --- Insert new account ---
                 log.info(f"Adding new account for phone {phone}.")
                 insert_sql = """
-                    INSERT INTO managed_accounts (user_id, phone, session_string, proxy_id, device_profile_id, is_active, is_running)
-                    VALUES (?, ?, ?, ?, ?, 1, 0)
+                    INSERT INTO managed_accounts (
+                        user_id, phone, session_string, proxy_id, device_profile_id,
+                        is_active, is_running, code_monitor_enabled, session_status
+                    )
+                    VALUES (?, ?, ?, ?, ?, 0, 0, 0, 'ok')
                 """
                 cursor.execute(insert_sql, (internal_user_id, phone, session_string, new_proxy_id, device_profile_id))
                 log.info(f"Successfully added account {phone}.")
@@ -606,37 +692,82 @@ def delete_managed_account(account_id: int, telegram_user_id: int):
     """
     Soft-deletes a managed account by setting the deleted_at timestamp.
     Also deactivates the account to pull it from any active loops.
+    Allowed for the owner or a delegated manager.
     """
+    if not user_owns_account(account_id, telegram_user_id):
+        return False
     sql = """
         UPDATE managed_accounts
         SET deleted_at = ?, is_active = 0
-        WHERE id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
+        WHERE id = ? AND deleted_at IS NULL
     """
     now_utc = datetime.now(timezone.utc)
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (now_utc, account_id, telegram_user_id))
+            cursor.execute(sql, (now_utc, account_id))
             conn.commit()
             return cursor.rowcount > 0 # Returns True if a row was updated
     except sqlite3.Error as e:
         log.error(f"Failed to soft-delete account {account_id} for user {telegram_user_id}: {e}")
         return False
 
+def toggle_code_monitor(account_id: int, telegram_user_id: int):
+    """
+    Toggles the code_monitor_enabled flag of a managed account.
+    Allowed for the owner or a delegated manager.
+    Returns the new status (True/False) or None if the account was not found.
+    """
+    if not user_owns_account(account_id, telegram_user_id):
+        log.warning(
+            f"User {telegram_user_id} tried to toggle code monitor on "
+            f"non-existent or unowned account {account_id}."
+        )
+        return None
+    get_status_sql = """
+        SELECT code_monitor_enabled FROM managed_accounts
+        WHERE id = ? AND deleted_at IS NULL
+    """
+    update_sql = """
+        UPDATE managed_accounts SET code_monitor_enabled = ? WHERE id = ?
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(get_status_sql, (account_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+
+            new_status = not bool(row['code_monitor_enabled'])
+            cursor.execute(update_sql, (1 if new_status else 0, account_id))
+            conn.commit()
+            log.info(f"Account {account_id} code monitor toggled to {new_status}.")
+            return new_status
+    except sqlite3.Error as e:
+        log.error(f"Failed to toggle code monitor for account {account_id}: {e}")
+        return None
+
+
 def toggle_account_status(account_id: int, telegram_user_id: int):
     """
     Toggles the is_active status of a managed account.
     If toggled ON, it also resets the account's schedule and error state.
+    Allowed for the owner or a delegated manager.
     """
-    get_status_sql = "SELECT is_active FROM managed_accounts WHERE id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)"
+    if not user_owns_account(account_id, telegram_user_id):
+        log.warning(f"User {telegram_user_id} tried to toggle non-existent or unowned account {account_id}.")
+        return None
 
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(get_status_sql, (account_id, telegram_user_id))
+            cursor.execute(
+                "SELECT is_active FROM managed_accounts WHERE id = ? AND deleted_at IS NULL",
+                (account_id,),
+            )
             row = cursor.fetchone()
             if not row:
-                log.warning(f"User {telegram_user_id} tried to toggle non-existent or unowned account {account_id}.")
                 return None
 
             current_status = row['is_active']
@@ -667,20 +798,40 @@ def toggle_account_status(account_id: int, telegram_user_id: int):
         return None
 
 def reassign_proxy(account_id: int, telegram_user_id: int):
-    """Assigns a new random proxy to a managed account."""
-    new_proxy_id = get_random_proxy_id()
-    if new_proxy_id is None:
-        return False, "no_available_proxies"
-
-    sql = """
-        UPDATE managed_accounts
-        SET proxy_id = ?
-        WHERE id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
-    """
+    """Assigns a new random proxy to a managed account, preferring a different one."""
+    if not user_owns_account(account_id, telegram_user_id):
+        return False, "db_error"
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (new_proxy_id, account_id, telegram_user_id))
+            cursor.execute(
+                """
+                SELECT proxy_id FROM managed_accounts
+                WHERE id = ? AND deleted_at IS NULL
+                """,
+                (account_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False, "db_error"
+            current_proxy_id = row["proxy_id"]
+
+        new_proxy_id = get_random_proxy_id(exclude_id=current_proxy_id)
+        if new_proxy_id is None:
+            new_proxy_id = get_random_proxy_id()
+        if new_proxy_id is None:
+            return False, "no_available_proxies"
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE managed_accounts
+                SET proxy_id = ?
+                WHERE id = ?
+                """,
+                (new_proxy_id, account_id),
+            )
             conn.commit()
             return cursor.rowcount > 0, "proxy_update_success"
     except sqlite3.Error as e:
@@ -754,6 +905,34 @@ def mark_proxy_as_bad(proxy_id: int):
         log.error(f"Failed to mark proxy {proxy_id} as bad: {e}")
 
 
+def assign_account_proxy(account_id: int, proxy_id: int | None) -> bool:
+    """Set the proxy assigned to a managed account."""
+    if account_id is None:
+        return False
+    sql = "UPDATE managed_accounts SET proxy_id = ? WHERE id = ? AND deleted_at IS NULL"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (proxy_id, account_id))
+            conn.commit()
+            return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        log.error(f"Failed to assign proxy {proxy_id} to account {account_id}: {e}")
+        return False
+
+
+def rotate_account_proxy(account_id: int, failed_proxy_id: int | None = None) -> int | None:
+    """Mark a failed proxy bad and assign a different working proxy to the account."""
+    if failed_proxy_id is not None:
+        mark_proxy_as_bad(failed_proxy_id)
+    new_proxy_id = get_random_proxy_id(exclude_id=failed_proxy_id)
+    if new_proxy_id is None:
+        new_proxy_id = get_random_proxy_id()
+    if new_proxy_id is not None:
+        assign_account_proxy(account_id, new_proxy_id)
+    return new_proxy_id
+
+
 def set_account_flood_wait(account_id: int, wait_until_timestamp: datetime):
     """Sets the flood wait time for a managed account."""
     sql = "UPDATE managed_accounts SET flood_wait_until = ? WHERE id = ?"
@@ -813,6 +992,7 @@ def get_eligible_accounts():
           AND s.end_date >= datetime('now')
           AND (ma.flood_wait_until IS NULL OR ma.flood_wait_until < datetime('now'))
           AND (ma.next_creation_time IS NULL OR ma.next_creation_time < datetime('now'))
+          AND (ma.session_status IS NULL OR ma.session_status != 'invalid')
     """
     try:
         with get_db_connection() as conn:
@@ -823,6 +1003,384 @@ def get_eligible_accounts():
     except sqlite3.Error as e:
         log.error(f"Failed to retrieve eligible accounts: {e}")
         return []
+
+
+def get_code_monitor_accounts():
+    """
+    Accounts whose login-code monitor should be running:
+    enabled, not deleted, and owned by a user with an active subscription.
+    """
+    sql = """
+        SELECT
+            ma.id as account_id,
+            ma.phone,
+            ma.session_string,
+            ma.proxy_id,
+            u.telegram_id,
+            dp.device_model,
+            dp.system_version,
+            dp.app_version,
+            dp.lang_code,
+            dp.api_id,
+            dp.api_hash
+        FROM managed_accounts ma
+        JOIN users u ON ma.user_id = u.id
+        JOIN subscriptions s ON u.id = s.user_id
+        JOIN plans p ON s.plan_id = p.id
+        LEFT JOIN device_profiles dp ON ma.device_profile_id = dp.id
+        WHERE ma.code_monitor_enabled = 1
+          AND ma.deleted_at IS NULL
+          AND s.is_active = 1
+          AND s.end_date >= datetime('now')
+          AND (ma.session_status IS NULL OR ma.session_status != 'invalid')
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            accounts = cursor.fetchall()
+            return [dict(acc) for acc in accounts]
+    except sqlite3.Error as e:
+        log.error(f"Failed to retrieve code-monitor accounts: {e}")
+        return []
+
+
+def get_account_runtime_details(account_id: int):
+    """Runtime details needed to start a Pyrogram client for one managed account."""
+    sql = """
+        SELECT
+            ma.id as account_id,
+            ma.phone,
+            ma.session_string,
+            ma.proxy_id,
+            ma.code_monitor_enabled,
+            ma.is_active,
+            u.telegram_id,
+            dp.device_model,
+            dp.system_version,
+            dp.app_version,
+            dp.lang_code,
+            dp.api_id,
+            dp.api_hash
+        FROM managed_accounts ma
+        JOIN users u ON ma.user_id = u.id
+        LEFT JOIN device_profiles dp ON ma.device_profile_id = dp.id
+        WHERE ma.id = ? AND ma.deleted_at IS NULL
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (account_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to get runtime details for account {account_id}: {e}")
+        return None
+
+def get_internal_user_id(telegram_id: int):
+    """Return the internal users.id for a Telegram ID, or None."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM users WHERE telegram_id = ?", (telegram_id,))
+            row = cursor.fetchone()
+            return row["id"] if row else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to resolve internal user id for {telegram_id}: {e}")
+        return None
+
+
+def user_is_account_owner(account_id: int, telegram_user_id: int) -> bool:
+    """True only if the actor is the account owner (not a delegated manager)."""
+    sql = """
+        SELECT 1 FROM managed_accounts
+        WHERE id = ? AND deleted_at IS NULL
+          AND user_id = (SELECT id FROM users WHERE telegram_id = ?)
+        LIMIT 1
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (account_id, telegram_user_id))
+            return cursor.fetchone() is not None
+    except sqlite3.Error as e:
+        log.error(f"Failed to check owner of account {account_id} for user {telegram_user_id}: {e}")
+        return False
+
+
+def user_owns_account(account_id: int, telegram_user_id: int) -> bool:
+    """True if the actor owns the account or is a manager of the owner."""
+    sql = """
+        SELECT 1 FROM managed_accounts ma
+        JOIN users u ON ma.user_id = u.id
+        WHERE ma.id = ? AND ma.deleted_at IS NULL
+          AND (
+            u.telegram_id = ?
+            OR EXISTS (
+                SELECT 1 FROM account_managers am
+                WHERE am.owner_user_id = ma.user_id
+                  AND am.manager_telegram_id = ?
+            )
+          )
+        LIMIT 1
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (account_id, telegram_user_id, telegram_user_id))
+            return cursor.fetchone() is not None
+    except sqlite3.Error as e:
+        log.error(f"Failed to check access to account {account_id} for user {telegram_user_id}: {e}")
+        return False
+
+
+def _new_sharing_token() -> str:
+    return secrets.token_urlsafe(12)
+
+
+def get_or_create_sharing_token(owner_telegram_id: int, kind: str):
+    """Return the owner's token for this kind, creating one if needed."""
+    if kind not in VALID_SHARE_KINDS:
+        return None
+    owner_user_id = get_internal_user_id(owner_telegram_id)
+    if owner_user_id is None:
+        return None
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT token FROM sharing_tokens WHERE owner_user_id = ? AND kind = ?",
+                (owner_user_id, kind),
+            )
+            row = cursor.fetchone()
+            if row:
+                return row["token"]
+            for _ in range(5):
+                token = _new_sharing_token()
+                try:
+                    cursor.execute(
+                        "INSERT INTO sharing_tokens (owner_user_id, kind, token) VALUES (?, ?, ?)",
+                        (owner_user_id, kind, token),
+                    )
+                    conn.commit()
+                    return token
+                except sqlite3.IntegrityError:
+                    conn.rollback()
+            return None
+    except sqlite3.Error as e:
+        log.error(f"Failed to get/create {kind} token for {owner_telegram_id}: {e}")
+        return None
+
+
+def rotate_sharing_token(owner_telegram_id: int, kind: str):
+    """Replace the owner's token so previous links stop working."""
+    if kind not in VALID_SHARE_KINDS:
+        return None
+    owner_user_id = get_internal_user_id(owner_telegram_id)
+    if owner_user_id is None:
+        return None
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            for _ in range(5):
+                token = _new_sharing_token()
+                try:
+                    cursor.execute(
+                        "SELECT id FROM sharing_tokens WHERE owner_user_id = ? AND kind = ?",
+                        (owner_user_id, kind),
+                    )
+                    row = cursor.fetchone()
+                    if row:
+                        cursor.execute(
+                            "UPDATE sharing_tokens SET token = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?",
+                            (token, row["id"]),
+                        )
+                    else:
+                        cursor.execute(
+                            "INSERT INTO sharing_tokens (owner_user_id, kind, token) VALUES (?, ?, ?)",
+                            (owner_user_id, kind, token),
+                        )
+                    conn.commit()
+                    return token
+                except sqlite3.IntegrityError:
+                    conn.rollback()
+            return None
+    except sqlite3.Error as e:
+        log.error(f"Failed to rotate {kind} token for {owner_telegram_id}: {e}")
+        return None
+
+
+def resolve_sharing_token(token: str):
+    """Return token metadata or None if the link is unknown."""
+    if not token:
+        return None
+    sql = """
+        SELECT
+            st.kind,
+            u.id AS owner_user_id,
+            u.telegram_id AS owner_telegram_id,
+            u.first_name AS owner_name,
+            u.username AS owner_username
+        FROM sharing_tokens st
+        JOIN users u ON u.id = st.owner_user_id
+        WHERE st.token = ?
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (token,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to resolve sharing token: {e}")
+        return None
+
+
+def add_account_manager(owner_telegram_id: int, manager_telegram_id: int) -> str:
+    """
+    Grant a Telegram user access to the owner's managed accounts.
+    Returns: ok | self | exists | not_found | error
+    """
+    if owner_telegram_id == manager_telegram_id:
+        return "self"
+    owner_user_id = get_internal_user_id(owner_telegram_id)
+    if owner_user_id is None:
+        return "not_found"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO account_managers (owner_user_id, manager_telegram_id) VALUES (?, ?)",
+                (owner_user_id, manager_telegram_id),
+            )
+            conn.commit()
+        return "ok"
+    except sqlite3.IntegrityError:
+        return "exists"
+    except sqlite3.Error as e:
+        log.error(f"Failed to add manager {manager_telegram_id} for {owner_telegram_id}: {e}")
+        return "error"
+
+
+def remove_account_manager(owner_telegram_id: int, manager_telegram_id: int) -> bool:
+    """Remove a manager from the owner's team. Owner-only (caller must enforce)."""
+    owner_user_id = get_internal_user_id(owner_telegram_id)
+    if owner_user_id is None:
+        return False
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM account_managers WHERE owner_user_id = ? AND manager_telegram_id = ?",
+                (owner_user_id, manager_telegram_id),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        log.error(f"Failed to remove manager {manager_telegram_id} for {owner_telegram_id}: {e}")
+        return False
+
+
+def list_account_managers(owner_telegram_id: int) -> list:
+    """Managers who can view/manage this owner's accounts."""
+    sql = """
+        SELECT
+            am.manager_telegram_id,
+            u.first_name,
+            u.username,
+            am.created_at
+        FROM account_managers am
+        LEFT JOIN users u ON u.telegram_id = am.manager_telegram_id
+        WHERE am.owner_user_id = (SELECT id FROM users WHERE telegram_id = ?)
+        ORDER BY am.created_at
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (owner_telegram_id,))
+            return [dict(row) for row in cursor.fetchall()]
+    except sqlite3.Error as e:
+        log.error(f"Failed to list managers for {owner_telegram_id}: {e}")
+        return []
+
+
+def list_owners_for_manager(manager_telegram_id: int) -> list:
+    """Owners who delegated account access to this Telegram user."""
+    sql = """
+        SELECT u.telegram_id, u.first_name, u.username
+        FROM account_managers am
+        JOIN users u ON u.id = am.owner_user_id
+        WHERE am.manager_telegram_id = ?
+        ORDER BY u.first_name
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (manager_telegram_id,))
+            return [dict(row) for row in cursor.fetchall()]
+    except sqlite3.Error as e:
+        log.error(f"Failed to list owners for manager {manager_telegram_id}: {e}")
+        return []
+
+
+def get_user_by_username(username: str):
+    """Look up a bot user by Telegram username (with or without @)."""
+    if not username:
+        return None
+    username = username.lstrip("@").strip()
+    if not username:
+        return None
+    sql = """
+        SELECT telegram_id, first_name, username
+        FROM users
+        WHERE lower(username) = lower(?)
+        LIMIT 1
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (username,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    except sqlite3.Error as e:
+        log.error(f"Failed to look up username {username}: {e}")
+        return None
+
+
+def get_accessible_accounts(actor_telegram_id: int) -> dict:
+    """
+    Accounts the actor can open: their own list plus each owner's list they manage.
+    Shared groups never include the actor's own accounts.
+    """
+    result = {"own": [], "shared": []}
+    own_details = get_user_details(actor_telegram_id)
+    if own_details:
+        result["own"] = own_details["accounts"]
+
+    accounts_sql = """
+        SELECT id, phone, is_active, code_monitor_enabled, last_error, session_status, next_creation_time
+        FROM managed_accounts
+        WHERE user_id = ? AND deleted_at IS NULL
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            for owner in list_owners_for_manager(actor_telegram_id):
+                owner_user_id = get_internal_user_id(owner["telegram_id"])
+                if owner_user_id is None:
+                    continue
+                cursor.execute(accounts_sql, (owner_user_id,))
+                result["shared"].append({
+                    "owner_telegram_id": owner["telegram_id"],
+                    "owner_name": owner["first_name"],
+                    "owner_username": owner["username"],
+                    "accounts": [dict(acc) for acc in cursor.fetchall()],
+                })
+        return result
+    except sqlite3.Error as e:
+        log.error(f"Failed to list accessible accounts for {actor_telegram_id}: {e}")
+        return result
+
 
 def get_groups_created_today(account_id: int):
     """Counts the number of groups created by an account in the last 24 hours."""
@@ -943,18 +1501,123 @@ def apply_error_backoff(account_id: int, error_message: str, wait_seconds: int |
             cursor.execute(sql, (next_time, new_level, str(error_message), account_id))
             conn.commit()
             log.warning(f"Account {account_id} encountered error: '{error_message}'. Backoff level is now {new_level}. Next attempt at {next_time.strftime('%Y-%m-%d %H:%M:%S')}.")
+            if looks_like_invalid_session(error_message):
+                mark_session_invalid(account_id, error_message)
             return True
     except sqlite3.Error as e:
         log.error(f"Failed to apply backoff for account {account_id}: {e}")
         return False
 
 
+SESSION_STATUS_OK = "ok"
+SESSION_STATUS_INVALID = "invalid"
+SESSION_STATUS_UNKNOWN = "unknown"
+
+_INVALID_SESSION_MARKERS = (
+    "authkeyunregistered",
+    "sessionrevoked",
+    "userdeactivated",
+    "authkeyduplicated",
+    "sessioninvalid",
+    "session_invalid",
+    "the key is not registered",
+)
+
+
+def looks_like_invalid_session(error: object | None) -> bool:
+    """True when an exception or last_error points to a dead Telegram session."""
+    if error is None:
+        return False
+    text = str(error).strip().lower()
+    if not text:
+        return False
+    compact = "".join(ch for ch in text if ch.isalnum())
+    for marker in _INVALID_SESSION_MARKERS:
+        if marker.replace("_", "") in compact or marker in text:
+            return True
+    return False
+
+
+def session_is_invalid(account: dict | None) -> bool:
+    """True if this managed account's Telegram session is expired or revoked."""
+    if not account:
+        return False
+    if account.get("session_status") == SESSION_STATUS_INVALID:
+        return True
+    if account.get("session_status") == SESSION_STATUS_OK:
+        return False
+    return looks_like_invalid_session(account.get("last_error"))
+
+
+def mark_session_status(account_id: int, status: str, error_message: str | None = None) -> bool:
+    """Persist session health for a managed account."""
+    if account_id is None or status not in {SESSION_STATUS_OK, SESSION_STATUS_INVALID, SESSION_STATUS_UNKNOWN}:
+        return False
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            if status == SESSION_STATUS_INVALID:
+                cursor.execute(
+                    """
+                    UPDATE managed_accounts
+                    SET session_status = ?, last_error = COALESCE(?, last_error)
+                    WHERE id = ? AND deleted_at IS NULL
+                    """,
+                    (status, error_message or "SESSION_INVALID", account_id),
+                )
+            elif status == SESSION_STATUS_OK:
+                cursor.execute(
+                    """
+                    UPDATE managed_accounts
+                    SET session_status = ?,
+                        last_error = CASE
+                            WHEN last_error IS NULL THEN NULL
+                            WHEN last_error = 'SESSION_INVALID' THEN NULL
+                            ELSE last_error
+                        END
+                    WHERE id = ? AND deleted_at IS NULL
+                    """,
+                    (status, account_id),
+                )
+            else:
+                cursor.execute(
+                    "UPDATE managed_accounts SET session_status = ? WHERE id = ? AND deleted_at IS NULL",
+                    (status, account_id),
+                )
+            conn.commit()
+            return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        log.error(f"Failed to set session_status={status} for account {account_id}: {e}")
+        return False
+
+
+def mark_session_invalid(account_id: int, error_message: str | None = None) -> bool:
+    """Mark a managed account so the UI can show that re-login is needed."""
+    log.warning(f"Marking account {account_id} session as invalid: {error_message}")
+    return mark_session_status(account_id, SESSION_STATUS_INVALID, error_message)
+
+
+def mark_session_ok(account_id: int) -> bool:
+    """Clear the invalid-session flag after a successful Telegram login/connect."""
+    return mark_session_status(account_id, SESSION_STATUS_OK)
+
+
+def ui_language_from_telegram(language_code: str | None) -> str:
+    """Map Telegram's language_code to a UI language we ship catalogs for."""
+    code = (language_code or "").lower().replace("-", "_")
+    if code == "ar" or code.startswith("ar_"):
+        return "ar"
+    return "en"
+
+
 def update_user_details(user: "telegram.User"):
     """
     Ensures a user exists in the database and that their details
     (first_name, username) are up-to-date.
+    New users inherit Arabic if their Telegram client language is Arabic.
     """
-    insert_sql = "INSERT OR IGNORE INTO users (telegram_id, first_name, username) VALUES (?, ?, ?)"
+    ui_lang = ui_language_from_telegram(getattr(user, "language_code", None))
+    insert_sql = "INSERT OR IGNORE INTO users (telegram_id, first_name, username, language_code) VALUES (?, ?, ?, ?)"
     update_sql = "UPDATE users SET first_name = ?, username = ? WHERE telegram_id = ?"
 
     try:
@@ -963,7 +1626,7 @@ def update_user_details(user: "telegram.User"):
             # Use a transaction for consistency
             cursor.execute("BEGIN")
             # Create a record if they are totally new, ignoring if they exist
-            cursor.execute(insert_sql, (user.id, user.first_name, user.username))
+            cursor.execute(insert_sql, (user.id, user.first_name, user.username, ui_lang))
             # Always update their details in case their name/username changed
             cursor.execute(update_sql, (user.first_name, user.username, user.id))
             cursor.execute("COMMIT")
@@ -1029,7 +1692,7 @@ def get_user_details(telegram_id: int):
         WHERE s.user_id = ? AND s.is_active = 1
         ORDER BY s.end_date DESC LIMIT 1
     """
-    accounts_sql = "SELECT id, phone, is_active, last_error, next_creation_time FROM managed_accounts WHERE user_id = ? AND deleted_at IS NULL"
+    accounts_sql = "SELECT id, phone, is_active, code_monitor_enabled, last_error, session_status, next_creation_time FROM managed_accounts WHERE user_id = ? AND deleted_at IS NULL"
 
     try:
         with get_db_connection() as conn:
@@ -1066,9 +1729,13 @@ def get_account_details(account_id: int):
             ma.id,
             ma.phone,
             ma.is_active,
+            ma.code_monitor_enabled,
+            ma.proxy_id,
+            p.proxy_string,
             ma.next_creation_time,
             ma.backoff_level,
             ma.last_error,
+            ma.session_status,
             (SELECT MAX(gcl.creation_timestamp)
              FROM group_creation_log gcl
              WHERE gcl.account_id = ma.id) as last_creation_time,
@@ -1076,6 +1743,7 @@ def get_account_details(account_id: int):
              FROM group_creation_log gcl
              WHERE gcl.account_id = ma.id) as total_groups
         FROM managed_accounts ma
+        LEFT JOIN proxies p ON p.id = ma.proxy_id
         WHERE ma.id = ?
     """
     try:
