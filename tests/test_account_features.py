@@ -705,5 +705,31 @@ class SharingAndManagersTests(unittest.TestCase):
         self.assertEqual(deep_link("mybot", "add", "tok"), "https://t.me/mybot?start=add_tok")
 
 
+class PerformanceAndConcurrencyTests(unittest.TestCase):
+    def test_two_step_locks_per_account(self):
+        from src.two_step import _account_lock_for
+        lock1 = _account_lock_for(42)
+        lock2 = _account_lock_for(42)
+        lock3 = _account_lock_for(43)
+        self.assertIs(lock1, lock2)
+        self.assertIsNot(lock1, lock3)
+
+    def test_database_wal_mode_and_busy_timeout(self):
+        from src.database import get_db_connection
+        with get_db_connection() as conn:
+            mode = conn.execute("PRAGMA journal_mode;").fetchone()[0]
+            self.assertIn(mode.lower(), ("wal", "memory"))
+
+    def test_two_step_conv_handler_fallbacks_include_start(self):
+        from telegram.ext import CommandHandler
+        from src.user_handlers import two_step_conv_handler, add_account_conv_handler
+
+        def has_start_command(handlers):
+            return any(isinstance(h, CommandHandler) and "start" in h.commands for h in handlers)
+
+        self.assertTrue(has_start_command(two_step_conv_handler.fallbacks))
+        self.assertTrue(has_start_command(add_account_conv_handler.fallbacks))
+
+
 if __name__ == "__main__":
     unittest.main()

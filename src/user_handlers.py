@@ -1002,6 +1002,8 @@ async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.answer()
         await main_menu(update, context, message_id=query.message.message_id)
     else:
+        if update.message and update.message.text and update.message.text.startswith("/start"):
+            return await start_handler(update, context)
         # If cancelled from a /cancel command, just send a reply
         await update.message.reply_text(_("Operation cancelled."))
 
@@ -1024,6 +1026,7 @@ add_account_conv_handler = ConversationHandler(
     },
     fallbacks=[
         CommandHandler("cancel", cancel_conversation),
+        CommandHandler("start", cancel_conversation),
         CallbackQueryHandler(cancel_conversation, pattern="^cancel_conv$")
     ],
     conversation_timeout=300,
@@ -1141,13 +1144,16 @@ async def cancel_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.user_data.pop("transfer_phone", None)
 
     query = update.callback_query
-    text = _("Account transfer cancelled.")
-    markup = InlineKeyboardMarkup([[InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")]]) if account_id else None
-
     if query:
+        text = _("Account transfer cancelled.")
+        markup = InlineKeyboardMarkup([[InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")]]) if account_id else None
         await query.answer()
         await query.edit_message_text(text, reply_markup=markup)
     else:
+        if update.message and update.message.text and update.message.text.startswith("/start"):
+            return await start_handler(update, context)
+        text = _("Account transfer cancelled.")
+        markup = InlineKeyboardMarkup([[InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")]]) if account_id else None
         await update.message.reply_text(text, reply_markup=markup)
     return ConversationHandler.END
 
@@ -1161,6 +1167,7 @@ transfer_account_conv_handler = ConversationHandler(
     },
     fallbacks=[
         CommandHandler("cancel", cancel_transfer),
+        CommandHandler("start", cancel_transfer),
         CallbackQueryHandler(cancel_transfer, pattern="^cancel_transfer$"),
     ],
     conversation_timeout=300,
@@ -1417,12 +1424,16 @@ async def cancel_two_step(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     _clear_two_step_data(context)
 
     query = update.callback_query
-    text = _("Two-step verification update cancelled.")
-    markup = _two_step_back_markup(account_id, _) if account_id else None
     if query:
+        text = _("Two-step verification update cancelled.")
+        markup = _two_step_back_markup(account_id, _) if account_id else None
         await query.answer()
         await query.edit_message_text(text, reply_markup=markup)
     else:
+        if update.message and update.message.text and update.message.text.startswith("/start"):
+            return await start_handler(update, context)
+        text = _("Two-step verification update cancelled.")
+        markup = _two_step_back_markup(account_id, _) if account_id else None
         await update.message.reply_text(text, reply_markup=markup)
     return ConversationHandler.END
 
@@ -1441,6 +1452,7 @@ two_step_conv_handler = ConversationHandler(
     },
     fallbacks=[
         CommandHandler("cancel", cancel_two_step),
+        CommandHandler("start", cancel_two_step),
         CallbackQueryHandler(cancel_two_step, pattern="^cancel_2fa$"),
     ],
     conversation_timeout=300,

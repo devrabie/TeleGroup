@@ -31,6 +31,7 @@ MAX_GIFTS = 30
 MAX_TEXT_CHARS = 3900
 
 TELEGRAM_OFFICIAL_ID = 777000
+EXPLORER_CALL_TIMEOUT = 15.0
 
 
 class ExplorerError(Exception):
@@ -344,10 +345,13 @@ async def fetch_identity(account_id: int, force: bool = False) -> dict:
             return cached
     try:
         async with open_account_client(account_id) as client:
-            res = await asyncio.gather(
-                client.get_me(),
-                client.get_chat("me"),
-                return_exceptions=True
+            res = await asyncio.wait_for(
+                asyncio.gather(
+                    client.get_me(),
+                    client.get_chat("me"),
+                    return_exceptions=True
+                ),
+                timeout=EXPLORER_CALL_TIMEOUT
             )
             me = res[0]
             if isinstance(me, Exception):
@@ -369,10 +373,13 @@ async def fetch_profile(account_id: int, force: bool = False) -> dict:
             return cached
     try:
         async with open_account_client(account_id) as client:
-            res = await asyncio.gather(
-                client.get_me(),
-                client.get_chat("me"),
-                return_exceptions=True
+            res = await asyncio.wait_for(
+                asyncio.gather(
+                    client.get_me(),
+                    client.get_chat("me"),
+                    return_exceptions=True
+                ),
+                timeout=EXPLORER_CALL_TIMEOUT
             )
             me = res[0]
             if isinstance(me, Exception):
@@ -430,16 +437,18 @@ async def fetch_private_dialogs(account_id: int, force: bool = False) -> list[di
     dialogs: list[dict] = []
     try:
         async with open_account_client(account_id) as client:
-            scanned = 0
-            async for dialog in client.get_dialogs():
-                scanned += 1
-                item = serialize_dialog(dialog)
-                if item:
-                    dialogs.append(item)
-                    if len(dialogs) >= MAX_PRIVATE_DIALOGS:
+            async def _scan_dialogs():
+                scanned = 0
+                async for dialog in client.get_dialogs():
+                    scanned += 1
+                    item = serialize_dialog(dialog)
+                    if item:
+                        dialogs.append(item)
+                        if len(dialogs) >= MAX_PRIVATE_DIALOGS:
+                            break
+                    if scanned >= MAX_DIALOG_SCAN:
                         break
-                if scanned >= MAX_DIALOG_SCAN:
-                    break
+            await asyncio.wait_for(_scan_dialogs(), timeout=EXPLORER_CALL_TIMEOUT)
             await _catch_up_security_messages(client, account_id)
     except Exception as e:
         raise _map_client_error(e, account_id) from e
@@ -459,24 +468,26 @@ async def fetch_private_messages(account_id: int, chat_id: int, force: bool = Fa
     chat_meta = {"chat_id": chat_id, "name": "", "username": "", "is_self": False, "is_bot": False}
     try:
         async with open_account_client(account_id) as client:
-            try:
-                chat = await client.get_chat(chat_id)
-                chat_meta.update({
-                    "name": (
-                        getattr(chat, "full_name", None)
-                        or getattr(chat, "first_name", None)
-                        or getattr(chat, "title", None)
-                        or ""
-                    ).strip(),
-                    "username": getattr(chat, "username", None) or "",
-                    "is_self": bool(getattr(chat, "is_self", False)),
-                    "is_bot": bool(getattr(chat, "is_bot", False)),
-                    "is_official": int(chat_id) == TELEGRAM_OFFICIAL_ID,
-                })
-            except Exception as e:
-                log.debug(f"get_chat({chat_id}) failed for account {account_id}: {e}")
-            async for message in client.get_chat_history(chat_id, limit=36):
-                messages.append(serialize_message(message))
+            async def _fetch_messages():
+                try:
+                    chat = await client.get_chat(chat_id)
+                    chat_meta.update({
+                        "name": (
+                            getattr(chat, "full_name", None)
+                            or getattr(chat, "first_name", None)
+                            or getattr(chat, "title", None)
+                            or ""
+                        ).strip(),
+                        "username": getattr(chat, "username", None) or "",
+                        "is_self": bool(getattr(chat, "is_self", False)),
+                        "is_bot": bool(getattr(chat, "is_bot", False)),
+                        "is_official": int(chat_id) == TELEGRAM_OFFICIAL_ID,
+                    })
+                except Exception as e:
+                    log.debug(f"get_chat({chat_id}) failed for account {account_id}: {e}")
+                async for message in client.get_chat_history(chat_id, limit=36):
+                    messages.append(serialize_message(message))
+            await asyncio.wait_for(_fetch_messages(), timeout=EXPLORER_CALL_TIMEOUT)
     except Exception as e:
         raise _map_client_error(e, account_id) from e
     mark_session_ok(account_id)
@@ -491,7 +502,10 @@ async def fetch_active_sessions(account_id: int) -> list[dict]:
     try:
         async with open_account_client(account_id) as client:
             from pyrogram import raw
-            res = await client.invoke(raw.functions.account.GetAuthorizations())
+            res = await asyncio.wait_for(
+                client.invoke(raw.functions.account.GetAuthorizations()),
+                timeout=EXPLORER_CALL_TIMEOUT
+            )
             authorizations = getattr(res, "authorizations", []) or []
             for auth in authorizations:
                 date_created = getattr(auth, "date_created", 0) or 0
@@ -523,7 +537,10 @@ async def revoke_session(account_id: int, hash_val: int) -> bool:
     try:
         async with open_account_client(account_id) as client:
             from pyrogram import raw
-            res = await client.invoke(raw.functions.account.ResetAuthorization(hash=hash_val))
+            res = await asyncio.wait_for(
+                client.invoke(raw.functions.account.ResetAuthorization(hash=hash_val)),
+                timeout=EXPLORER_CALL_TIMEOUT
+            )
             return bool(res)
     except Exception as e:
         raise _map_client_error(e, account_id) from e

@@ -145,8 +145,11 @@ def initialize_database():
     """
     log.info(f"Initializing database at: {DB_FILE.resolve()}")
     try:
-        with sqlite3.connect(DB_FILE) as conn:
+        with sqlite3.connect(DB_FILE, timeout=15.0) as conn:
             cursor = conn.cursor()
+            # Enable WAL mode and busy timeout for high concurrency
+            cursor.execute("PRAGMA journal_mode = WAL;")
+            cursor.execute("PRAGMA busy_timeout = 10000;")
             # Enable foreign key support
             cursor.execute("PRAGMA foreign_keys = ON;")
 
@@ -316,8 +319,10 @@ def get_db_connection():
     """
     Returns a connection to the SQLite database.
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=15.0)
     conn.row_factory = sqlite3.Row # Allows accessing columns by name
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA busy_timeout = 10000;")
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
