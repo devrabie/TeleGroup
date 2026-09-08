@@ -9,7 +9,7 @@ from typing import Any, Callable, Optional
 
 from pyrogram.enums import ChatType, MessageMediaType
 import asyncio
-from pyrogram.errors import FloodWait, Timeout
+from pyrogram.errors import FloodWait, Timeout, RPCError
 
 from src.cache_store import cache_store
 from src.code_monitor import AUTH_ERRORS
@@ -71,6 +71,7 @@ def display_name(identity: Optional[dict], fallback: str = "") -> str:
 
 
 def _map_client_error(exc: Exception, account_id: int | None = None) -> ExplorerError:
+    log.error(f"Explorer client error for account {account_id}: {type(exc).__name__}: {exc}", exc_info=exc)
     if isinstance(exc, ExplorerError):
         error = exc
     elif isinstance(exc, TwoStepError):
@@ -81,6 +82,8 @@ def _map_client_error(exc: Exception, account_id: int | None = None) -> Explorer
         error = ExplorerError("flood_wait", str(getattr(exc, "value", "")))
     elif isinstance(exc, (asyncio.TimeoutError, Timeout, ConnectionError, OSError)):
         error = ExplorerError("connect_failed", str(exc))
+    elif isinstance(exc, RPCError):
+        error = ExplorerError("unexpected", f"RPCError ({exc.MESSAGE or type(exc).__name__}): {exc}")
     else:
         error = ExplorerError("unexpected", str(exc))
     if error.code == "session_invalid" and account_id is not None:
