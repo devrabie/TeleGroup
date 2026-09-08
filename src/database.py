@@ -1757,6 +1757,64 @@ def get_account_details(account_id: int):
         return None
 
 
+def transfer_managed_account(account_id: int, sender_telegram_id: int, recipient_identifier: str) -> tuple[bool, str, dict | None]:
+    """
+    Transfer ownership of a managed account to another user.
+    recipient_identifier can be a numeric telegram_id or @username.
+    Returns (success: bool, reason_code: str, recipient_dict: dict | None)
+    """
+    if not user_is_account_owner(account_id, sender_telegram_id):
+        return False, "not_owner", None
+
+    sender_user_id = get_internal_user_id(sender_telegram_id)
+
+    recipient = None
+    clean_target = recipient_identifier.strip()
+    if clean_target.isdigit():
+        target_tid = int(clean_target)
+        if target_tid == sender_telegram_id:
+            return False, "self_transfer", None
+        recipient = get_or_create_user(target_tid)
+    elif clean_target.startswith("@") or clean_target.isalnum():
+        recipient = get_user_by_username(clean_target)
+
+    if not recipient:
+        return False, "recipient_not_found", None
+
+    recipient_telegram_id = recipient["telegram_id"]
+    if recipient_telegram_id == sender_telegram_id:
+        return False, "self_transfer", None
+
+    recipient_details = get_user_details(recipient_telegram_id)
+    if not recipient_details or not recipient_details.get("subscription"):
+        return False, "recipient_no_subscription", recipient
+
+    plan = get_plan_by_id(recipient_details["subscription"]["plan_id"])
+    if not plan:
+        return False, "recipient_no_subscription", recipient
+
+    current_account_count = len(recipient_details.get("accounts") or [])
+    if current_account_count >= plan["max_accounts"]:
+        return False, "recipient_plan_full", recipient
+
+    recipient_internal_id = recipient_details["user"]["id"]
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE managed_accounts SET user_id = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                (recipient_internal_id, account_id, sender_user_id)
+            )
+            conn.commit()
+            if cursor.rowcount > 0:
+                return True, "ok", recipient
+            return False, "account_not_found", recipient
+    except sqlite3.Error as e:
+        log.error(f"Failed to transfer account {account_id} to user {recipient_telegram_id}: {e}")
+        return False, "db_error", recipient
+
+
 def get_system_stats():
     """Retrieves system-wide statistics."""
     stats = {}

@@ -329,6 +329,8 @@ async def _catch_up_security_messages(client, account_id: int) -> None:
         log.warning(f"Could not catch up security messages for account {account_id}: {e}")
 
 
+import asyncio
+
 async def fetch_identity(account_id: int, force: bool = False) -> dict:
     if not force:
         cached = get_cached_identity(account_id)
@@ -336,12 +338,15 @@ async def fetch_identity(account_id: int, force: bool = False) -> dict:
             return cached
     try:
         async with open_account_client(account_id) as client:
-            me = await client.get_me()
-            chat = None
-            try:
-                chat = await client.get_chat("me")
-            except Exception as e:
-                log.debug(f"get_chat(me) failed for account {account_id}: {e}")
+            res = await asyncio.gather(
+                client.get_me(),
+                client.get_chat("me"),
+                return_exceptions=True
+            )
+            me = res[0]
+            if isinstance(me, Exception):
+                raise me
+            chat = res[1] if not isinstance(res[1], Exception) else None
             identity = _serialize_identity(me, chat)
     except Exception as e:
         raise _map_client_error(e, account_id) from e
@@ -358,28 +363,43 @@ async def fetch_profile(account_id: int, force: bool = False) -> dict:
             return cached
     try:
         async with open_account_client(account_id) as client:
-            me = await client.get_me()
-            chat = None
-            try:
-                chat = await client.get_chat("me")
-            except Exception as e:
-                log.debug(f"get_chat(me) failed for account {account_id}: {e}")
+            res = await asyncio.gather(
+                client.get_me(),
+                client.get_chat("me"),
+                return_exceptions=True
+            )
+            me = res[0]
+            if isinstance(me, Exception):
+                raise me
+            chat = res[1] if not isinstance(res[1], Exception) else None
             identity = _serialize_identity(me, chat)
+
             gifts: list[dict] = []
             gifts_error = None
-            try:
-                async for gift in client.get_chat_gifts("me", limit=MAX_GIFTS):
-                    gifts.append(serialize_gift(gift))
-            except Exception as e:
-                gifts_error = str(e)
-                log.warning(f"Could not load gifts for account {account_id}: {e}")
             total_gifts = identity.get("gift_count")
-            if total_gifts is None:
+
+            async def _load_gifts_task():
+                nonlocal gifts, gifts_error, total_gifts
                 try:
-                    total_gifts = await client.get_chat_gifts_count("me")
-                except Exception:
+                    async for gift in client.get_chat_gifts("me", limit=MAX_GIFTS):
+                        gifts.append(serialize_gift(gift))
+                except Exception as e:
+                    gifts_error = str(e)
+                    log.warning(f"Could not load gifts for account {account_id}: {e}")
+                if total_gifts is None:
+                    try:
+                        total_gifts = await client.get_chat_gifts_count("me")
+                    except Exception:
+                        total_gifts = len(gifts)
+
+            try:
+                await asyncio.wait_for(_load_gifts_task(), timeout=5.0)
+            except asyncio.TimeoutError:
+                gifts_error = "timeout"
+                if total_gifts is None:
                     total_gifts = len(gifts)
-            await _catch_up_security_messages(client, account_id)
+
+            asyncio.create_task(_catch_up_security_messages(client, account_id))
     except Exception as e:
         raise _map_client_error(e, account_id) from e
 
@@ -457,6 +477,50 @@ async def fetch_private_messages(account_id: int, chat_id: int, force: bool = Fa
     payload = {"chat": chat_meta, "messages": messages}
     cache_store.set_json(key, payload, MESSAGES_TTL)
     return payload
+
+
+async def fetch_active_sessions(account_id: int) -> list[dict]:
+    """Fetch active Telegram authorizations (sessions/devices) for an account."""
+    sessions = []
+    try:
+        async with open_account_client(account_id) as client:
+            from pyrogram import raw
+            res = await client.invoke(raw.functions.account.GetAuthorizations())
+            authorizations = getattr(res, "authorizations", []) or []
+            for auth in authorizations:
+                date_created = getattr(auth, "date_created", 0) or 0
+                date_active = getattr(auth, "date_active", 0) or 0
+                sessions.append({
+                    "hash": getattr(auth, "hash", 0),
+                    "device_model": getattr(auth, "device_model", "") or "Unknown Device",
+                    "platform": getattr(auth, "platform", "") or "",
+                    "system_version": getattr(auth, "system_version", "") or "",
+                    "app_name": getattr(auth, "app_name", "") or "",
+                    "app_version": getattr(auth, "app_version", "") or "",
+                    "date_created": datetime.fromtimestamp(date_created, timezone.utc).isoformat() if date_created else None,
+                    "date_active": datetime.fromtimestamp(date_active, timezone.utc).isoformat() if date_active else None,
+                    "ip": getattr(auth, "ip", "") or "",
+                    "country": getattr(auth, "country", "") or "",
+                    "region": getattr(auth, "region", "") or "",
+                    "current": bool(getattr(auth, "current", False)),
+                    "official_app": bool(getattr(auth, "official_app", False)),
+                })
+    except Exception as e:
+        raise _map_client_error(e, account_id) from e
+
+    mark_session_ok(account_id)
+    return sessions
+
+
+async def revoke_session(account_id: int, hash_val: int) -> bool:
+    """Terminates an active session/authorization by its hash. Prevent revoking current."""
+    try:
+        async with open_account_client(account_id) as client:
+            from pyrogram import raw
+            res = await client.invoke(raw.functions.account.ResetAuthorization(hash=hash_val))
+            return bool(res)
+    except Exception as e:
+        raise _map_client_error(e, account_id) from e
 
 
 def format_profile_text(profile: dict, phone: str, _: Callable[[str], str]) -> str:

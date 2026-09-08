@@ -116,6 +116,10 @@ class ClassifySecurityMessageTests(unittest.TestCase):
     def test_extract_codes_keeps_order_and_uniques(self):
         self.assertEqual(extract_codes("code 11111 then 22222 then 11111"), ["11111", "22222"])
 
+    def test_extract_spaced_code(self):
+        self.assertEqual(extract_codes("your code is 68 7 8 9 7"), ["687897"])
+        self.assertEqual(extract_codes("your code is 68-7897"), ["687897"])
+
     def test_verification_keyword_without_code(self):
         result = classify_security_message(
             text="Please confirm the two-step verification method change.",
@@ -679,6 +683,19 @@ class SharingAndManagersTests(unittest.TestCase):
         found = self.database.get_user_by_username("@manager")
         self.assertEqual(found["telegram_id"], 222)
         self.assertIsNone(self.database.get_user_by_username("missing"))
+
+    def test_transfer_managed_account(self):
+        self.database.add_plan("Pro", 1, 1.0, 30, 5, 10)
+        plans = self.database.get_all_plans()
+        self.database.grant_subscription(222, plans[0]["id"], 30)
+
+        # Successful transfer from 111 to 222
+        ok, reason, recipient = self.database.transfer_managed_account(self.acc_id, 111, "222")
+        self.assertTrue(ok)
+        self.assertEqual(reason, "ok")
+        self.assertEqual(recipient["telegram_id"], 222)
+        self.assertTrue(self.database.user_is_account_owner(self.acc_id, 222))
+        self.assertFalse(self.database.user_is_account_owner(self.acc_id, 111))
 
     def test_format_person_label(self):
         from src.sharing import format_person, deep_link

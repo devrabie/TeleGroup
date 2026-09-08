@@ -33,17 +33,19 @@ from src.database import (
     set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
     update_user_details, mark_proxy_as_bad, get_account_details, get_info_page_content,
     get_user_language, get_random_device_profile, get_device_profile_by_account_id,
-    session_is_invalid, user_owns_account, get_accessible_accounts, add_account_manager,
-    resolve_sharing_token,
+    session_is_invalid, user_owns_account, user_is_account_owner, get_accessible_accounts, add_account_manager,
+    resolve_sharing_token, transfer_managed_account,
 )
 from src.translation import get_translation_func_for_user
 from src.code_monitor import build_proxy_dict, code_monitor_manager, is_socks_auth_error
 from src.account_explorer import display_name, format_session_health_text, get_cached_identity
 from src.account_views import (
+    handle_revoke_session,
     load_identity_for_menu,
     show_conversation,
     show_inbox,
     show_profile,
+    show_sessions,
 )
 from src.two_step import (
     TwoStepError,
@@ -912,7 +914,10 @@ async def async_sign_in(code, context, user_id, _):
 async def receive_phone_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    code = update.message.text
+    raw_code = update.message.text or ""
+    # Strip spaces, hyphens, and non-digit characters so inputs like "68 7 8 9 7" or "68-7897" work properly
+    clean_code = re.sub(r"\D", "", raw_code)
+    code = clean_code if clean_code else raw_code.strip()
     asyncio.create_task(async_sign_in(code, context, user_id, _))
     await update.message.reply_text(_("Processing..."))
     # The state transition is problematic here. We'll let the user send the password if needed.
@@ -1025,6 +1030,143 @@ add_account_conv_handler = ConversationHandler(
     per_message=False,
     allow_reentry=True,
 )
+
+# --- Account Transfer Conversation ---
+TRANSFER_RECIPIENT = 20
+
+
+async def transfer_account_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+
+    try:
+        account_id = int(query.data.split("_")[2])
+    except (IndexError, ValueError):
+        await query.edit_message_text(_("Error: Account not found or you don't have permission."))
+        return ConversationHandler.END
+
+    if not user_is_account_owner(account_id, user_id):
+        await query.edit_message_text(_("Only the owner can transfer this account."))
+        return ConversationHandler.END
+
+    acc = get_account_details(account_id)
+    phone = acc["phone"] if acc else "?"
+    context.user_data["transfer_account_id"] = account_id
+    context.user_data["transfer_phone"] = phone
+
+    text = _(
+        "<b>Transfer Account</b>: <code>{phone}</code>\n\n"
+        "Transferring an account moves its session and ownership to another user in this bot, without requiring them to log in again.\n\n"
+        "Please send the recipient's numeric Telegram User ID or @username now:"
+    ).format(phone=phone)
+
+    keyboard = [[InlineKeyboardButton(_("❌ Cancel"), callback_data="cancel_transfer")]]
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode=ParseMode.HTML,
+    )
+    return TRANSFER_RECIPIENT
+
+
+async def receive_transfer_recipient(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    account_id = context.user_data.get("transfer_account_id")
+    phone = context.user_data.get("transfer_phone") or "?"
+
+    if not account_id:
+        await update.message.reply_text(_("Error: Transfer session expired."))
+        return ConversationHandler.END
+
+    raw_input = update.message.text or ""
+    success, reason, recipient = transfer_managed_account(account_id, user_id, raw_input)
+
+    back_markup = InlineKeyboardMarkup([[
+        InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")
+    ]])
+
+    if success and recipient:
+        recipient_tid = recipient["telegram_id"]
+        recipient_name = format_person(recipient_tid, recipient.get("first_name"), recipient.get("username"))
+        await update.message.reply_text(
+            _("✅ Account <code>{phone}</code> has been successfully transferred to {recipient}.").format(
+                phone=phone, recipient=recipient_name
+            ),
+            parse_mode=ParseMode.HTML,
+            reply_markup=back_markup,
+        )
+        # Notify recipient
+        try:
+            sender_details = get_user_details(user_id)
+            sender_user = (sender_details or {}).get("user") or {}
+            sender_person = format_person(user_id, sender_user.get("first_name"), sender_user.get("username"))
+            r_ = get_translation_func_for_user(recipient_tid)
+            await context.bot.send_message(
+                recipient_tid,
+                r_("📲 User {sender} transferred the managed account <code>{phone}</code> to your list!").format(
+                    sender=sender_person, phone=phone
+                ),
+                parse_mode=ParseMode.HTML,
+            )
+        except Exception as e:
+            log.warning(f"Could not notify recipient {recipient_tid} about account transfer: {e}")
+
+        context.user_data.pop("transfer_account_id", None)
+        context.user_data.pop("transfer_phone", None)
+        return ConversationHandler.END
+
+    # Error cases
+    error_messages = {
+        "self_transfer": _("You cannot transfer an account to yourself."),
+        "recipient_not_found": _("Recipient not found. They must start this bot first."),
+        "recipient_no_subscription": _("The recipient does not have an active subscription."),
+        "recipient_plan_full": _("The recipient's subscription plan has reached its account limit."),
+        "not_owner": _("Only the owner can transfer this account."),
+    }
+    err_text = error_messages.get(reason, _("Transfer failed. Please try again."))
+    await update.message.reply_text(
+        err_text + "\n\n" + _("Send a valid user ID / @username, or send /cancel to stop.")
+    )
+    return TRANSFER_RECIPIENT
+
+
+async def cancel_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    account_id = context.user_data.get("transfer_account_id")
+    context.user_data.pop("transfer_account_id", None)
+    context.user_data.pop("transfer_phone", None)
+
+    query = update.callback_query
+    text = _("Account transfer cancelled.")
+    markup = InlineKeyboardMarkup([[InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")]]) if account_id else None
+
+    if query:
+        await query.answer()
+        await query.edit_message_text(text, reply_markup=markup)
+    else:
+        await update.message.reply_text(text, reply_markup=markup)
+    return ConversationHandler.END
+
+
+transfer_account_conv_handler = ConversationHandler(
+    entry_points=[
+        CallbackQueryHandler(transfer_account_start, pattern=r"^mng_transfer_\d+$"),
+    ],
+    states={
+        TRANSFER_RECIPIENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_transfer_recipient)],
+    },
+    fallbacks=[
+        CommandHandler("cancel", cancel_transfer),
+        CallbackQueryHandler(cancel_transfer, pattern="^cancel_transfer$"),
+    ],
+    conversation_timeout=300,
+    per_message=False,
+)
+
 
 # --- Two-Step Verification Conversation ---
 TWO_STEP_NEW, TWO_STEP_CONFIRM, TWO_STEP_CURRENT, TWO_STEP_NEW_CHANGE, TWO_STEP_CONFIRM_CHANGE = range(10, 15)
@@ -1506,6 +1648,9 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
             InlineKeyboardButton(_("💬 Private Chats"), callback_data=f"mng_inbox_{acc['id']}"),
         ],
         [
+            InlineKeyboardButton(_("💻 Active Sessions & Devices"), callback_data=f"mng_sessions_{acc['id']}"),
+        ],
+        [
             InlineKeyboardButton(
                 _("▶️ Enable Group Creation") if not acc['is_active'] else _("⏹️ Disable Group Creation"),
                 callback_data=f"mng_toggle_{acc['id']}"
@@ -1523,6 +1668,10 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
                 _("🔑 Two-Step Verification"),
                 callback_data=f"mng_2fa_{acc['id']}"
             ),
+            InlineKeyboardButton(
+                _("📲 Transfer Account"),
+                callback_data=f"mng_transfer_{acc['id']}"
+            ) if user_is_account_owner(acc['id'], user_id) else None,
         ],
         [
             InlineKeyboardButton(_("📂 View Groups"), callback_data=f"mng_viewgroups_{acc['id']}"),
@@ -1697,6 +1846,19 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                 int(action_parts[3]),
                 0,
                 force=True,
+            )
+            return
+
+        if action == "sessions":
+            await show_sessions(update, context, int(action_parts[2]))
+            return
+
+        if action == "revokesess":
+            await handle_revoke_session(
+                update,
+                context,
+                int(action_parts[2]),
+                int(action_parts[3]),
             )
             return
 
@@ -1995,6 +2157,7 @@ user_handlers_list = [
     CommandHandler("language", language_handler),
     CallbackQueryHandler(set_language_callback, pattern="^set_lang_"),
     CommandHandler("my_accounts", my_accounts_handler),
+    transfer_account_conv_handler,
     two_step_conv_handler,
     team_add_conv_handler,
     CallbackQueryHandler(manage_account_callback, pattern="^mng_"),

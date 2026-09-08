@@ -11,6 +11,7 @@ TELEGRAM_OFFICIAL_USERNAMES = {"telegram"}
 
 # Telegram login codes are typically 5 digits; other OTPs are commonly 5-8.
 LOGIN_CODE_RE = re.compile(r"(?<!\d)(\d{5,8})(?!\d)")
+SPACED_CODE_RE = re.compile(r"(?<!\d)(\d(?:[\s\-\.–—_]*\d){4,7})(?!\d)")
 
 # Phrases that indicate a verification / 2FA / login-security message.
 # ASCII phrases are matched case-insensitively; Arabic phrases are matched as-is.
@@ -68,7 +69,7 @@ KIND_VERIFICATION = "verification"
 
 
 def extract_codes(text: str) -> list[str]:
-    """Return unique 5-8 digit codes found in *text*, preserving order."""
+    """Return unique 5-8 digit codes found in *text*, preserving order. Handles spaced codes like '68 7 8 9 7'."""
     if not text:
         return []
     seen = set()
@@ -77,6 +78,14 @@ def extract_codes(text: str) -> list[str]:
         if code not in seen:
             seen.add(code)
             codes.append(code)
+
+    if not codes:
+        for match in SPACED_CODE_RE.findall(text):
+            digits_only = re.sub(r"\D", "", match)
+            if 5 <= len(digits_only) <= 8 and digits_only not in seen:
+                seen.add(digits_only)
+                codes.append(digits_only)
+
     return codes
 
 
