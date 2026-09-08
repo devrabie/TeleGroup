@@ -8,7 +8,8 @@ from html import escape
 from typing import Any, Callable, Optional
 
 from pyrogram.enums import ChatType, MessageMediaType
-from pyrogram.errors import FloodWait
+import asyncio
+from pyrogram.errors import FloodWait, Timeout
 
 from src.cache_store import cache_store
 from src.code_monitor import AUTH_ERRORS
@@ -78,6 +79,8 @@ def _map_client_error(exc: Exception, account_id: int | None = None) -> Explorer
         error = ExplorerError("session_invalid", str(exc))
     elif isinstance(exc, FloodWait):
         error = ExplorerError("flood_wait", str(getattr(exc, "value", "")))
+    elif isinstance(exc, (asyncio.TimeoutError, Timeout, ConnectionError, OSError)):
+        error = ExplorerError("connect_failed", str(exc))
     else:
         error = ExplorerError("unexpected", str(exc))
     if error.code == "session_invalid" and account_id is not None:

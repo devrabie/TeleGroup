@@ -513,9 +513,14 @@ msgid ""
 "<b>/language</b> - Change the display language of the bot "
 "(English/العربية).\n"
 "\n"
-"After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation, login-code monitoring, or two-step verification for each account separately.\n"
+"After adding an account, group creation is <b>off</b> by default. Open "
+"/my_accounts to enable group creation, login-code monitoring, or two-step"
+" verification for each account separately.\n"
 "\n"
-"From the main menu you can add a <b>manager</b> who can view and manage your accounts, and share an <b>add-number invite</b>. Anyone who opens that link can sign in a phone number; it is added to your list (not theirs) and you get a notification.\n"
+"From the main menu you can add a <b>manager</b> who can view and manage "
+"your accounts, and share an <b>add-number invite</b>. Anyone who opens "
+"that link can sign in a phone number; it is added to your list (not "
+"theirs) and you get a notification.\n"
 "\n"
 "For most features, you need an active subscription. You can get one via "
 "the /subscribe command."
@@ -532,9 +537,13 @@ msgstr ""
 "البوت.\n"
 "<b>/language</b> - تغيير لغة عرض البوت (English/العربية).\n"
 "\n"
-"بعد إضافة حساب، يكون إنشاء المجموعات <b>متوقفاً</b> افتراضياً. افتح /my_accounts لتفعيل إنشاء المجموعات و/أو مراقبة أكواد التحقق أو رمز التحقق بخطوتين لكل حساب على حدة.\n"
+"بعد إضافة حساب، يكون إنشاء المجموعات <b>متوقفاً</b> افتراضياً. افتح "
+"/my_accounts لتفعيل إنشاء المجموعات و/أو مراقبة أكواد التحقق أو رمز "
+"التحقق بخطوتين لكل حساب على حدة.\n"
 "\n"
-"من القائمة الرئيسية يمكنك إضافة <b>مدير</b> يرى ويدير حساباتك، ومشاركة <b>رابط إضافة رقم</b>. أي شخص يفتح الرابط يسجّل رقم هاتف فيُضاف إلى قائمتك وليس إلى قائمته، ويصلك إشعار.\n"
+"من القائمة الرئيسية يمكنك إضافة <b>مدير</b> يرى ويدير حساباتك، ومشاركة "
+"<b>رابط إضافة رقم</b>. أي شخص يفتح الرابط يسجّل رقم هاتف فيُضاف إلى "
+"قائمتك وليس إلى قائمته، ويصلك إشعار.\n"
 "\n"
 "لاستخدام معظم الميزات، تحتاج إلى اشتراك نشط. يمكنك الحصول عليه عبر الأمر "
 "/subscribe."
@@ -970,13 +979,21 @@ msgstr "الرجاء اختيار صفحة المحتوى التي تريد تع
 #: src/admin_handlers.py:97
 #, python-brace-format
 msgid ""
-"You are editing the content for: <b>{page_key}</b>\n\n"
-"Please send the new text. Send /cancel to abort.\n\n"
-"<b>Current content:</b>\n\n<pre>{current_content}</pre>"
+"You are editing the content for: <b>{page_key}</b>\n"
+"\n"
+"Please send the new text. Send /cancel to abort.\n"
+"\n"
+"<b>Current content:</b>\n"
+"\n"
+"<pre>{current_content}</pre>"
 msgstr ""
-"أنت تقوم بتعديل المحتوى لـ: <b>{page_key}</b>\n\n"
-"الرجاء إرسال النص الجديد. أرسل /cancel للإلغاء.\n\n"
-"<b>المحتوى الحالي:</b>\n\n<pre>{current_content}</pre>"
+"أنت تقوم بتعديل المحتوى لـ: <b>{page_key}</b>\n"
+"\n"
+"الرجاء إرسال النص الجديد. أرسل /cancel للإلغاء.\n"
+"\n"
+"<b>المحتوى الحالي:</b>\n"
+"\n"
+"<pre>{current_content}</pre>"
 
 #: src/admin_handlers.py:113
 #, python-brace-format
@@ -998,12 +1015,22 @@ msgstr "الرجاء اختيار اللغة التي تريد تعديلها:"
 
 #: src/admin_handlers.py:137
 #, python-brace-format
-msgid "You are editing the content for: <b>{page_key} ({lang})</b>\n\n"
-"Please send the new text. Send /cancel to abort.\n\n"
-"<b>Current content:</b>\n\n<pre>{current_content}</pre>"
-msgstr "أنت تقوم بتعديل المحتوى لـ: <b>{page_key} ({lang})</b>\n\n"
-"الرجاء إرسال النص الجديد. أرسل /cancel للإلغاء.\n\n"
-"<b>المحتوى الحالي:</b>\n\n<pre>{current_content}</pre>"
+msgid ""
+"You are editing the content for: <b>{page_key} ({lang})</b>\n"
+"\n"
+"Please send the new text. Send /cancel to abort.\n"
+"\n"
+"<b>Current content:</b>\n"
+"\n"
+"<pre>{current_content}</pre>"
+msgstr ""
+"أنت تقوم بتعديل المحتوى لـ: <b>{page_key} ({lang})</b>\n"
+"\n"
+"الرجاء إرسال النص الجديد. أرسل /cancel للإلغاء.\n"
+"\n"
+"<b>المحتوى الحالي:</b>\n"
+"\n"
+"<pre>{current_content}</pre>"
 
 #: src/admin_handlers.py:155
 #, python-brace-format
@@ -1016,15 +1043,25 @@ msgid "❌ Failed to update content for '<b>{page_key} ({lang})</b>'."
 msgstr "❌ فشل تحديث المحتوى لـ '<b>{page_key} ({lang})</b>'."
 
 #: src/user_handlers.py:516
-msgid "Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number."
-msgstr "لقد حظر تليجرام محاولة تسجيل الدخول هذه بواسطة اختبار CAPTCHA. قد يكون هذا بسبب رقم الهاتف أو عنوان IP الخاص بالخادم. يرجى المحاولة مرة أخرى لاحقًا أو باستخدام رقم هاتف مختلف."
+msgid ""
+"Telegram has blocked this login attempt with a CAPTCHA. This can be due "
+"to the phone number or the server's IP. Please try again later or with a "
+"different phone number."
+msgstr ""
+"لقد حظر تليجرام محاولة تسجيل الدخول هذه بواسطة اختبار CAPTCHA. قد يكون "
+"هذا بسبب رقم الهاتف أو عنوان IP الخاص بالخادم. يرجى المحاولة مرة أخرى "
+"لاحقًا أو باستخدام رقم هاتف مختلف."
 
 msgid ""
-"✅ Account added successfully!\n\n"
-"Group creation is <b>disabled</b> by default. Open /my_accounts to enable group creation or login-code monitoring for this account."
+"✅ Account added successfully!\n"
+"\n"
+"Group creation is <b>disabled</b> by default. Open /my_accounts to enable"
+" group creation or login-code monitoring for this account."
 msgstr ""
-"✅ تمت إضافة الحساب بنجاح!\n\n"
-"إنشاء المجموعات <b>معطّل</b> افتراضياً. افتح /my_accounts لتفعيل إنشاء المجموعات أو مراقبة أكواد التحقق لهذا الحساب."
+"✅ تمت إضافة الحساب بنجاح!\n"
+"\n"
+"إنشاء المجموعات <b>معطّل</b> افتراضياً. افتح /my_accounts لتفعيل إنشاء "
+"المجموعات أو مراقبة أكواد التحقق لهذا الحساب."
 
 msgid "⚪️ Off"
 msgstr "⚪️ متوقف"
@@ -1044,9 +1081,11 @@ msgstr "🟢 يعمل (متصل)"
 msgid "🟡 On (connecting)"
 msgstr "🟡 يعمل (جارٍ الاتصال)"
 
+#, python-brace-format
 msgid "<b>Account:</b> <code>{phone}</code>"
 msgstr "<b>الحساب:</b> <code>{phone}</code>"
 
+#, python-brace-format
 msgid ""
 "\n"
 "<b>Group Creation:</b> {status}"
@@ -1054,6 +1093,7 @@ msgstr ""
 "\n"
 "<b>إنشاء المجموعات:</b> {status}"
 
+#, python-brace-format
 msgid ""
 "\n"
 "<b>Code Monitor:</b> {status}"
@@ -1073,17 +1113,26 @@ msgstr "🔐 تفعيل مراقبة الأكواد"
 msgid "🔓 Disable Code Monitor"
 msgstr "🔓 إيقاف مراقبة الأكواد"
 
+#, python-brace-format
 msgid "Group creation has been {status}."
 msgstr "تم {status} إنشاء المجموعات."
 
 msgid "Code monitor is enabled, but an active subscription is required to run it."
 msgstr "تم تفعيل مراقبة الأكواد، لكن يلزم اشتراك نشط لتشغيلها."
 
-msgid "Code monitor enabled. Login codes and security notices will be forwarded here."
-msgstr "تم تفعيل مراقبة الأكواد. سيتم إرسال أكواد الدخول والتنبيهات الأمنية إلى هنا."
+msgid ""
+"Code monitor enabled. Login codes and security notices will be forwarded "
+"here."
+msgstr ""
+"تم تفعيل مراقبة الأكواد. سيتم إرسال أكواد الدخول والتنبيهات الأمنية إلى "
+"هنا."
 
-msgid "Code monitor is enabled, but the account could not connect yet. It will retry automatically."
-msgstr "تم تفعيل مراقبة الأكواد، لكن تعذر الاتصال بالحساب الآن. ستتم إعادة المحاولة تلقائياً."
+msgid ""
+"Code monitor is enabled, but the account could not connect yet. It will "
+"retry automatically."
+msgstr ""
+"تم تفعيل مراقبة الأكواد، لكن تعذر الاتصال بالحساب الآن. ستتم إعادة "
+"المحاولة تلقائياً."
 
 msgid "Code monitor disabled."
 msgstr "تم إيقاف مراقبة الأكواد."
@@ -1100,6 +1149,7 @@ msgstr "المراقبة تعمل"
 msgid "Monitor Off"
 msgstr "المراقبة متوقفة"
 
+#, python-brace-format
 msgid "  - <code>{phone}</code> ({group_status}, {monitor_status})\n"
 msgstr "  - <code>{phone}</code> ({group_status}، {monitor_status})\n"
 
@@ -1124,18 +1174,23 @@ msgstr "إشعار أمني"
 msgid "🔐 <b>Security alert</b>\n"
 msgstr "🔐 <b>تنبيه أمني</b>\n"
 
+#, python-brace-format
 msgid "Account: <code>{phone}</code>\n"
 msgstr "الحساب: <code>{phone}</code>\n"
 
+#, python-brace-format
 msgid "Source: {source}\n"
 msgstr "المصدر: {source}\n"
 
+#, python-brace-format
 msgid "Type: {kind}\n"
 msgstr "النوع: {kind}\n"
 
+#, python-brace-format
 msgid "Code: {codes}\n"
 msgstr "الرمز: {codes}\n"
 
+#, python-brace-format
 msgid ""
 "\n"
 "{body}"
@@ -1146,25 +1201,38 @@ msgstr ""
 msgid "(no text)"
 msgstr "(لا يوجد نص)"
 
-msgid "⚠️ Code monitor could not start for <code>{phone}</code> because the session is invalid or revoked. Please delete and re-add the account."
-msgstr "⚠️ تعذر تشغيل مراقبة الأكواد للحساب <code>{phone}</code> لأن الجلسة غير صالحة أو تم إلغاؤها. يرجى حذف الحساب وإضافته من جديد."
+#, python-brace-format
+msgid ""
+"⚠️ Code monitor could not start for <code>{phone}</code> because the "
+"session is invalid or revoked. Please delete and re-add the account."
+msgstr ""
+"⚠️ تعذر تشغيل مراقبة الأكواد للحساب <code>{phone}</code> لأن الجلسة غير "
+"صالحة أو تم إلغاؤها. يرجى حذف الحساب وإضافته من جديد."
 
+#, python-brace-format
 msgid "⚠️ Code monitor failed for <code>{phone}</code>."
 msgstr "⚠️ فشلت مراقبة الأكواد للحساب <code>{phone}</code>."
 
 msgid "🔑 Two-Step Verification"
 msgstr "🔑 رمز التحقق بخطوتين"
 
+#, python-brace-format
 msgid "Checking two-step verification status for <code>{phone}</code>..."
 msgstr "جارٍ التحقق من حالة التحقق بخطوتين للحساب <code>{phone}</code>..."
 
+#, python-brace-format
 msgid ""
-"<b>Two-Step Verification</b> is already enabled for <code>{phone}</code>.{hint_line}\n\n"
+"<b>Two-Step Verification</b> is already enabled for "
+"<code>{phone}</code>.{hint_line}\n"
+"\n"
 "Send the <b>current</b> password to change it, or tap Cancel."
 msgstr ""
-"<b>التحقق بخطوتين</b> مفعّل مسبقاً للحساب <code>{phone}</code>.{hint_line}\n\n"
+"<b>التحقق بخطوتين</b> مفعّل مسبقاً للحساب "
+"<code>{phone}</code>.{hint_line}\n"
+"\n"
 "أرسل كلمة المرور <b>الحالية</b> لتغييرها، أو اضغط إلغاء."
 
+#, python-brace-format
 msgid ""
 "\n"
 "Current hint: <code>{hint}</code>"
@@ -1172,11 +1240,14 @@ msgstr ""
 "\n"
 "التلميح الحالي: <code>{hint}</code>"
 
+#, python-brace-format
 msgid ""
-"<b>Two-Step Verification</b> is not enabled for <code>{phone}</code>.\n\n"
+"<b>Two-Step Verification</b> is not enabled for <code>{phone}</code>.\n"
+"\n"
 "Send the new password you want to set (at least 4 characters)."
 msgstr ""
-"<b>التحقق بخطوتين</b> غير مفعّل للحساب <code>{phone}</code>.\n\n"
+"<b>التحقق بخطوتين</b> غير مفعّل للحساب <code>{phone}</code>.\n"
+"\n"
 "أرسل كلمة المرور الجديدة التي تريد تعيينها (4 أحرف على الأقل)."
 
 msgid "Please send the same password again to confirm."
@@ -1194,9 +1265,11 @@ msgstr "أرسل كلمة المرور <b>الجديدة</b> (4 أحرف على 
 msgid "Updating two-step verification, please wait..."
 msgstr "جارٍ تحديث التحقق بخطوتين، الرجاء الانتظار..."
 
+#, python-brace-format
 msgid "✅ Two-step verification password updated for <code>{phone}</code>."
 msgstr "✅ تم تحديث كلمة مرور التحقق بخطوتين للحساب <code>{phone}</code>."
 
+#, python-brace-format
 msgid "✅ Two-step verification password enabled for <code>{phone}</code>."
 msgstr "✅ تم تفعيل كلمة مرور التحقق بخطوتين للحساب <code>{phone}</code>."
 
@@ -1218,19 +1291,26 @@ msgstr "كلمة المرور غير صالحة. أرسلها في سطر واح
 msgid "The current password is incorrect. Please try again."
 msgstr "كلمة المرور الحالية غير صحيحة. حاول مرة أخرى."
 
-msgid "Telegram temporarily blocked changing this password. Please try again later."
+msgid ""
+"Telegram temporarily blocked changing this password. Please try again "
+"later."
 msgstr "تليجرام منع تغيير كلمة المرور مؤقتاً. حاول لاحقاً."
 
 msgid "Telegram asked us to wait. Please try again in a few minutes."
 msgstr "طلب تليجرام الانتظار. حاول بعد بضع دقائق."
 
+#, python-brace-format
 msgid "Telegram asked us to wait {seconds} seconds. Please try again later."
 msgstr "طلب تليجرام الانتظار {seconds} ثانية. حاول لاحقاً."
 
-msgid "The account session is invalid or revoked. Please delete and re-add the account."
+msgid ""
+"The account session is invalid or revoked. Please delete and re-add the "
+"account."
 msgstr "جلسة الحساب غير صالحة أو تم إلغاؤها. احذف الحساب وأضفه من جديد."
 
-msgid "Two-step verification is already enabled. Send the current password to change it."
+msgid ""
+"Two-step verification is already enabled. Send the current password to "
+"change it."
 msgstr "التحقق بخطوتين مفعّل مسبقاً. أرسل كلمة المرور الحالية لتغييرها."
 
 msgid "Two-step verification is not enabled on this account yet."
@@ -1257,6 +1337,7 @@ msgstr "لا توجد بروكسيات متاحة."
 msgid "Could not update the proxy."
 msgstr "تعذر تحديث البروكسي."
 
+#, python-brace-format
 msgid ""
 "\n"
 "<b>Proxy:</b> <code>{proxy}</code>"
@@ -1273,33 +1354,41 @@ msgstr "💬 المحادثات الخاصة"
 msgid "📊 Group Report"
 msgstr "📊 تقرير المجموعات"
 
+#, python-brace-format
 msgid "👤 <b>{name}</b>"
 msgstr "👤 <b>{name}</b>"
 
+#, python-brace-format
 msgid "🔗 @{username}"
 msgstr "🔗 @{username}"
 
+#, python-brace-format
 msgid "📱 <code>{phone}</code>"
 msgstr "📱 <code>{phone}</code>"
 
+#, python-brace-format
 msgid "🆔 <code>{user_id}</code>"
 msgstr "🆔 <code>{user_id}</code>"
 
 msgid "⭐ Telegram Premium"
 msgstr "⭐ تيليجرام بريميوم"
 
+#, python-brace-format
 msgid "🌐 Language: {lang}"
 msgstr "🌐 اللغة: {lang}"
 
+#, python-brace-format
 msgid "🎭 {status}"
 msgstr "🎭 {status}"
 
+#, python-brace-format
 msgid "📝 {bio}"
 msgstr "📝 {bio}"
 
 msgid "✨ <b>Collectible usernames</b>"
 msgstr "✨ <b>أسماء المستخدم القابلة للجمع</b>"
 
+#, python-brace-format
 msgid "🎁 <b>Gifts & collectibles</b> ({count})"
 msgstr "🎁 <b>الهدايا والمقتنيات</b> ({count})"
 
@@ -1309,6 +1398,7 @@ msgstr "لا توجد هدايا أو مقتنيات على هذا الملف."
 msgid "Could not load gifts right now."
 msgstr "تعذر تحميل الهدايا الآن."
 
+#, python-brace-format
 msgid "…and {count} more"
 msgstr "…و{count} إضافية"
 
@@ -1324,8 +1414,13 @@ msgstr "جارٍ تحميل المحادثات الخاصة…"
 msgid "Opening conversation…"
 msgstr "جارٍ فتح المحادثة…"
 
-msgid "💬 <b>Private chats</b> · {name}\n{count} conversations · page {page}/{pages}"
-msgstr "💬 <b>المحادثات الخاصة</b> · {name}\n{count} محادثة · صفحة {page}/{pages}"
+#, python-brace-format
+msgid ""
+"💬 <b>Private chats</b> · {name}\n"
+"{count} conversations · page {page}/{pages}"
+msgstr ""
+"💬 <b>المحادثات الخاصة</b> · {name}\n"
+"{count} محادثة · صفحة {page}/{pages}"
 
 msgid "This account has no private conversations."
 msgstr "لا توجد محادثات خاصة على هذا الحساب."
@@ -1336,8 +1431,13 @@ msgstr "💾 الرسائل المحفوظة"
 msgid "No messages in this conversation."
 msgstr "لا توجد رسائل في هذه المحادثة."
 
-msgid "💬 <b>{name}</b>\n{subtitle}\n"
-msgstr "💬 <b>{name}</b>\n{subtitle}\n"
+#, python-brace-format
+msgid ""
+"💬 <b>{name}</b>\n"
+"{subtitle}\n"
+msgstr ""
+"💬 <b>{name}</b>\n"
+"{subtitle}\n"
 
 msgid "You"
 msgstr "أنت"
@@ -1387,6 +1487,7 @@ msgstr "الأقدم ➡️"
 msgid "🔙 Back to Chats"
 msgstr "🔙 رجوع للمحادثات"
 
+#, python-brace-format
 msgid "Page {page}/{pages}"
 msgstr "صفحة {page}/{pages}"
 
@@ -1417,8 +1518,12 @@ msgstr "❌ غير صالح — أعد تسجيل الدخول"
 msgid "⚠️ <b>Account invalid</b>"
 msgstr "⚠️ <b>الحساب غير صالح</b>"
 
-msgid "This session has expired or is no longer valid. You may need to sign in again — delete the account and add it once more."
-msgstr "هذه الجلسة منتهية أو لم تعد صالحة. قد تحتاج إعادة تسجيل الدخول: احذف الحساب ثم أضفه من جديد."
+msgid ""
+"This session has expired or is no longer valid. You may need to sign in "
+"again — delete the account and add it once more."
+msgstr ""
+"هذه الجلسة منتهية أو لم تعد صالحة. قد تحتاج إعادة تسجيل الدخول: احذف "
+"الحساب ثم أضفه من جديد."
 
 msgid "This invite link is invalid or has been replaced."
 msgstr "رابط الإضافة غير صالح أو تم استبداله."
@@ -1426,27 +1531,41 @@ msgstr "رابط الإضافة غير صالح أو تم استبداله."
 msgid "This team link is invalid or has been replaced."
 msgstr "رابط الفريق غير صالح أو تم استبداله."
 
-msgid "This is your own team link. Share it with the person you want as a manager."
+msgid ""
+"This is your own team link. Share it with the person you want as a "
+"manager."
 msgstr "هذا رابط فريقك. شاركه مع الشخص الذي تريد جعله مديراً."
 
-msgid "You can now view and manage {name}'s accounts from My Accounts. The numbers stay on their list, not yours."
-msgstr "يمكنك الآن عرض وإدارة حسابات {name} من «حساباتي». الأرقام تبقى في قائمته وليس في قائمتك."
+#, python-brace-format
+msgid ""
+"You can now view and manage {name}'s accounts from My Accounts. The "
+"numbers stay on their list, not yours."
+msgstr ""
+"يمكنك الآن عرض وإدارة حسابات {name} من «حساباتي». الأرقام تبقى في قائمته "
+"وليس في قائمتك."
 
+#, python-brace-format
 msgid "👥 {person} can now view and manage your accounts."
 msgstr "👥 أصبح {person} قادراً على عرض وإدارة حساباتك."
 
+#, python-brace-format
 msgid "You already manage {name}'s accounts."
 msgstr "أنت تدير حسابات {name} بالفعل."
 
 msgid "Could not add you as a manager."
 msgstr "تعذر إضافتك كمدير."
 
-msgid "The account owner does not have an active subscription, so this number cannot be added right now."
+msgid ""
+"The account owner does not have an active subscription, so this number "
+"cannot be added right now."
 msgstr "مالك الحساب لا يملك اشتراكاً نشطاً، لذلك لا يمكن إضافة هذا الرقم الآن."
 
-msgid "The account owner has reached the maximum number of accounts on their plan."
+msgid ""
+"The account owner has reached the maximum number of accounts on their "
+"plan."
 msgstr "وصل مالك الحساب إلى الحد الأقصى لعدد الحسابات في باقته."
 
+#, python-brace-format
 msgid ""
 "Enter the phone number to add to {name}'s account list.\n"
 "<i>(Must be in international format, e.g., +1234567890)</i>\n"
@@ -1458,6 +1577,7 @@ msgstr ""
 "\n"
 "لن يظهر هذا الرقم في حساباتك."
 
+#, python-brace-format
 msgid ""
 "✅ The number {phone} was added to {name}'s account list.\n"
 "\n"
@@ -1467,6 +1587,7 @@ msgstr ""
 "\n"
 "لن يظهر في حساباتك."
 
+#, python-brace-format
 msgid "📥 {person} added the number {phone} to your accounts."
 msgstr "📥 أضاف {person} الرقم {phone} إلى حساباتك."
 
@@ -1476,8 +1597,12 @@ msgstr "👥 الحسابات المشتركة تخص شخصاً أضافك كم
 msgid "<b>Team</b>"
 msgstr "<b>الفريق</b>"
 
-msgid "Managers can view and manage every Telegram account you added. They cannot change this team or your invite links."
-msgstr "المديرون يمكنهم عرض وإدارة كل حسابات تيليجرام التي أضفتها. لا يمكنهم تعديل هذا الفريق أو روابط الإحالة."
+msgid ""
+"Managers can view and manage every Telegram account you added. They "
+"cannot change this team or your invite links."
+msgstr ""
+"المديرون يمكنهم عرض وإدارة كل حسابات تيليجرام التي أضفتها. لا يمكنهم "
+"تعديل هذا الفريق أو روابط الإحالة."
 
 msgid "<b>Managers</b>"
 msgstr "<b>المديرون</b>"
@@ -1500,6 +1625,7 @@ msgstr "لإضافة رقم إلى قائمتهم، اطلب منهم رابط �
 msgid "➕ Add manager by ID"
 msgstr "➕ إضافة مدير بالمعرّف"
 
+#, python-brace-format
 msgid "❌ Remove {name}"
 msgstr "❌ إزالة {name}"
 
@@ -1509,10 +1635,17 @@ msgstr "🔄 رابط فريق جديد"
 msgid "<b>Add-number invite</b>"
 msgstr "<b>رابط إضافة الأرقام</b>"
 
-msgid "Anyone who opens this link can sign in a phone number. The number is added to <b>your</b> account list, it does not appear in theirs, and you get a notification."
-msgstr "أي شخص يفتح هذا الرابط يمكنه تسجيل رقم هاتف. يُضاف الرقم إلى قائمة <b>حساباتك</b> ولا يظهر عنده، ويصلك إشعار."
+msgid ""
+"Anyone who opens this link can sign in a phone number. The number is "
+"added to <b>your</b> account list, it does not appear in theirs, and you "
+"get a notification."
+msgstr ""
+"أي شخص يفتح هذا الرابط يمكنه تسجيل رقم هاتف. يُضاف الرقم إلى قائمة "
+"<b>حساباتك</b> ولا يظهر عنده، ويصلك إشعار."
 
-msgid "They do not need their own subscription. The number counts against your plan limit."
+msgid ""
+"They do not need their own subscription. The number counts against your "
+"plan limit."
 msgstr "لا يحتاجون اشتراكاً خاصاً بهم. الرقم يُحسب ضمن حد باقتك."
 
 msgid "Your invite link:"
@@ -1540,16 +1673,22 @@ msgid "Manager removed."
 msgstr "تمت إزالة المدير."
 
 msgid ""
-"Send the manager's numeric Telegram user ID, or their @username if they have already used this bot.\n"
+"Send the manager's numeric Telegram user ID, or their @username if they "
+"have already used this bot.\n"
 "\n"
 "Use /cancel to go back."
 msgstr ""
-"أرسل المعرّف الرقمي لتيليجرام الخاص بالمدير، أو @username إذا سبق له استخدام هذا البوت.\n"
+"أرسل المعرّف الرقمي لتيليجرام الخاص بالمدير، أو @username إذا سبق له "
+"استخدام هذا البوت.\n"
 "\n"
 "استخدم /cancel للرجوع."
 
-msgid "No bot user with that username. They must press /start first, or send their numeric Telegram ID."
-msgstr "لا يوجد مستخدم بهذا الاسم. يجب أن يضغط /start أولاً، أو أرسل معرّفه الرقمي."
+msgid ""
+"No bot user with that username. They must press /start first, or send "
+"their numeric Telegram ID."
+msgstr ""
+"لا يوجد مستخدم بهذا الاسم. يجب أن يضغط /start أولاً، أو أرسل معرّفه "
+"الرقمي."
 
 msgid "Please send a numeric Telegram user ID or an @username."
 msgstr "أرسل معرّف تيليجرام الرقمي أو @username."
@@ -1560,6 +1699,7 @@ msgstr "لا يمكنك إضافة نفسك كمدير."
 msgid "That person is already a manager."
 msgstr "هذا الشخص مدير بالفعل."
 
+#, python-brace-format
 msgid "{name} can now view and manage your accounts."
 msgstr "أصبح {name} قادراً على عرض وإدارة حساباتك."
 
@@ -1570,14 +1710,14 @@ msgid ""
 "Who should this account be added for?\n"
 "\n"
 "• <b>For myself</b>: the account will appear in your own list.\n"
-"• <b>For someone else</b>: the account will be added to another user's account in this bot "
-"(not yours). You will need their Telegram numeric ID."
+"• <b>For someone else</b>: the account will be added to another user's "
+"account in this bot (not yours). You will need their Telegram numeric ID."
 msgstr ""
 "لمن تريد إضافة هذا الحساب؟\n"
 "\n"
 "• <b>لي</b>: سيظهر الحساب في قائمتك أنت.\n"
-"• <b>لشخص آخر</b>: سيُضاف الحساب إلى حساب مستخدم آخر في هذا البوت "
-"(وليس حسابك). ستحتاج إلى معرّف تليجرام الرقمي الخاص به."
+"• <b>لشخص آخر</b>: سيُضاف الحساب إلى حساب مستخدم آخر في هذا البوت (وليس "
+"حسابك). ستحتاج إلى معرّف تليجرام الرقمي الخاص به."
 
 msgid "👤 Add for myself"
 msgstr "👤 إضافة لي"
@@ -1588,34 +1728,41 @@ msgstr "👥 إضافة لشخص آخر"
 msgid ""
 "<b>Add for someone else</b>\n"
 "\n"
-"This means the Telegram account you are about to log in will be linked to "
-"<b>another person's</b> profile in this bot — it will appear in <b>their</b> "
-"\"My Accounts\" list, not yours.\n"
+"This means the Telegram account you are about to log in will be linked to"
+" <b>another person's</b> profile in this bot — it will appear in "
+"<b>their</b> \"My Accounts\" list, not yours.\n"
 "\n"
 "Please send that person's Telegram numeric ID now.\n"
-"<i>(They must have used this bot before and have an active subscription with free slots.)</i>"
+"<i>(They must have used this bot before and have an active subscription "
+"with free slots.)</i>"
 msgstr ""
 "<b>إضافة لشخص آخر</b>\n"
 "\n"
-"هذا يعني أن حساب تليجرام الذي ستسجّل الدخول إليه سيُربط بملف "
-"<b>شخص آخر</b> في هذا البوت — وسيظهر في قائمة <b>\"حساباتي\" الخاصة به</b>، وليس بك.\n"
+"هذا يعني أن حساب تليجرام الذي ستسجّل الدخول إليه سيُربط بملف <b>شخص "
+"آخر</b> في هذا البوت — وسيظهر في قائمة <b>\"حساباتي\" الخاصة به</b>، وليس"
+" بك.\n"
 "\n"
 "أرسل الآن معرّف تليجرام الرقمي لذلك الشخص.\n"
-"<i>(يجب أن يكون قد استخدم البوت من قبل ولديه اشتراك نشط ومساحة لحسابات إضافية.)</i>"
+"<i>(يجب أن يكون قد استخدم البوت من قبل ولديه اشتراك نشط ومساحة لحسابات "
+"إضافية.)</i>"
 
 msgid "Invalid ID. Please send a numeric Telegram user ID, or /cancel to stop."
 msgstr "معرّف غير صالح. أرسل معرّف مستخدم تليجرام رقميًا، أو /cancel للإيقاف."
 
-msgid "That is your own ID. Choose \"Add for myself\", or send another person's ID."
+msgid ""
+"That is your own ID. Choose \"Add for myself\", or send another person's "
+"ID."
 msgstr "هذا معرّفك أنت. اختر \"إضافة لي\"، أو أرسل معرّف شخص آخر."
 
+#, python-brace-format
 msgid ""
-"No user with ID <code>{user_id}</code> was found in this bot. "
-"They must start the bot first."
+"No user with ID <code>{user_id}</code> was found in this bot. They must "
+"start the bot first."
 msgstr ""
 "لم يتم العثور على مستخدم بالمعرّف <code>{user_id}</code> في هذا البوت. "
 "يجب أن يبدأ استخدام البوت أولًا."
 
+#, python-brace-format
 msgid "OK. The account will be added for {name}."
 msgstr "حسنًا. سيتم إضافة الحساب لـ {name}."
 
@@ -1625,7 +1772,99 @@ msgid ""
 "(starts with +, digits only, no letters)."
 msgstr ""
 "هذا لا يبدو رقم هاتف صالحًا.\n"
-"أرسله بالصيغة الدولية، مثال: <code>+1234567890</code> "
-"(يبدأ بـ +، أرقام فقط، بدون حروف)."
+"أرسله بالصيغة الدولية، مثال: <code>+1234567890</code> (يبدأ بـ +، أرقام "
+"فقط، بدون حروف)."
 
+msgid "📲 Transfer Account"
+msgstr "📲 نقل الحساب"
+
+#, python-brace-format
+msgid ""
+"<b>Transfer Account</b>: <code>{phone}</code>\n"
+"\n"
+"Transferring an account moves its session and ownership to another user "
+"in this bot, without requiring them to log in again.\n"
+"\n"
+"Please send the recipient's numeric Telegram User ID or @username now:"
+msgstr ""
+"<b>نقل الحساب</b>: <code>{phone}</code>\n"
+"\n"
+"نقل الحساب ينقل جلسته وملكيته إلى مستخدم آخر في هذا البوت دون الحاجة "
+"لتسجيل دخوله مجدداً.\n"
+"\n"
+"الرجاء إرسال المعرّف الرقمي للمستلم أو @username الآن:"
+
+msgid "Only the owner can transfer this account."
+msgstr "مالك الحساب فقط يمكنه نقل هذا الحساب."
+
+msgid "Error: Transfer session expired."
+msgstr "خطأ: انتهت جلسة نقل الحساب."
+
+#, python-brace-format
+msgid ""
+"✅ Account <code>{phone}</code> has been successfully transferred to "
+"{recipient}."
+msgstr "✅ تم نقل الحساب <code>{phone}</code> بنجاح إلى {recipient}."
+
+#, python-brace-format
+msgid ""
+"📲 User {sender} transferred the managed account <code>{phone}</code> to "
+"your list!"
+msgstr ""
+"📲 قام المستخدم {sender} بنقل الحساب المدار <code>{phone}</code> إلى "
+"قائمتك!"
+
+msgid "You cannot transfer an account to yourself."
+msgstr "لا يمكنك نقل الحساب لنفسك."
+
+msgid "Recipient not found. They must start this bot first."
+msgstr "لم يتم العثور على المستلم. يجب أن يبدأ استخدام هذا البوت أولاً."
+
+msgid "The recipient does not have an active subscription."
+msgstr "المستلم لا يملك اشتراكاً نشطاً."
+
+msgid "The recipient's subscription plan has reached its account limit."
+msgstr "وصلت باقة اشتراك المستلم إلى الحد الأقصى لعدد الحسابات."
+
+msgid "Transfer failed. Please try again."
+msgstr "فشل النقل. يرجى المحاولة مرة أخرى."
+
+msgid "Send a valid user ID / @username, or send /cancel to stop."
+msgstr "أرسل معرّف مستخدم صالح أو @username، أو أرسل /cancel للإلغاء."
+
+msgid "Account transfer cancelled."
+msgstr "تم إلغاء نقل الحساب."
+
+msgid "💻 Active Sessions & Devices"
+msgstr "💻 الجلسات والأجهزة النشطة"
+
+msgid "Loading active sessions…"
+msgstr "جارٍ تحميل الجلسات النشطة…"
+
+msgid ""
+"🖥 <b>Active Sessions & Devices</b>\n"
+"\n"
+msgstr ""
+"🖥 <b>الجلسات والأجهزة النشطة</b>\n"
+"\n"
+
+msgid "No active sessions found."
+msgstr "لم يتم العثور على جلسات نشطة."
+
+msgid "Current Session"
+msgstr "الجلسة الحالية"
+
+#, python-brace-format
+msgid "🕒 Last active: {date}\n"
+msgstr "🕒 آخر نشاط: {date}\n"
+
+#, python-brace-format
+msgid "🚪 Terminate Session #{idx} ({device})"
+msgstr "🚪 إنهاء الجلسة #{idx} ({device})"
+
+msgid "Session terminated successfully!"
+msgstr "تم إنهاء الجلسة بنجاح!"
+
+msgid "Could not terminate session."
+msgstr "تعذر إنهاء الجلسة."
 
