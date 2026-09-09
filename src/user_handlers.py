@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import re
+import random
 import threading
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -22,6 +23,8 @@ from pyrogram import Client
 from pyrogram.errors import (
     SessionPasswordNeeded,
     PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired,
+    PhoneNumberBanned, PhoneNumberFlood, PasswordHashInvalid,
+    FloodWait,
     Timeout,
     Forbidden
 )
@@ -748,16 +751,21 @@ async def receive_target_user_id(update: Update, context: ContextTypes.DEFAULT_T
     )
     return await prompt_add_account_phone(update, context)
 
-MAX_PROXY_RETRIES = 3
+MAX_PROXY_RETRIES = 2
+CLIENT_CONNECT_TIMEOUT = 12.0
+CLIENT_ACTION_TIMEOUT = 15.0
 
-async def async_send_code(phone, context, user_id, _):
+
+async def send_login_code(phone: str, context: ContextTypes.DEFAULT_TYPE, user_id: int, _) -> tuple[bool, str | None, str | None]:
     """
     Tries to connect to Telegram and send a login code.
-    Retries with a new proxy and device profile if the connection fails or if a CAPTCHA is requested.
+    Retries with a new proxy and device profile if the connection fails.
+    Returns: (success: bool, error_type: str | None, error_detail: str | None)
     """
+    tried_proxies = set()
     for attempt in range(MAX_PROXY_RETRIES):
         # --- Get a new proxy and device profile for each attempt ---
-        proxy_id = get_random_proxy_id()
+        proxy_id = get_random_proxy_id(exclude_id=tried_proxies)
         proxy_string = get_proxy_string(proxy_id) if proxy_id else None
         proxy_dict = None
         client = None
@@ -765,8 +773,7 @@ async def async_send_code(phone, context, user_id, _):
         device_profile = get_random_device_profile()
         if not device_profile:
             log.error(f"Could not get a device profile for user {user_id} on attempt {attempt + 1}. Aborting login.")
-            await context.bot.send_message(user_id, _("Could not prepare a secure session. Please contact support."))
-            return
+            return False, "no_device_profile", _("Could not prepare a secure session. Please contact support.")
 
         # Store the chosen profile ID to be saved with the account later
         context.user_data['device_profile_id'] = device_profile['id']
@@ -778,18 +785,20 @@ async def async_send_code(phone, context, user_id, _):
                 log.error(f"Invalid proxy format: '{proxy_string}'.")
                 if proxy_id:
                     mark_proxy_as_bad(proxy_id)
+                    tried_proxies.add(proxy_id)
                 continue
             log.info(
                 f"Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: User {user_id} using proxy "
-                f"{proxy_dict['hostname']} and device '{device_profile['device_model']}'"
+                f"{proxy_dict.get('hostname')} and device '{device_profile.get('device_model')}'"
             )
         else:
             log.warning(f"Attempt {attempt + 1}/{MAX_PROXY_RETRIES}: No proxy available for user {user_id}. Proceeding without proxy.")
 
         # --- Attempt Connection and Send Code ---
         try:
+            clean_digits = re.sub(r"\D", "", phone)
             client = Client(
-                f"user_session_{phone}_{attempt}",
+                f"user_session_{clean_digits}_{attempt}_{random.randint(1000, 9999)}",
                 api_id=config.API_ID or device_profile.get('api_id'),
                 api_hash=config.API_HASH or device_profile.get('api_hash'),
                 device_model=device_profile.get('device_model'),
@@ -798,38 +807,65 @@ async def async_send_code(phone, context, user_id, _):
                 in_memory=True,
                 proxy=proxy_dict
             )
-            context.user_data['pyrogram_client'] = client
 
-            await client.connect()
-            sent_code = await client.send_code(phone)
+            await asyncio.wait_for(client.connect(), timeout=CLIENT_CONNECT_TIMEOUT)
+            sent_code = await asyncio.wait_for(client.send_code(phone), timeout=CLIENT_ACTION_TIMEOUT)
+
+            context.user_data['pyrogram_client'] = client
             context.user_data['phone_code_hash'] = sent_code.phone_code_hash
-            await context.bot.send_message(user_id, _("A login code has been sent. Please send it here."))
-            return  # Success
+            context.user_data['proxy_id'] = proxy_id
+            return True, None, None
 
         except Forbidden as e:
+            if client and getattr(client, "is_connected", False):
+                try:
+                    await client.disconnect()
+                except Exception:
+                    pass
+
             if "RECAPTCHA_CHECK" in str(e):
                 log.warning(f"Login for user {user_id} blocked by reCAPTCHA.")
-
-                # Format the device profile details for the user
                 device_info = "\n".join([f"- {k}: {v}" for k, v in device_profile.items()])
-
-                # Format the final message
                 debug_message = (
                     _("Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number.") +
                     "\n\n--- 🐞 Debug Info ---\n" +
                     _("Proxy Used: `{proxy}`").format(proxy=proxy_string or _("None")) + "\n" +
                     _("Device Profile:") + f"\n<pre>{device_info}</pre>"
                 )
-
-                await context.bot.send_message(user_id, debug_message, parse_mode=ParseMode.HTML)
+                return False, "recaptcha", debug_message
             else:
                 log.error(f"An unexpected Forbidden error occurred while sending code for user {user_id}: {e}", exc_info=True)
-                await context.bot.send_message(user_id, _("An unexpected error occurred. Please try again."))
-            if client and client.is_connected:
-                await client.disconnect()
-            return # Stop the process
+                return False, "forbidden", str(e)
 
-        except (Timeout, ConnectionError, OSError) as e:
+        except PhoneNumberInvalid:
+            log.warning(f"Phone number {phone} is invalid for user {user_id}.")
+            if client and getattr(client, "is_connected", False):
+                try:
+                    await client.disconnect()
+                except Exception:
+                    pass
+            return False, "invalid_phone", None
+
+        except PhoneNumberBanned:
+            log.warning(f"Phone number {phone} is banned for user {user_id}.")
+            if client and getattr(client, "is_connected", False):
+                try:
+                    await client.disconnect()
+                except Exception:
+                    pass
+            return False, "banned_phone", None
+
+        except (FloodWait, PhoneNumberFlood) as e:
+            wait_time = getattr(e, "value", 300)
+            log.warning(f"Flood wait for user {user_id} on {phone}: {wait_time}s")
+            if client and getattr(client, "is_connected", False):
+                try:
+                    await client.disconnect()
+                except Exception:
+                    pass
+            return False, "flood_wait", str(wait_time)
+
+        except (asyncio.TimeoutError, Timeout, ConnectionError, OSError) as e:
             reason = "SOCKS5 authentication failed" if is_socks_auth_error(e) else str(e)
             log.warning(
                 f"Proxy/Connection failed for user {user_id} on attempt {attempt + 1}/{MAX_PROXY_RETRIES}. "
@@ -837,18 +873,16 @@ async def async_send_code(phone, context, user_id, _):
             )
             if proxy_id:
                 mark_proxy_as_bad(proxy_id)
-            if client and client.is_connected:
-                await client.disconnect()
+                tried_proxies.add(proxy_id)
+            if client and getattr(client, "is_connected", False):
+                try:
+                    await client.disconnect()
+                except Exception:
+                    pass
             if attempt < MAX_PROXY_RETRIES - 1:
-                await asyncio.sleep(1)  # Wait a bit before retrying
+                await asyncio.sleep(1)
             else:
-                await context.bot.send_message(user_id, _("Failed to connect to Telegram after multiple attempts. Please check proxy settings and try again later."))
-
-        except PhoneNumberInvalid:
-            await context.bot.send_message(user_id, _("The phone number is invalid. Please try again."))
-            if client and client.is_connected:
-                await client.disconnect()
-            return
+                return False, "connection_failed", None
 
         except Exception as e:
             if is_socks_auth_error(e):
@@ -858,23 +892,38 @@ async def async_send_code(phone, context, user_id, _):
                 )
                 if proxy_id:
                     mark_proxy_as_bad(proxy_id)
+                    tried_proxies.add(proxy_id)
                 if client and getattr(client, "is_connected", False):
-                    await client.disconnect()
+                    try:
+                        await client.disconnect()
+                    except Exception:
+                        pass
                 if attempt < MAX_PROXY_RETRIES - 1:
                     await asyncio.sleep(1)
                     continue
-                await context.bot.send_message(user_id, _("Failed to connect to Telegram after multiple attempts. Please check proxy settings and try again later."))
-                return
+                return False, "connection_failed", None
+
             log.error(f"An unexpected error occurred while sending code for user {user_id}: {e}", exc_info=True)
-            await context.bot.send_message(user_id, _("An unexpected error occurred. Please try again."))
-            if client and client.is_connected:
-                await client.disconnect()
-            return
+            if client and getattr(client, "is_connected", False):
+                try:
+                    await client.disconnect()
+                except Exception:
+                    pass
+            return False, "unexpected", str(e)
+
+    return False, "connection_failed", None
+
+
+async def async_send_code(phone, context, user_id, _):
+    """Backwards-compatibility wrapper for send_login_code."""
+    return await send_login_code(phone, context, user_id, _)
+
 
 async def receive_phone_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    phone_number = normalize_phone_number(update.message.text)
+    raw_text = (update.message.text or "").strip()
+    phone_number = normalize_phone_number(raw_text)
 
     if not is_valid_phone_number(phone_number):
         await update.message.reply_text(
@@ -887,66 +936,215 @@ async def receive_phone_number(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return PHONE
 
-    context.user_data['phone'] = phone_number
-    await update.message.reply_text(_("Processing... Please wait."))
-    asyncio.create_task(async_send_code(phone_number, context, user_id, _))
-    return CODE
+    # Clean up previous client if one existed in context
+    old_client = context.user_data.get('pyrogram_client')
+    if old_client:
+        try:
+            if getattr(old_client, "is_connected", False):
+                await old_client.disconnect()
+        except Exception:
+            pass
+        context.user_data.pop('pyrogram_client', None)
+    context.user_data.pop('phone_code_hash', None)
 
-async def async_sign_in(code, context, user_id, _):
-    client = context.user_data['pyrogram_client']
-    phone = context.user_data['phone']
-    phone_code_hash = context.user_data['phone_code_hash']
-    next_state = ConversationHandler.END
-    try:
-        await client.sign_in(phone, phone_code_hash, code)
-        await async_complete_login(context, user_id, _)
-    except SessionPasswordNeeded:
-        await context.bot.send_message(user_id, _("This account has Two-Factor Authentication enabled. Please send your password."))
-        next_state = PASSWORD
-    except (PhoneCodeInvalid, PhoneCodeExpired):
-        await context.bot.send_message(user_id, _("Invalid or expired code. Please send the correct code again."))
-        next_state = CODE
-    except Exception as e:
-        log.error(f"Error signing in for user {user_id}: {e}")
-        await context.bot.send_message(user_id, _("An unexpected error occurred."))
-    context.user_data['next_state'] = next_state
+    context.user_data['phone'] = phone_number
+    status_msg = await update.message.reply_text(_("Processing... Please wait."))
+
+    success, err_type, err_detail = await send_login_code(phone_number, context, user_id, _)
+    if success:
+        reply_text = _("A login code has been sent. Please send it here.")
+        try:
+            await status_msg.edit_text(reply_text)
+        except Exception:
+            await update.message.reply_text(reply_text)
+        return CODE
+    else:
+        if err_type == "recaptcha":
+            try:
+                await status_msg.edit_text(err_detail, parse_mode=ParseMode.HTML)
+            except Exception:
+                await update.message.reply_text(err_detail, parse_mode=ParseMode.HTML)
+            context.user_data.clear()
+            return ConversationHandler.END
+        elif err_type == "invalid_phone":
+            reply_text = _("The phone number is invalid. Please try again.")
+        elif err_type == "banned_phone":
+            reply_text = _("This phone number is banned from Telegram. Please try another number or use /cancel.")
+        elif err_type == "flood_wait":
+            reply_text = _("Too many attempts. Telegram requires you to wait {seconds} seconds.").format(seconds=err_detail or 300)
+            context.user_data.clear()
+            try:
+                await status_msg.edit_text(reply_text)
+            except Exception:
+                await update.message.reply_text(reply_text)
+            return ConversationHandler.END
+        elif err_type == "connection_failed":
+            reply_text = _("Failed to connect to Telegram after multiple attempts. Please check proxy settings and try again later.")
+        else:
+            reply_text = _("An unexpected error occurred. Please try again.")
+
+        try:
+            await status_msg.edit_text(reply_text)
+        except Exception:
+            await update.message.reply_text(reply_text)
+        return PHONE
+
 
 async def receive_phone_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    raw_code = update.message.text or ""
-    # Strip spaces, hyphens, and non-digit characters so inputs like "68 7 8 9 7" or "68-7897" work properly
-    clean_code = re.sub(r"\D", "", raw_code)
-    code = clean_code if clean_code else raw_code.strip()
-    asyncio.create_task(async_sign_in(code, context, user_id, _))
-    await update.message.reply_text(_("Processing..."))
-    # The state transition is problematic here. We'll let the user send the password if needed.
-    return PASSWORD
+    raw_text = (update.message.text or "").strip()
 
-async def async_check_password(password, context, user_id, _):
-    client = context.user_data['pyrogram_client']
+    # 1. Did user send a phone number instead of a verification code?
+    if raw_text.startswith("+") or (raw_text.isdigit() and len(raw_text) >= 9 and not context.user_data.get('phone_code_hash')):
+        log.info(f"User {user_id} sent phone number '{raw_text}' while in CODE state. Redirecting to receive_phone_number.")
+        return await receive_phone_number(update, context)
+
+    client = context.user_data.get('pyrogram_client')
+    phone_code_hash = context.user_data.get('phone_code_hash')
+    phone = context.user_data.get('phone')
+
+    # 2. Check if login session is valid
+    if not client or not phone_code_hash or not phone or not getattr(client, "is_connected", False):
+        log.warning(f"User {user_id} in CODE state without valid connected session or phone_code_hash.")
+        await update.message.reply_text(
+            _("Login session expired or code was not sent. Please send your phone number again to restart.")
+        )
+        return PHONE
+
+    # 3. Clean code
+    clean_code = re.sub(r"\D", "", raw_text)
+    code = clean_code if clean_code else raw_text
+
+    if not code:
+        await update.message.reply_text(_("Please send a valid code, or /cancel to stop."))
+        return CODE
+
+    status_msg = await update.message.reply_text(_("Processing..."))
+
     try:
-        await client.check_password(password)
+        await asyncio.wait_for(client.sign_in(phone, phone_code_hash, code), timeout=CLIENT_ACTION_TIMEOUT)
         await async_complete_login(context, user_id, _)
+        return ConversationHandler.END
+    except SessionPasswordNeeded:
+        reply_text = _("This account has Two-Factor Authentication enabled. Please send your password.")
+        try:
+            await status_msg.edit_text(reply_text)
+        except Exception:
+            await update.message.reply_text(reply_text)
+        return PASSWORD
+    except (PhoneCodeInvalid, PhoneCodeExpired):
+        reply_text = _("Invalid or expired code. Please send the correct code again.")
+        try:
+            await status_msg.edit_text(reply_text)
+        except Exception:
+            await update.message.reply_text(reply_text)
+        return CODE
+    except FloodWait as e:
+        reply_text = _("Too many attempts. Telegram requires you to wait {seconds} seconds.").format(seconds=e.value)
+        try:
+            await status_msg.edit_text(reply_text)
+        except Exception:
+            await update.message.reply_text(reply_text)
+        if getattr(client, "is_connected", False):
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+        context.user_data.clear()
+        return ConversationHandler.END
     except Exception as e:
-        log.error(f"Error with 2FA for user {user_id}: {e}")
-        await context.bot.send_message(user_id, _("Incorrect password or an error occurred. Please try again or use /cancel."))
+        log.error(f"Error signing in for user {user_id}: {e}", exc_info=True)
+        reply_text = _("An unexpected error occurred. Please try again.")
+        try:
+            await status_msg.edit_text(reply_text)
+        except Exception:
+            await update.message.reply_text(reply_text)
+        if getattr(client, "is_connected", False):
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+        context.user_data.clear()
+        return ConversationHandler.END
+
 
 async def receive_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    password = update.message.text
-    asyncio.create_task(async_check_password(password, context, user_id, _))
-    return ConversationHandler.END
+    password = (update.message.text or "").strip()
+
+    client = context.user_data.get('pyrogram_client')
+    if not client or not getattr(client, "is_connected", False):
+        await update.message.reply_text(_("Login session expired. Please start over with /add_account."))
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    status_msg = await update.message.reply_text(_("Processing..."))
+    try:
+        await asyncio.wait_for(client.check_password(password), timeout=CLIENT_ACTION_TIMEOUT)
+        await async_complete_login(context, user_id, _)
+        return ConversationHandler.END
+    except PasswordHashInvalid:
+        reply_text = _("Incorrect password or an error occurred. Please try again or use /cancel.")
+        try:
+            await status_msg.edit_text(reply_text)
+        except Exception:
+            await update.message.reply_text(reply_text)
+        return PASSWORD
+    except FloodWait as e:
+        reply_text = _("Too many attempts. Telegram requires you to wait {seconds} seconds.").format(seconds=e.value)
+        try:
+            await status_msg.edit_text(reply_text)
+        except Exception:
+            await update.message.reply_text(reply_text)
+        if getattr(client, "is_connected", False):
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+        context.user_data.clear()
+        return ConversationHandler.END
+    except Exception as e:
+        log.error(f"Error with 2FA check for user {user_id}: {e}", exc_info=True)
+        reply_text = _("Incorrect password or an error occurred. Please try again or use /cancel.")
+        try:
+            await status_msg.edit_text(reply_text)
+        except Exception:
+            await update.message.reply_text(reply_text)
+        return PASSWORD
+
+
+async def async_sign_in(code, context, user_id, _):
+    """Backwards compatibility wrapper."""
+    client = context.user_data.get('pyrogram_client')
+    phone = context.user_data.get('phone')
+    phone_code_hash = context.user_data.get('phone_code_hash')
+    if not client or not phone_code_hash:
+        return
+    await client.sign_in(phone, phone_code_hash, code)
+
+
+async def async_check_password(password, context, user_id, _):
+    """Backwards compatibility wrapper."""
+    client = context.user_data.get('pyrogram_client')
+    if not client:
+        return
+    await client.check_password(password)
+
 
 async def async_complete_login(context, user_id, _):
-    client = context.user_data['pyrogram_client']
-    phone = context.user_data['phone']
-    device_profile_id = context.user_data['device_profile_id']
+    client = context.user_data.get('pyrogram_client')
+    phone = context.user_data.get('phone')
+    device_profile_id = context.user_data.get('device_profile_id')
     owner_id = context.user_data.get('add_for_owner_id') or user_id
     owner_name = context.user_data.get('add_for_owner_name') or ""
     session_string = await client.export_session_string()
-    await client.disconnect()
+    if client and getattr(client, "is_connected", False):
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
     if add_managed_account(owner_id, phone, session_string, device_profile_id):
         if owner_id != user_id:
             await context.bot.send_message(
@@ -987,13 +1185,17 @@ async def async_complete_login(context, user_id, _):
         await context.bot.send_message(user_id, _("❌ Could not save your account to the database. It might already be registered."))
     context.user_data.clear()
 
+
 async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Generic conversation cancellation function."""
     _ = get_translation_func_for_user(update.effective_user.id)
-    if 'pyrogram_client' in context.user_data:
-        client = context.user_data['pyrogram_client']
-        if client.is_connected:
-            await client.disconnect()
+    client = context.user_data.get('pyrogram_client')
+    if client:
+        try:
+            if getattr(client, "is_connected", False):
+                await client.disconnect()
+        except Exception:
+            pass
     context.user_data.clear()
 
     query = update.callback_query

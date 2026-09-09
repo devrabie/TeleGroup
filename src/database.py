@@ -572,19 +572,43 @@ def warn_if_no_working_proxies() -> None:
     except sqlite3.Error as e:
         log.error(f"Failed to check proxy health: {e}")
 
-def get_random_proxy_id(exclude_id: int | None = None):
-    """Retrieves the ID of a random, working proxy, optionally skipping one ID."""
+def get_random_proxy_id(exclude_id: int | set | list | tuple | None = None):
+    """Retrieves the ID of a random, working proxy, optionally skipping one or more IDs."""
     sql = "SELECT id FROM proxies WHERE is_working = 1"
     params = []
     if exclude_id is not None:
-        sql += " AND id != ?"
-        params.append(exclude_id)
+        if isinstance(exclude_id, (set, list, tuple)):
+            clean_excludes = [x for x in exclude_id if x is not None]
+            if clean_excludes:
+                placeholders = ",".join("?" for _ in clean_excludes)
+                sql += f" AND id NOT IN ({placeholders})"
+                params.extend(clean_excludes)
+        else:
+            sql += " AND id != ?"
+            params.append(exclude_id)
     sql += " ORDER BY RANDOM() LIMIT 1"
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(sql, params)
             proxy = cursor.fetchone()
+            if not proxy:
+                # Fallback: if no working proxies found, try proxies ordered by last_checked
+                fb_sql = "SELECT id FROM proxies"
+                fb_params = []
+                if exclude_id is not None:
+                    if isinstance(exclude_id, (set, list, tuple)):
+                        clean_excludes = [x for x in exclude_id if x is not None]
+                        if clean_excludes:
+                            placeholders = ",".join("?" for _ in clean_excludes)
+                            fb_sql += f" WHERE id NOT IN ({placeholders})"
+                            fb_params.extend(clean_excludes)
+                    else:
+                        fb_sql += " WHERE id != ?"
+                        fb_params.append(exclude_id)
+                fb_sql += " ORDER BY last_checked ASC, RANDOM() LIMIT 1"
+                cursor.execute(fb_sql, fb_params)
+                proxy = cursor.fetchone()
             return proxy['id'] if proxy else None
     except sqlite3.Error as e:
         log.error(f"Failed to retrieve a random proxy: {e}")
