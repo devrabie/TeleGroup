@@ -103,8 +103,13 @@ async def main() -> None:
     compiled = compile_translations()
     log.info(f"Translation catalogs compiled/updated: {compiled}")
 
-    log.info("Building bot application...")
-    application = Application.builder().token(config.BOT_TOKEN).build()
+    log.info("Building bot application with concurrent updates enabled...")
+    application = (
+        Application.builder()
+        .token(config.BOT_TOKEN)
+        .concurrent_updates(16)
+        .build()
+    )
 
     # --- Handler Registration ---
     all_handlers = admin_handlers_list + user_handlers_list

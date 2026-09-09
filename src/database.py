@@ -145,8 +145,11 @@ def initialize_database():
     """
     log.info(f"Initializing database at: {DB_FILE.resolve()}")
     try:
-        with sqlite3.connect(DB_FILE) as conn:
+        with sqlite3.connect(DB_FILE, timeout=15.0) as conn:
             cursor = conn.cursor()
+            # Enable WAL mode and busy timeout for high concurrency
+            cursor.execute("PRAGMA journal_mode = WAL;")
+            cursor.execute("PRAGMA busy_timeout = 10000;")
             # Enable foreign key support
             cursor.execute("PRAGMA foreign_keys = ON;")
 
@@ -316,8 +319,10 @@ def get_db_connection():
     """
     Returns a connection to the SQLite database.
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=15.0)
     conn.row_factory = sqlite3.Row # Allows accessing columns by name
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA busy_timeout = 10000;")
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
@@ -567,19 +572,43 @@ def warn_if_no_working_proxies() -> None:
     except sqlite3.Error as e:
         log.error(f"Failed to check proxy health: {e}")
 
-def get_random_proxy_id(exclude_id: int | None = None):
-    """Retrieves the ID of a random, working proxy, optionally skipping one ID."""
+def get_random_proxy_id(exclude_id: int | set | list | tuple | None = None):
+    """Retrieves the ID of a random, working proxy, optionally skipping one or more IDs."""
     sql = "SELECT id FROM proxies WHERE is_working = 1"
     params = []
     if exclude_id is not None:
-        sql += " AND id != ?"
-        params.append(exclude_id)
+        if isinstance(exclude_id, (set, list, tuple)):
+            clean_excludes = [x for x in exclude_id if x is not None]
+            if clean_excludes:
+                placeholders = ",".join("?" for _ in clean_excludes)
+                sql += f" AND id NOT IN ({placeholders})"
+                params.extend(clean_excludes)
+        else:
+            sql += " AND id != ?"
+            params.append(exclude_id)
     sql += " ORDER BY RANDOM() LIMIT 1"
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(sql, params)
             proxy = cursor.fetchone()
+            if not proxy:
+                # Fallback: if no working proxies found, try proxies ordered by last_checked
+                fb_sql = "SELECT id FROM proxies"
+                fb_params = []
+                if exclude_id is not None:
+                    if isinstance(exclude_id, (set, list, tuple)):
+                        clean_excludes = [x for x in exclude_id if x is not None]
+                        if clean_excludes:
+                            placeholders = ",".join("?" for _ in clean_excludes)
+                            fb_sql += f" WHERE id NOT IN ({placeholders})"
+                            fb_params.extend(clean_excludes)
+                    else:
+                        fb_sql += " WHERE id != ?"
+                        fb_params.append(exclude_id)
+                fb_sql += " ORDER BY last_checked ASC, RANDOM() LIMIT 1"
+                cursor.execute(fb_sql, fb_params)
+                proxy = cursor.fetchone()
             return proxy['id'] if proxy else None
     except sqlite3.Error as e:
         log.error(f"Failed to retrieve a random proxy: {e}")
@@ -1755,6 +1784,64 @@ def get_account_details(account_id: int):
     except sqlite3.Error as e:
         log.error(f"Failed to get details for account {account_id}: {e}")
         return None
+
+
+def transfer_managed_account(account_id: int, sender_telegram_id: int, recipient_identifier: str) -> tuple[bool, str, dict | None]:
+    """
+    Transfer ownership of a managed account to another user.
+    recipient_identifier can be a numeric telegram_id or @username.
+    Returns (success: bool, reason_code: str, recipient_dict: dict | None)
+    """
+    if not user_is_account_owner(account_id, sender_telegram_id):
+        return False, "not_owner", None
+
+    sender_user_id = get_internal_user_id(sender_telegram_id)
+
+    recipient = None
+    clean_target = recipient_identifier.strip()
+    if clean_target.isdigit():
+        target_tid = int(clean_target)
+        if target_tid == sender_telegram_id:
+            return False, "self_transfer", None
+        recipient = get_or_create_user(target_tid)
+    elif clean_target.startswith("@") or clean_target.isalnum():
+        recipient = get_user_by_username(clean_target)
+
+    if not recipient:
+        return False, "recipient_not_found", None
+
+    recipient_telegram_id = recipient["telegram_id"]
+    if recipient_telegram_id == sender_telegram_id:
+        return False, "self_transfer", None
+
+    recipient_details = get_user_details(recipient_telegram_id)
+    if not recipient_details or not recipient_details.get("subscription"):
+        return False, "recipient_no_subscription", recipient
+
+    plan = get_plan_by_id(recipient_details["subscription"]["plan_id"])
+    if not plan:
+        return False, "recipient_no_subscription", recipient
+
+    current_account_count = len(recipient_details.get("accounts") or [])
+    if current_account_count >= plan["max_accounts"]:
+        return False, "recipient_plan_full", recipient
+
+    recipient_internal_id = recipient_details["user"]["id"]
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE managed_accounts SET user_id = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                (recipient_internal_id, account_id, sender_user_id)
+            )
+            conn.commit()
+            if cursor.rowcount > 0:
+                return True, "ok", recipient
+            return False, "account_not_found", recipient
+    except sqlite3.Error as e:
+        log.error(f"Failed to transfer account {account_id} to user {recipient_telegram_id}: {e}")
+        return False, "db_error", recipient
 
 
 def get_system_stats():

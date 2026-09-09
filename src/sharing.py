@@ -322,6 +322,7 @@ team_add_conv_handler = ConversationHandler(
     },
     fallbacks=[
         CommandHandler("cancel", cancel_team_add),
+        CommandHandler("start", cancel_team_add),
         CallbackQueryHandler(cancel_team_add, pattern="^main_back$"),
         CallbackQueryHandler(cancel_team_add, pattern="^main_team$"),
     ],

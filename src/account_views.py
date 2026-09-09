@@ -15,6 +15,7 @@ from src.account_explorer import (
     ExplorerError,
     dialog_title,
     display_name,
+    fetch_active_sessions,
     fetch_private_dialogs,
     fetch_private_messages,
     fetch_profile,
@@ -23,6 +24,7 @@ from src.account_explorer import (
     format_profile_text,
     get_cached_identity,
     paginate,
+    revoke_session,
     trim_html,
 )
 from src.database import get_account_details, user_owns_account
@@ -279,6 +281,121 @@ async def show_conversation(
         reply_markup=InlineKeyboardMarkup(buttons),
         parse_mode=ParseMode.HTML,
     )
+
+
+async def show_sessions(update, context: ContextTypes.DEFAULT_TYPE, account_id: int):
+    query = update.callback_query
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+    if not owned_account(account_id, user_id):
+        try:
+            await query.answer(_("Error: Account not found or you don't have permission."), show_alert=True)
+        except BadRequest:
+            pass
+        return
+
+    await _safe_edit(
+        context.bot,
+        chat_id=user_id,
+        message_id=query.message.message_id,
+        text=_("Loading active sessions…"),
+    )
+
+    try:
+        sessions = await fetch_active_sessions(account_id)
+    except ExplorerError as e:
+        buttons = [[InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")]]
+        await _safe_edit(
+            context.bot,
+            chat_id=user_id,
+            message_id=query.message.message_id,
+            text=explorer_error_text(e, _),
+            reply_markup=InlineKeyboardMarkup(buttons),
+        )
+        return
+
+    text = _("🖥 <b>Active Sessions & Devices</b>\n\n")
+    if not sessions:
+        text += _("No active sessions found.")
+
+    buttons = []
+    from html import escape
+
+    for idx, sess in enumerate(sessions, 1):
+        is_curr = sess.get("current")
+        device = sess.get("device_model") or "Device"
+        app = sess.get("app_name") or "App"
+        app_ver = sess.get("app_version") or ""
+        ip = sess.get("ip") or ""
+        location = " ".join(filter(None, [sess.get("country"), sess.get("region")]))
+
+        curr_badge = f" 🟢 <b>({_('Current Session')})</b>" if is_curr else ""
+        text += f"<b>{idx}. {escape(device)}</b> ({escape(app)} {escape(app_ver)}){curr_badge}\n"
+        if ip or location:
+            text += f"📍 IP: <code>{escape(ip)}</code> ({escape(location)})\n"
+        if sess.get("date_active"):
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(sess["date_active"])
+                text += _("🕒 Last active: {date}\n").format(date=dt.strftime("%Y-%m-%d %H:%M UTC"))
+            except Exception:
+                pass
+        text += "\n"
+
+        if not is_curr and sess.get("hash"):
+            btn_label = _("🚪 Terminate Session #{idx} ({device})").format(idx=idx, device=device[:15])
+            buttons.append([
+                InlineKeyboardButton(
+                    btn_label,
+                    callback_data=f"mng_revokesess_{account_id}_{sess['hash']}"
+                )
+            ])
+
+    buttons.append([
+        InlineKeyboardButton(_("🔄 Refresh"), callback_data=f"mng_sessions_{account_id}"),
+        InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}"),
+    ])
+
+    await _safe_edit(
+        context.bot,
+        chat_id=user_id,
+        message_id=query.message.message_id,
+        text=trim_html(text),
+        reply_markup=InlineKeyboardMarkup(buttons),
+        parse_mode=ParseMode.HTML,
+    )
+
+
+async def handle_revoke_session(update, context: ContextTypes.DEFAULT_TYPE, account_id: int, hash_val: int):
+    query = update.callback_query
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+    if not owned_account(account_id, user_id):
+        try:
+            await query.answer(_("Error: Account not found or you don't have permission."), show_alert=True)
+        except BadRequest:
+            pass
+        return
+
+    try:
+        success = await revoke_session(account_id, hash_val)
+        if success:
+            try:
+                await query.answer(_("Session terminated successfully!"), show_alert=True)
+            except BadRequest:
+                pass
+        else:
+            try:
+                await query.answer(_("Could not terminate session."), show_alert=True)
+            except BadRequest:
+                pass
+    except ExplorerError as e:
+        try:
+            await query.answer(explorer_error_text(e, _), show_alert=True)
+        except BadRequest:
+            pass
+
+    await show_sessions(update, context, account_id)
 
 
 def escape_name(value: str) -> str:

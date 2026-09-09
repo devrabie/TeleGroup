@@ -213,3 +213,7 @@ __marimo__/
 # Ignore pyrogram session files specifically
 *.session
 *.session-journal
+
+# IDE
+.idea/
+
