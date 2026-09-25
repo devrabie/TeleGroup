@@ -1,0 +1,24 @@
+# Example unit for a non-Docker install. Adjust paths, user, and the
+# PostgreSQL unit name to match the host. Environment= overrides
+# EnvironmentFile, so RUNTIME_ROLE stays bot even when .env says otherwise.
+# ExecStartPre applies migrations before the control bot starts.
+
+[Unit]
+Description=TeleGroup control bot
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=telegroup
+Group=telegroup
+WorkingDirectory=/opt/telegroup
+EnvironmentFile=/opt/telegroup/.env
+Environment=RUNTIME_ROLE=bot
+ExecStartPre=/opt/telegroup/venv/bin/alembic upgrade head
+ExecStart=/opt/telegroup/venv/bin/python -m src.main
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

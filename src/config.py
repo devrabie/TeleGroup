@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from functools import lru_cache
 from typing import Annotated
 
@@ -186,6 +187,21 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()  # type: ignore[call-arg]
+
+
+def resolve_database_url() -> str:
+    """Database URL for Alembic.
+
+    A value already in the process environment wins, so Docker and tests keep
+    the URL they set. When it is absent, load ``.env`` the same way ``Settings``
+    does. The settings cache is cleared in that case so an earlier import does
+    not hide the file.
+    """
+    url = os.environ.get("DATABASE_URL")
+    if url:
+        return url
+    get_settings.cache_clear()
+    return get_settings().database_url
 
 
 settings = get_settings()

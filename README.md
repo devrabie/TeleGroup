@@ -37,7 +37,7 @@ Accounts with an active subscription start when at least one allowed plugin is e
 
 Phase 2 tables: `plan_plugins`, `account_plugins`, `plugin_settings`, `runtime_signals`, `session_leases`.
 
-Phase 3 tables: `auto_replies`, `pm_permits`, `chat_locks`. The migration does not grant the new plugins to plans that already exist. Open the plan editor and allow `admin`, `storage`, `autoreply`, `afk`, `pmpermit`, `locks`, `tagall`, `broadcast`, `create`, `gifts`, and `games`. New plans include every plugin registered when the plan is created. The Plugins screen can edit each plugin's settings (warning limit, log chat, mention cap, and so on).
+Phase 3 tables: `auto_replies`, `pm_permits`, `chat_locks`. The migration does not grant the new plugins to plans that already have an allowlist. Open the plan editor and allow `admin`, `storage`, `autoreply`, `afk`, `pmpermit`, `locks`, `tagall`, `broadcast`, `create`, `gifts`, and `games`. New plans include every plugin registered when the plan is created. The SQLite importer fills allowlists that are still empty; see below. The Plugins screen can edit each plugin's settings (warning limit, log chat, mention cap, and so on).
 
 Sharding is configured per process; there is no automatic assignment of accounts to workers yet. Downloads, sticker tools, converters, and the remaining userbot commands are phase 4.
 
@@ -82,11 +82,34 @@ Startup also creates any missing tables, seeds device profiles and default info 
 
 ### Existing SQLite data / نقل قاعدة SQLite
 
+Apply the schema first, then copy into that empty database:
+
 ```bash
-python -m src.tools.migrate_sqlite --sqlite data/bot.db
+alembic upgrade head
+python -m src.tools.migrate_sqlite --sqlite data/bot.db --verify
 ```
 
-The script copies the current tables into `DATABASE_URL`, keeps ids, and encrypts session strings. Re-running it does not overwrite existing rows.
+The script copies the current tables into `DATABASE_URL`, keeps ids, and encrypts session strings. Alembic 0002 grants plugins only to plans that exist when it runs. Plans copied afterwards would otherwise have an empty allowlist, and no account would start. The importer grants `ping`, `id`, `help`, `groups`, `codemon`, `admin`, `storage`, `autoreply`, `afk`, `pmpermit`, `locks`, `tagall`, `broadcast`, `create`, `gifts`, and `games` to every plan that still has no plugin rows. Plans that already have an allowlist are not changed.
+
+The default mode skips rows that already exist (`ON CONFLICT DO NOTHING`) and does not update them. A faithful copy needs an empty target database, which is what `alembic upgrade head` on a new PostgreSQL database gives you.
+
+- `--upsert` updates existing rows, matched on the same unique key the skip uses (`telegram_id`, plan `name`, proxy string, sharing token, info-page key, or `id`).
+- `--reset` deletes the copied tables and the plugin rows that hang off them, then inserts. Do not combine it with `--upsert`.
+- `--verify` compares source and destination row counts for each copied table and checks that every plan has at least one plugin. It exits non-zero when they differ. Use it after a copy into an empty database or after `--reset`.
+
+A row that fails to insert is logged with the table, an id or phone, and the exception type. The process then exits non-zero and prints a summary. Session strings are not written to the log.
+
+### Native install (no Docker) / تثبيت بدون Docker
+
+Example systemd units are in `deploy/`. They assume the checkout is `/opt/telegroup`, the virtualenv is `/opt/telegroup/venv`, a `telegroup` user can read `/opt/telegroup/.env`, and PostgreSQL is `postgresql.service`. Change those if the host differs. `.env` needs the same variables as `.env.example`.
+
+`deploy/telegroup-bot.service` sets `RUNTIME_ROLE=bot` and runs `alembic upgrade head` in `ExecStartPre` before `python -m src.main`. `deploy/telegroup-worker.service` sets `RUNTIME_ROLE=worker` and starts `python -m src.worker` after the bot unit. `Environment=` in the unit overrides `RUNTIME_ROLE` from the env file, so a value left in `.env` does not switch the process. The worker does not run migrations; start the bot unit so `ExecStartPre` finishes before relying on the worker.
+
+```bash
+sudo cp deploy/telegroup-bot.service deploy/telegroup-worker.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now telegroup-bot telegroup-worker
+```
 
 ### Docker
 
@@ -105,7 +128,10 @@ ruff check src tests alembic
 ruff format --check src tests alembic
 mypy src
 pytest
+pybabel compile -D base -d locales
 ```
+
+Translation catalogs are `locales/*/LC_MESSAGES/base.po`. The gettext domain is `base`. `pybabel compile` needs `-D base`; without it, pybabel looks for `messages.po`. Startup still compiles catalogs through `compile_translations()`, and the Docker image does the same.
 
 Logs are JSON, one object per line. Shutdown stops the code monitor, the bot, the webhook server when it is running, and disposes the database engine.
 

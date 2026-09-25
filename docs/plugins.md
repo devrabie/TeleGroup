@@ -33,7 +33,7 @@ plugin = PingPlugin()
 - `commands` are matched without the prefix. Latin names are case-insensitive. Arabic names are matched as written.
 - The longest command name wins, so `.رد عام` is not handled as `.رد`. A name must end at a space or the end of the message.
 - `default_enabled` applies when the account has no row in `account_plugins`. `groups` and `codemon` are special: they follow `managed_accounts.is_active` and `code_monitor_enabled`.
-- New plugins are not added to existing plans. `add_plan` grants whatever is registered at creation time. Admins change the allowlist from the plan editor.
+- New plugins are not added to existing plans. `add_plan` grants whatever is registered at creation time. Admins change the allowlist from the plan editor. The SQLite importer grants the default plugins only to plans that have no allowlist rows.
 
 ## Commands
 
