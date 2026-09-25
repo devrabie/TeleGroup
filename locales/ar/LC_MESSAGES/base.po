@@ -1892,3 +1892,57 @@ msgstr "عملة غير مدعومة"
 msgid "Amount does not match the plan price"
 msgstr "المبلغ لا يطابق سعر الخطة"
 
+msgid "📢 Channels & Groups"
+msgstr "📢 القنوات والمجموعات"
+
+msgid "Advanced Channel & Group Management"
+msgstr "إدارة متقدمة للقنوات والمجموعات"
+
+msgid "View Left Channels"
+msgstr "عرض القنوات المغادرة"
+
+msgid "Group Tools"
+msgstr "أدوات المجموعات"
+
+msgid "Fetching group data..."
+msgstr "جاري جلب بيانات المجموعات..."
+
+#, python-brace-format
+msgid ""
+"<b>Group Statistics</b>\n"
+"\n"
+"Total owned groups: {owned_count}\n"
+"Normal groups (can be upgraded): {normal_count}"
+msgstr ""
+"<b>إحصائيات المجموعات</b>\n"
+"\n"
+"إجمالي المجموعات المملوكة: {owned_count}\n"
+"المجموعات العادية (يمكن ترقيتها): {normal_count}"
+
+msgid "Upgrade Normal Groups"
+msgstr "ترقية المجموعات العادية"
+
+msgid "An error occurred while fetching group data."
+msgstr "حدث خطأ أثناء جلب بيانات المجموعة."
+
+msgid "Fetching left channels... Please wait."
+msgstr "جاري جلب القنوات المغادرة... يرجى الانتظار."
+
+msgid "No left channels found."
+msgstr "لم يتم العثور على قنوات مغادرة."
+
+msgid "<b>Left Channels:</b>\n\n"
+msgstr "<b>القنوات المغادرة:</b>\n\n"
+
+msgid "An error occurred while fetching left chats."
+msgstr "حدث خطأ أثناء جلب المحادثات المغادرة."
+
+msgid "Upgrading groups... This may take a moment."
+msgstr "جاري ترقية المجموعات... قد يستغرق هذا بعض الوقت."
+
+msgid "All upgradable groups have been processed."
+msgstr "تمت معالجة جميع المجموعات القابلة للترقية."
+
+msgid "An error occurred during the upgrade process."
+msgstr "حدث خطأ أثناء عملية الترقية."
+

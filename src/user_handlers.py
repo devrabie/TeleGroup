@@ -25,8 +25,10 @@ from pyrogram.errors import (
     PhoneNumberBanned, PhoneNumberFlood, PasswordHashInvalid,
     FloodWait,
     Timeout,
-    Forbidden
+    Forbidden,
+    UserNotParticipant,
 )
+from pyrogram.raw.functions.channels import GetLeftChannels
 
 from src import config
 from src.database import (
@@ -1790,6 +1792,243 @@ def _format_group_report(owned_groups, normal_groups_count, supergroups_count, u
     return text, InlineKeyboardMarkup(buttons)
 
 
+def _account_client(account_id: int, name: str, session_string: str):
+    """Build a user client from the decrypted session and stored device profile."""
+    device_profile = get_device_profile_by_account_id(account_id)
+    if not device_profile:
+        log.warning(f"No device profile found for account {account_id}. Using default client settings.")
+        return build_user_client(
+            name,
+            session_string=session_string,
+            in_memory=True,
+            api_id=config.API_ID,
+            api_hash=config.API_HASH,
+        )
+    return build_user_client(
+        name,
+        session_string=session_string,
+        api_id=config.API_ID or device_profile.get("api_id"),
+        api_hash=config.API_HASH or device_profile.get("api_hash"),
+        device_model=device_profile.get("device_model"),
+        system_version=device_profile.get("system_version"),
+        app_version=device_profile.get("app_version"),
+        lang_code=device_profile.get("lang_code"),
+        in_memory=True,
+    )
+
+
+def _positive_basic_group_id(chat_id: int) -> int:
+    """messages.MigrateChat expects the positive id of a basic group."""
+    if chat_id >= 0:
+        raise ValueError("chat_id for a basic group should be negative")
+    return -chat_id
+
+
+async def channels_and_groups_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id: int, message_id: int):
+    """Displays advanced options for channels and groups."""
+    user_id = update.effective_user.id
+    _ = get_translation_func_for_user(user_id)
+    if not user_owns_account(account_id, user_id):
+        await _safe_edit_message_text(
+            context.bot,
+            chat_id=user_id,
+            message_id=message_id,
+            text=_("Error: Account not found or you don't have permission."),
+        )
+        return
+
+    text = _("Advanced Channel & Group Management")
+    buttons = [
+        [InlineKeyboardButton(_("View Left Channels"), callback_data=f"mng_leftchannels_{account_id}_0")],
+        [InlineKeyboardButton(_("Group Tools"), callback_data=f"mng_grouptools_{account_id}")],
+        [InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")],
+    ]
+    await _safe_edit_message_text(
+        context.bot,
+        chat_id=user_id,
+        message_id=message_id,
+        text=text,
+        reply_markup=InlineKeyboardMarkup(buttons),
+        parse_mode=ParseMode.HTML,
+    )
+
+
+async def group_tools_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id: int, message_id: int):
+    """Shows group statistics and tools."""
+    query = update.callback_query
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+
+    if not user_owns_account(account_id, user_id):
+        await query.edit_message_text(_("Error: Account not found or you don't have permission."))
+        return
+
+    await query.edit_message_text(_("Fetching group data..."))
+
+    session_string = get_account_session_string(account_id)
+    if not session_string:
+        await query.edit_message_text(_("Error: Could not retrieve session for this account."))
+        return
+
+    client = None
+    try:
+        client = _account_client(account_id, f"user_session_tools_{account_id}", session_string)
+        await client.connect()
+        me = await client.get_me()
+
+        owned_groups = []
+        normal_groups = []
+
+        async for dialog in client.get_dialogs():
+            if dialog.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+                try:
+                    member = await client.get_chat_member(dialog.chat.id, me.id)
+                    if member.status == ChatMemberStatus.OWNER:
+                        owned_groups.append(dialog.chat)
+                        if dialog.chat.type == ChatType.GROUP:
+                            normal_groups.append(dialog.chat)
+                except UserNotParticipant:
+                    pass
+                except Exception as e:
+                    log.warning(f"Could not get member for chat {dialog.chat.id}: {e}")
+
+        await client.disconnect()
+
+        text = _("<b>Group Statistics</b>\n\n"
+                 "Total owned groups: {owned_count}\n"
+                 "Normal groups (can be upgraded): {normal_count}").format(
+                     owned_count=len(owned_groups),
+                     normal_count=len(normal_groups)
+                 )
+
+        buttons = []
+        if normal_groups:
+            buttons.append([InlineKeyboardButton(_("Upgrade Normal Groups"), callback_data=f"mng_upgradegroups_{account_id}")])
+
+        buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data=f"mng_channels_{account_id}")])
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode=ParseMode.HTML)
+
+    except Exception as e:
+        log.error(f"Error in group_tools_menu for user {user_id}, account {account_id}: {e}")
+        await query.edit_message_text(_("An error occurred while fetching group data."))
+        if client is not None and client.is_connected:
+            await client.disconnect()
+
+
+async def view_left_channels(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id: int, offset: int):
+    """Lists channels the account has left, with offset pagination."""
+    query = update.callback_query
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+    log.info(f"User {user_id} requested to view left channels for account {account_id} with offset {offset}.")
+
+    if not user_owns_account(account_id, user_id):
+        await query.edit_message_text(_("Error: Account not found or you don't have permission."))
+        return
+
+    await query.edit_message_text(_("Fetching left channels... Please wait."))
+
+    session_string = get_account_session_string(account_id)
+    if not session_string:
+        await query.edit_message_text(_("Error: Could not retrieve session for this account."))
+        return
+
+    client = None
+    try:
+        client = _account_client(account_id, f"user_session_reader_{account_id}", session_string)
+        await client.connect()
+        # A takeout session might be required for this to work long-term,
+        # but we try without it first.
+        res = await client.invoke(GetLeftChannels(offset=offset))
+        await client.disconnect()
+
+        chats = res.chats
+        if not chats:
+            text = _("No left channels found.")
+            buttons = [[InlineKeyboardButton(_("🔙 Back"), callback_data=f"mng_channels_{account_id}")]]
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+            return
+
+        text = _("<b>Left Channels:</b>\n\n") + "\n".join([f"• <code>{chat.title}</code>" for chat in chats])
+
+        # GetLeftChannels has no limit parameter. If this page returned chats,
+        # offer the next offset; the previous page steps back by this page size.
+        pagination_buttons = []
+        if offset > 0:
+            previous_offset = max(0, offset - len(chats))
+            pagination_buttons.append(InlineKeyboardButton(_("⬅️ Previous"), callback_data=f"mng_leftchannels_{account_id}_{previous_offset}"))
+        if len(chats) > 0:
+            pagination_buttons.append(InlineKeyboardButton(_("Next ➡️"), callback_data=f"mng_leftchannels_{account_id}_{offset + len(chats)}"))
+
+        buttons = [pagination_buttons] if pagination_buttons else []
+        buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data=f"mng_channels_{account_id}")])
+
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode=ParseMode.HTML)
+
+    except Exception as e:
+        log.error(f"Error fetching left channels for user {user_id}, account {account_id}: {e}")
+        await query.edit_message_text(_("An error occurred while fetching left chats."))
+        if client is not None and client.is_connected:
+            await client.disconnect()
+
+
+async def upgrade_normal_groups(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id: int):
+    """Upgrades every basic group owned by the account to a supergroup."""
+    query = update.callback_query
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+    log.info(f"User {user_id} requested to upgrade groups for account {account_id}.")
+
+    if not user_owns_account(account_id, user_id):
+        await query.edit_message_text(_("Error: Account not found or you don't have permission."))
+        return
+
+    await query.edit_message_text(_("Upgrading groups... This may take a moment."))
+
+    session_string = get_account_session_string(account_id)
+    if not session_string:
+        await query.edit_message_text(_("Error: Could not retrieve session for this account."))
+        return
+
+    client = None
+    try:
+        client = _account_client(account_id, f"user_session_upgrader_{account_id}", session_string)
+        await client.connect()
+        me = await client.get_me()
+        normal_groups = []
+        async for dialog in client.get_dialogs():
+            if dialog.chat.type == ChatType.GROUP:
+                try:
+                    member = await client.get_chat_member(dialog.chat.id, me.id)
+                    if member.status == ChatMemberStatus.OWNER:
+                        normal_groups.append(dialog.chat)
+                except UserNotParticipant:
+                    pass
+                except Exception:
+                    pass
+
+        for group in normal_groups:
+            try:
+                await client.invoke(
+                    pyrogram.raw.functions.messages.MigrateChat(
+                        chat_id=_positive_basic_group_id(group.id)
+                    )
+                )
+                await asyncio.sleep(1)
+            except Exception as e:
+                log.error(f"Could not upgrade group {group.id} for user {user_id}: {e}")
+
+        await client.disconnect()
+        await query.edit_message_text(_("All upgradable groups have been processed."))
+        await group_tools_menu(update, context, account_id, query.message.message_id)
+
+    except Exception as e:
+        log.error(f"Error upgrading groups for user {user_id}, account {account_id}: {e}")
+        await query.edit_message_text(_("An error occurred during the upgrade process."))
+        if client is not None and client.is_connected:
+            await client.disconnect()
+
+
 async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id: int, message_id: int):
     """Displays the management menu for a single account."""
     user_id = update.effective_user.id
@@ -1918,6 +2157,9 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         [
             InlineKeyboardButton(_("📂 View Groups"), callback_data=f"mng_viewgroups_{acc['id']}"),
             InlineKeyboardButton(_("📊 Group Report"), callback_data=f"mng_groupreport_{acc['id']}"),
+        ],
+        [
+            InlineKeyboardButton(_("📢 Channels & Groups"), callback_data=f"mng_channels_{acc['id']}")
         ],
         [InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc['id']}")],
         [InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")]
@@ -2057,6 +2299,11 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             await account_detail_menu(update, context, account_id, query.message.message_id)
             return
 
+        if action == "channels":
+            account_id = int(action_parts[2])
+            await channels_and_groups_menu(update, context, account_id, query.message.message_id)
+            return
+
         if action == "profile":
             await show_profile(update, context, int(action_parts[2]))
             return
@@ -2181,6 +2428,19 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                 await query.edit_message_text(_("An error occurred while fetching groups. The session might be invalid or revoked."))
                 if client.is_connected:
                     await client.disconnect()
+        elif action == "grouptools":
+            account_id = int(action_parts[2])
+            await group_tools_menu(update, context, account_id, query.message.message_id)
+            return
+        elif action == "leftchannels":
+            account_id = int(action_parts[2])
+            offset = int(action_parts[3])
+            await view_left_channels(update, context, account_id, offset)
+            return
+        elif action == "upgradegroups":
+            account_id = int(action_parts[2])
+            await upgrade_normal_groups(update, context, account_id)
+            return
         elif action == "groupreport":
             account_id = int(action_parts[2])
             if not user_owns_account(account_id, user_id):

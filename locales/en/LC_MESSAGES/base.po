@@ -1541,6 +1541,60 @@ msgstr "Invalid plan price"
 msgid "Unsupported currency"
 msgstr "Unsupported currency"
 
+msgid "📢 Channels & Groups"
+msgstr "📢 Channels & Groups"
+
+msgid "Advanced Channel & Group Management"
+msgstr "Advanced Channel & Group Management"
+
+msgid "View Left Channels"
+msgstr "View Left Channels"
+
+msgid "Group Tools"
+msgstr "Group Tools"
+
+msgid "Fetching group data..."
+msgstr "Fetching group data..."
+
+#, python-brace-format
+msgid ""
+"<b>Group Statistics</b>\n"
+"\n"
+"Total owned groups: {owned_count}\n"
+"Normal groups (can be upgraded): {normal_count}"
+msgstr ""
+"<b>Group Statistics</b>\n"
+"\n"
+"Total owned groups: {owned_count}\n"
+"Normal groups (can be upgraded): {normal_count}"
+
+msgid "Upgrade Normal Groups"
+msgstr "Upgrade Normal Groups"
+
+msgid "An error occurred while fetching group data."
+msgstr "An error occurred while fetching group data."
+
+msgid "Fetching left channels... Please wait."
+msgstr "Fetching left channels... Please wait."
+
+msgid "No left channels found."
+msgstr "No left channels found."
+
+msgid "<b>Left Channels:</b>\n\n"
+msgstr "<b>Left Channels:</b>\n\n"
+
+msgid "An error occurred while fetching left chats."
+msgstr "An error occurred while fetching left chats."
+
+msgid "Upgrading groups... This may take a moment."
+msgstr "Upgrading groups... This may take a moment."
+
+msgid "All upgradable groups have been processed."
+msgstr "All upgradable groups have been processed."
+
+msgid "An error occurred during the upgrade process."
+msgstr "An error occurred during the upgrade process."
+
 msgid "Amount does not match the plan price"
 msgstr "Amount does not match the plan price"
 
