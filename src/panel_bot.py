@@ -39,9 +39,8 @@ def _language(account_id: int) -> str:
     return "ar" if code == "ar" else "en"
 
 
-def _markup(rows: list[list[tuple[str, str]]]) -> InlineKeyboardMarkup | None:
-    if not rows:
-        return None
+def _markup(rows: list[list[tuple[str, str]]]) -> InlineKeyboardMarkup:
+    """Build a keyboard. An empty keyboard removes buttons, including on inline messages."""
     return InlineKeyboardMarkup(
         [[InlineKeyboardButton(label, callback_data=data) for label, data in row] for row in rows]
     )
@@ -126,15 +125,17 @@ async def on_panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         op, arg = "a", ""
     try:
         text, rows = render(parsed.account_id, parsed.account_user_id, op, arg)
-        if query.message is not None:
+        # Inline results arrive with inline_message_id and message=None.
+        # edit_message_text edits either kind and applies reply_markup to both.
+        if query.message is not None or query.inline_message_id:
             await query.edit_message_text(
                 text,
                 reply_markup=_markup(rows),
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True,
             )
-    except Exception:
-        log.debug("Panel edit failed", exc_info=True)
+    except Exception as exc:
+        log.warning("Panel edit failed: %s", exc, exc_info=True)
     if notice:
         await query.answer(notice, show_alert=True)
         return

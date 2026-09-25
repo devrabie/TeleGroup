@@ -9,7 +9,7 @@ from src.runtime.plugins import CommandContext, Plugin, PluginMeta
 from src.templates import inline_disabled, panel_failed
 
 _PANEL_ARGS = {"لوحة", "اللوحة", "panel"}
-_PANEL_COMMANDS = {"اللوحة", "panel"}
+_PANEL_COMMANDS = {"تحكم", "اللوحة", "panel"}
 
 
 class HelpPlugin(Plugin):
@@ -29,6 +29,7 @@ class HelpPlugin(Plugin):
                 "Open the inline button panel in this chat.",
                 "فتح لوحة الأزرار في هذه المحادثة.",
                 "panel",
+                "تحكم",
                 "اللوحة",
             ),
         ),
@@ -42,9 +43,14 @@ class HelpPlugin(Plugin):
             await self._panel(ctx)
             return
         if query:
-            await ctx.reply(render_query(ctx.account_id, ctx.language, ctx.prefix, query))
+            await self._send(ctx, render_query(ctx.account_id, ctx.language, ctx.prefix, query))
             return
-        await ctx.reply(render_index(ctx.account_id, ctx.language, ctx.prefix))
+        await self._send(ctx, render_index(ctx.account_id, ctx.language, ctx.prefix))
+
+    async def _send(self, ctx: CommandContext, pages: list[str]) -> None:
+        for page in pages:
+            if page:
+                await ctx.reply(page)
 
     async def _panel(self, ctx: CommandContext) -> None:
         status = await open_panel(ctx)

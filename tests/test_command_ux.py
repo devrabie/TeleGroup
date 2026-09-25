@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
+import re
 from types import SimpleNamespace
 
 import pytest
 from src.command_catalog import CATEGORY_BY_ID, PLUGIN_CATEGORY
-from src.help_text import render_index, render_query
+from src.help_text import pack_help_pages, render_index, render_query, telegram_units
 from src.panel import (
     actor_allowed,
     adjust_setting,
@@ -17,6 +19,7 @@ from src.panel import (
     unpack_callback,
     unpack_query,
 )
+from src.panel_bot import on_panel_callback
 from src.panel_open import open_panel
 from src.runtime.flood import AccountLimiter
 from src.runtime.plugins import CommandContext, all_plugins, load_plugins
@@ -58,7 +61,8 @@ def test_inline_disabled_tells_the_owner_to_use_botfather():
     english = inline_disabled("en", ".")
     assert "/setinline" in arabic
     assert "BotFather" in arabic
-    assert ".اللوحة" in arabic
+    assert ".تحكم" in arabic
+    assert ".اللوحة" not in arabic
     assert "/setinline" in english
     assert ".panel" in english
 
@@ -82,8 +86,15 @@ def test_every_command_has_help_and_a_category():
             assert command.example_ar.strip()
             assert command.example_en.strip()
     assert "فحص" in names
+    assert "تحكم" in names
     assert "اللوحة" in names
     assert "الاوامر" in names
+
+
+def _joined(pages: list[str]) -> str:
+    assert pages
+    assert all(telegram_units(page) <= 4096 for page in pages)
+    return "\n".join(pages)
 
 
 def test_help_index_is_categorized(tmp_path, monkeypatch):
@@ -91,23 +102,62 @@ def test_help_index_is_categorized(tmp_path, monkeypatch):
 
     _use_db(database, tmp_path, monkeypatch)
     account_id, _plan_id = _prepare(database)
-    text = render_index(account_id, "ar", ".")
+    text = _joined(render_index(account_id, "ar", "."))
     assert "الادارة" in text
     assert "الحماية" in text
     assert "التحميل" in text
-    assert ".فحص" in text
-    assert ".ping" in text
-    assert ".اللوحة" in text
-    detail = render_query(account_id, "ar", ".", "حظر")
+    assert re.search(r"1\. 🛡 الادارة ← \.الاوامر الادارة \(\d+ ", text)
+    assert ".تحكم" in text
+    assert "صاحب الحساب" not in text
+    assert ".فحص" not in text
+    assert ".ping" not in text
+    assert ".اللوحة" not in text
+    detail = _joined(render_query(account_id, "ar", ".", "حظر"))
     assert "الوصف" in detail
     assert "الاستخدام" in detail
     assert "مثال" in detail
     assert ".حظر" in detail
-    section = render_query(account_id, "ar", ".", "الادارة")
-    assert ".حظر" in section
-    english = render_query(account_id, "en", ".", "ban")
+    assert ".ban" in detail
+    assert "الحالة" in detail
+    assert "من يستخدمه" in detail
+    section = _joined(render_query(account_id, "ar", ".", "الادارة"))
+    assert "● .حظر ←" in section
+    assert "   الاستخدام:" in section
+    assert ".ban" not in section
+    assert "\n\n" in section
+    guard = _joined(render_query(account_id, "ar", ".", "الحماية"))
+    assert "أكواد الدخول" in guard
+    assert "إعادة توجيه أكواد الدخول" in guard
+    assert "الاستخدام:" in guard
+    english_index = _joined(render_index(account_id, "en", "."))
+    assert ".help management" in english_index
+    assert ".panel" in english_index
+    assert ".حظر" not in english_index
+    english_section = _joined(render_query(account_id, "en", ".", "management"))
+    assert "● .ban ←" in english_section
+    assert "   Usage:" in english_section
+    assert ".حظر" not in english_section
+    english = _joined(render_query(account_id, "en", ".", "ban"))
     assert "Description" in english
     assert ".ban" in english
+    assert "Who can use it" in english
+    system = _joined(render_query(account_id, "ar", ".", "النظام"))
+    assert "صاحب الحساب" in system
+    assert ".رفع ادمن" in system
+    delegates = _joined(render_query(account_id, "ar", ".", "المسؤولين"))
+    assert "من يرسل الأوامر" in delegates
+    assert ".تحكم" in _joined(render_query(account_id, "ar", ".", "تحكم"))
+
+
+def test_help_pages_stay_under_the_telegram_limit():
+    title = "الادارة 🛡"
+    blocks = [f"الإشراف\n● .حظر ← وصف {index}\n   الاستخدام: .حظر" for index in range(80)]
+    pages = pack_help_pages("ar", title, blocks, limit=500)
+    assert len(pages) > 1
+    assert all(telegram_units(page) <= 500 for page in pages)
+    joined = "\n".join(pages)
+    assert "● .حظر ← وصف 0" in joined
+    assert "● .حظر ← وصف 79" in joined
 
 
 def test_callback_data_stays_within_64_bytes(tmp_path, monkeypatch):
@@ -225,3 +275,134 @@ async def test_open_panel_reports_inline_disabled(monkeypatch):
         limiter=AccountLimiter(7, min_interval=0, retry_threshold=0),
     )
     assert await open_panel(ctx) == "disabled"
+
+
+class _Callback:
+    def __init__(self, data: str, *, message: object | None, inline_message_id: str | None):
+        self.data = data
+        self.from_user = SimpleNamespace(id=111)
+        self.message = message
+        self.inline_message_id = inline_message_id
+        self.edits: list[tuple[str, dict]] = []
+        self.answers: list[tuple[object, bool]] = []
+
+    async def edit_message_text(self, text: str, **kwargs: object) -> None:
+        self.edits.append((text, kwargs))
+
+    async def answer(self, text: object = None, show_alert: bool = False) -> None:
+        self.answers.append((text, show_alert))
+
+
+async def _press(
+    data: str,
+    *,
+    message: object | None = None,
+    inline_message_id: str | None = "inline-1",
+) -> _Callback:
+    query = _Callback(data, message=message, inline_message_id=inline_message_id)
+    await on_panel_callback(SimpleNamespace(callback_query=query), None)
+    return query
+
+
+def _button(rows: list, op: str, arg: str | None = None) -> str:
+    for row in rows:
+        for _label, data in row:
+            parsed = unpack_callback(data)
+            assert parsed is not None
+            if parsed.op == op and (arg is None or parsed.arg == arg):
+                return data
+    raise AssertionError(f"missing {op} {arg}")
+
+
+@pytest.mark.asyncio
+async def test_inline_callbacks_edit_when_message_is_missing(tmp_path, monkeypatch, caplog):
+    import src.database as database
+    from src.runtime.store import add_account_admin
+
+    _use_db(database, tmp_path, monkeypatch)
+    account_id, _plan_id = _prepare(database)
+    account_user_id = 555
+    assert add_account_admin(account_id, 222, username="helper") == "added"
+
+    async def edited(op: str, arg: str = "") -> _Callback:
+        query = await _press(pack_callback(account_id, account_user_id, op, arg))
+        assert query.edits, op
+        text, kwargs = query.edits[-1]
+        assert text
+        assert kwargs["reply_markup"] is not None
+        assert kwargs["parse_mode"]
+        return query
+
+    home = await edited("h")
+    home_text, home_markup = home.edits[-1]
+    assert "لوحة التحكم" in home_text
+    assert home_markup["reply_markup"].inline_keyboard
+
+    _section_text, section_rows = render(account_id, account_user_id, "c", "admin")
+    back = await _press(_button(section_rows, "h"))
+    assert back.edits
+    assert "لوحة التحكم" in back.edits[-1][0]
+
+    category = await edited("c", "admin")
+    assert "الادارة" in category.edits[-1][0] or "🛡" in category.edits[-1][0]
+
+    plugin = await edited("g", "ping")
+    assert "الفحص" in plugin.edits[-1][0]
+
+    _plugin_text, plugin_rows = render(account_id, account_user_id, "g", "ping")
+    detail_data = _button(plugin_rows, "d")
+    detail = await _press(detail_data)
+    assert detail.edits
+    assert "الاستخدام" in detail.edits[-1][0]
+
+    toggled = await edited("t", "ping")
+    assert toggled.answers
+    assert toggled.answers[-1][1] is True
+
+    settings = await edited("s", "pmpermit")
+    assert "إعداد" in settings.edits[-1][0] or "⚙️" in settings.edits[-1][0]
+    _settings_text, settings_rows = render(account_id, account_user_id, "s", "pmpermit")
+    adjusted = await _press(_button(settings_rows, "k"))
+    assert adjusted.edits
+    assert adjusted.answers[-1][1] is True
+
+    admins = await edited("a")
+    assert "المسؤول" in admins.edits[-1][0]
+    _admins_text, admin_rows = render(account_id, account_user_id, "a", "")
+    removed = await _press(_button(admin_rows, "r"))
+    assert removed.edits
+    assert "لا يوجد مسؤولون" in removed.edits[-1][0]
+
+    closed = await edited("x")
+    assert "أُغلقت" in closed.edits[-1][0]
+    assert closed.edits[-1][1]["reply_markup"].inline_keyboard == ()
+
+    posted = await _press(
+        pack_callback(account_id, account_user_id, "h"),
+        message=SimpleNamespace(chat_id=1, message_id=2),
+        inline_message_id=None,
+    )
+    assert posted.edits
+
+    nowhere = await _press(
+        pack_callback(account_id, account_user_id, "h"),
+        message=None,
+        inline_message_id=None,
+    )
+    assert nowhere.edits == []
+    assert nowhere.answers
+
+    class Broken(_Callback):
+        async def edit_message_text(self, text: str, **kwargs: object) -> None:
+            raise RuntimeError("edit rejected")
+
+    broken = Broken(
+        pack_callback(account_id, account_user_id, "c", "tools"),
+        message=None,
+        inline_message_id="inline-2",
+    )
+    with caplog.at_level(logging.WARNING, logger="src.panel_bot"):
+        await on_panel_callback(SimpleNamespace(callback_query=broken), None)
+    assert broken.answers
+    assert any("Panel edit failed" in record.message for record in caplog.records)
+    assert any(record.exc_info for record in caplog.records)

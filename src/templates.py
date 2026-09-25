@@ -100,9 +100,9 @@ def inline_disabled(language: str, prefix: str) -> str:
             "فعّله من @BotFather:\n"
             "1. أرسل /setinline\n"
             "2. اختر بوت التحكم\n"
-            "3. أرسل النص الذي يظهر في البحث، مثل: لوحة\n"
+            "3. أرسل النص الذي يظهر في البحث، مثل: تحكم\n"
             "\n"
-            f"ثم أعد إرسال {prefix}اللوحة"
+            f"ثم أعد إرسال {prefix}تحكم"
         )
         return card(language, "❌ تنبيه", body)
     body = (
@@ -124,7 +124,7 @@ def panel_failed(language: str, prefix: str) -> str:
             "تعذر فتح اللوحة.\n"
             "تأكد أن بوت التحكم يعمل، ثم أعد المحاولة.\n"
             "إذا لم تفعّل الوضع الإنلاين من قبل، أرسل /setinline إلى @BotFather "
-            f"ثم أعد {prefix}اللوحة"
+            f"ثم أعد {prefix}تحكم"
         )
         return card(language, "❌ تنبيه", body)
     body = (
@@ -137,29 +137,10 @@ def panel_failed(language: str, prefix: str) -> str:
 
 
 def help_intro(language: str, prefix: str) -> str:
+    """Prefix line for the command index. Who-may-send lives in the system section."""
     if is_ar(language):
-        return (
-            f"{section('الأوامر')}\n"
-            f"{SEP}\n"
-            f"● البادئة: {prefix}\n"
-            "● يرسل الأوامر: هذا الحساب، أو صاحب الحساب من حسابه، أو مسؤول أضفته\n"
-            f"● إضافة مسؤول: {prefix}رفع ادمن بالرد أو المعرّف أو @username\n"
-            f"● قائمة المسؤولين: {prefix}الادمنية\n"
-            "● أوامر الحساب والإذاعة وحذف البيانات والمسؤولين تبقى لصاحب الحساب\n"
-            f"● قسم أو إضافة أو أمر: {prefix}الاوامر الادارة\n"
-            f"● لوحة الأزرار: {prefix}اللوحة"
-        )
-    return (
-        f"{section('Commands')}\n"
-        f"{SEP}\n"
-        f"● Prefix: {prefix}\n"
-        "● Who can send them: this account, its owner, or an admin you added\n"
-        f"● Add an admin: {prefix}addadmin by reply, id, or @username\n"
-        f"● Admin list: {prefix}admins\n"
-        "● Account, broadcast, deleting saved data, and admin changes stay with the owner\n"
-        f"● Section, plugin, or command: {prefix}help admin\n"
-        f"● Button panel: {prefix}panel"
-    )
+        return f"البادئة: {prefix}"
+    return f"Prefix: {prefix}"
 
 
 def owner_only_notice(language: str) -> str:
@@ -232,6 +213,7 @@ def panel_home(language: str, prefix: str) -> str:
             "من هنا تدير ميزات الحساب وتقرأ أوامرها.\n"
             "اضغط قسماً، ثم اسم الميزة، لتشغيلها أو إيقافها أو رؤية مثال.\n"
             f"● أوامر الحساب تبدأ بـ {prefix}\n"
+            f"● لإعادة الفتح: {prefix}تحكم\n"
             "🟢 تعمل الآن · ⚪️ متوقفة · 🔒 غير متاحة في خطتك\n"
             "زر «المسؤولون» يعرض من يستطيع إرسال الأوامر غيرك."
         )
@@ -240,6 +222,7 @@ def panel_home(language: str, prefix: str) -> str:
         "Manage this account's features and read their commands.\n"
         "Tap a section, then a feature, to turn it on or off or see an example.\n"
         f"● Commands start with {prefix}\n"
+        f"● Open it again with {prefix}panel\n"
         "🟢 On · ⚪️ Off · 🔒 Not in your plan\n"
         "The admins button lists who else may send commands."
     )
