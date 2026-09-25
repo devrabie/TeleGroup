@@ -128,7 +128,7 @@ _row(
     "الاوامر",
     "الأوامر",
 )
-_row("{p}panel", "{p}اللوحة", "{p}panel", "{p}اللوحة", "panel", "اللوحة")
+_row("{p}panel", "{p}تحكم", "{p}panel", "{p}تحكم", "panel", "تحكم", "اللوحة")
 _row(
     "{p}addadmin by reply, id, or @username",
     "{p}رفع ادمن بالرد أو المعرّف أو @username",

@@ -291,12 +291,16 @@ def test_feature_screens_use_display_names(tmp_path, monkeypatch):
     assert "إيقاف الفحص" in " ".join(_labels(plugin_rows))
     assert "رجوع إلى" in " ".join(_labels(plugin_rows))
 
-    help_text = render_index(account_id, "ar", ".")
-    assert "رفع ادمن" in help_text
-    assert "صاحب الحساب" in help_text
-    broadcast = render_query(account_id, "ar", ".", "اذاعة")
-    assert "صاحب الحساب فقط" in broadcast
-    ping = render_query(account_id, "ar", ".", "فحص")
+    help_text = "\n".join(render_index(account_id, "ar", "."))
+    assert "رفع ادمن" not in help_text
+    assert "صاحب الحساب" not in help_text
+    system = "\n".join(render_query(account_id, "ar", ".", "النظام"))
+    assert "رفع ادمن" in system
+    assert "صاحب الحساب" in system
+    broadcast = "\n".join(render_query(account_id, "ar", ".", "اذاعة"))
+    assert "صاحب الحساب" in broadcast
+    assert "المسؤولون" not in broadcast
+    ping = "\n".join(render_query(account_id, "ar", ".", "فحص"))
     assert "المسؤولون" in ping
 
 

@@ -21,7 +21,7 @@ sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-ara
 
 ## Inline control panel
 
-`.اللوحة` posts buttons through the control bot's inline mode. Enable it once per bot, from the Telegram account that owns the bot:
+`.تحكم` posts buttons through the control bot's inline mode. `.panel` is the English name. Enable inline mode once per bot, from the Telegram account that owns the bot:
 
 1. Open `@BotFather`.
 2. Send `/setinline`.

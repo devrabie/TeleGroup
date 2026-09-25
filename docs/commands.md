@@ -42,18 +42,18 @@ Commands are grouped into eight sections: الادارة، الحماية، ال
 
 | Command | What it shows |
 | --- | --- |
-| `.الاوامر` / `.help` | The sections, then each enabled plugin's commands |
-| `.الاوامر الادارة` | One section. English: `.help management` |
-| `.الاوامر admin` | One plugin, with usage for each command |
-| `.الاوامر حظر` | One command: description, usage, and an example |
-| `.اللوحة` / `.panel` | The inline button panel in the current chat |
-| `.الاوامر لوحة` | Same panel |
+| `.الاوامر` / `.help` | A numbered index: each section, the command that opens it, and how many commands are on |
+| `.الاوامر الادارة` | That section, one Arabic command per line plus a usage line. English: `.help management` lists English names only |
+| `.الاوامر حظر` | One command card: description, usage, example, aliases, who can use it, and whether the feature is on |
+| `.الاوامر النظام` | The system commands, plus who may send commands |
+| `.تحكم` / `.panel` | The inline button panel in the current chat |
+| `.اللوحة` and `.الاوامر لوحة` | The same panel. Hidden aliases, not shown in the index |
 
-`.help panel` opens the panel too. The Arabic guide for the buttons is [panel-ar.md](panel-ar.md).
+`.help panel` opens the panel too. Who may send commands is in the system section, not in the index. The Arabic guide for the buttons is [panel-ar.md](panel-ar.md).
 
 ## Inline panel
 
-`.اللوحة` asks the control bot, through inline mode, to post a message with buttons. The owner can browse sections, read a command, turn a plugin on or off for that account, and change simple settings (on/off, or a number). Plugins missing from the plan are shown with a lock and cannot be enabled. Only the managed account itself and the registered owner may press the buttons. Other people get an alert.
+`.تحكم` asks the control bot, through inline mode, to post a message with buttons. `.panel` is the English name. The owner can browse sections, read a command, turn a plugin on or off for that account, and change simple settings (on/off, or a number). Plugins missing from the plan are shown with a lock and cannot be enabled. Only the managed account itself and the registered owner may press the buttons. Other people get an alert.
 
 The toggle is written to `account_plugins` (or the existing group-creation and code-monitor columns). The worker reads enablement on every command, and background listeners re-check it about every two seconds. A `runtime_signals` row and Postgres `NOTIFY telegroup_runtime` wake that wait immediately, so a toggle applies without restarting the worker. Setting changes from the panel use the same wake-up.
 
@@ -66,9 +66,9 @@ The control bot must have inline mode turned on, or Telegram refuses the panel:
 3. Choose the control bot.
 4. Send the placeholder shown while someone searches, for example `لوحة`.
 
-Until that is done, `.اللوحة` replies with these same steps instead of a button panel.
+Until that is done, `.تحكم` replies with these same steps instead of a button panel.
 
-Phase 4 commands are in the first table. Phase 3 commands follow. `.الاوامر download` (or `.help download`) prints one plugin's descriptions.
+Phase 4 commands are in the first table. Phase 3 commands follow. `.الاوامر التحميل` (or `.help downloads`) prints that section, one command per line.
 
 Alembic `0004_phase4` grants the phase 4 plugins to every existing plan and does not remove anything. New plans include them. Empty allowlists filled by the SQLite importer include them too.
 
@@ -117,7 +117,7 @@ Animated and video stickers are not added to packs. Static images are resized to
 
 ## Phase 3 commands
 
-Outgoing messages from the managed account, starting with `USERBOT_PREFIX` (default `.`). Arabic is the primary name. English is an alias. `.الاوامر admin` (or `.help admin`) prints one plugin's descriptions.
+Outgoing messages from the managed account, starting with `USERBOT_PREFIX` (default `.`). Arabic is the primary name. English is an alias. `.الاوامر الادارة` (or `.help management`) prints that section. A section name wins when a command reuses it, so `.الاوامر الحماية` is the protection section and `.الاوامر pmpermit` is the single command.
 
 Plugins are idle until you use them. PM protection, logging, and game notices stay off until you turn them on. Locks and replies do nothing until you add one. Broadcast and gifts ask for a second command before they spend messages or Stars.
 

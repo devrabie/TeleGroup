@@ -73,11 +73,11 @@ def is_owner_only(command_name: str) -> bool:
 def access_label(language: str, command_name: str) -> str:
     if is_owner_only(command_name):
         if language == "ar":
-            return "صاحب الحساب فقط"
-        return "Account owner only"
+            return "الحساب نفسه وصاحب الحساب"
+        return "The account itself and its owner"
     if language == "ar":
-        return "صاحب الحساب والمسؤولون"
-    return "Owner and account admins"
+        return "الحساب نفسه وصاحب الحساب والمسؤولون"
+    return "The account, its owner, and admins"
 
 
 def message_sender_id(message: Any) -> int | None:

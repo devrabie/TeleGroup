@@ -231,8 +231,9 @@ async def test_dispatcher_prefix_arabic_owner_and_isolation(tmp_path, monkeypatc
         limiter=limiter,
         language="ar",
     )
-    assert "فحص" in sender.sent[-1]
-    assert "ping" in sender.sent[-1]
+    assert "الادارة" in sender.sent[-1]
+    assert ".الاوامر الادارة" in sender.sent[-1]
+    assert ".تحكم" in sender.sent[-1]
 
     from src.runtime.gating import set_account_plugin
 
