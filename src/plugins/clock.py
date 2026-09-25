@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from src.config import get_settings
 from src.plugins.common import aliases, tr
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta
+from src.templates import card
 
 _TIME = ("الوقت", "time")
 _DATE = ("التاريخ", "date")
@@ -50,7 +51,13 @@ class ClockPlugin(Plugin):
                 f"{text}\nUnknown timezone, using UTC.",
                 f"{text}\nالمنطقة غير معروفة، استُخدم UTC.",
             )
-        await ctx.reply(text)
+        title = "التاريخ" if ctx.command in _DATE and ctx.language == "ar" else ""
+        if not title:
+            if ctx.command in _DATE:
+                title = "Date"
+            else:
+                title = "الوقت" if ctx.language == "ar" else "Time"
+        await ctx.reply(card(ctx.language, title, text))
 
 
 plugin = ClockPlugin()

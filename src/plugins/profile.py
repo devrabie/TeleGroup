@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.plugins.common import aliases, message_text, tr
+from src.plugins.common import aliases, message_text, present
 from src.plugins.files import download_reply, scratch_dir
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta
 
@@ -58,7 +58,7 @@ class ProfilePlugin(Plugin):
 async def _name(ctx: CommandContext) -> None:
     parsed = split_name(ctx.args or "")
     if parsed is None:
-        await ctx.reply(tr(ctx, "Send the new name.", "أرسل الاسم الجديد."))
+        await ctx.reply(present(ctx, "Send the new name.", "أرسل الاسم الجديد."))
         return
     first, last = parsed
 
@@ -66,7 +66,7 @@ async def _name(ctx: CommandContext) -> None:
         return await ctx.client.update_profile(first_name=first, last_name=last)
 
     await ctx.limiter.run(_update)
-    await ctx.reply(tr(ctx, "Name updated.", "تم تحديث الاسم."))
+    await ctx.reply(present(ctx, "Name updated.", "تم تحديث الاسم."))
 
 
 async def _bio(ctx: CommandContext) -> None:
@@ -74,17 +74,17 @@ async def _bio(ctx: CommandContext) -> None:
     text = (ctx.args or "").strip() or (message_text(reply) if reply else "")
     text = text.strip()
     if not text:
-        await ctx.reply(tr(ctx, "Send the new bio.", "أرسل النبذة الجديدة."))
+        await ctx.reply(present(ctx, "Send the new bio.", "أرسل النبذة الجديدة."))
         return
     if len(text) > _BIO_MAX:
-        await ctx.reply(tr(ctx, "The bio limit is 70 characters.", "حد النبذة 70 حرفاً."))
+        await ctx.reply(present(ctx, "The bio limit is 70 characters.", "حد النبذة 70 حرفاً."))
         return
 
     async def _update() -> bool:
         return await ctx.client.update_profile(bio=text)
 
     await ctx.limiter.run(_update)
-    await ctx.reply(tr(ctx, "Bio updated.", "تم تحديث النبذة."))
+    await ctx.reply(present(ctx, "Bio updated.", "تم تحديث النبذة."))
 
 
 async def _photo(ctx: CommandContext) -> None:
@@ -93,19 +93,19 @@ async def _photo(ctx: CommandContext) -> None:
     document = getattr(reply, "document", None)
     mime = str(getattr(document, "mime_type", "") or "")
     if reply is None or (photo is None and not mime.startswith("image/")):
-        await ctx.reply(tr(ctx, "Reply to an image.", "رد على صورة."))
+        await ctx.reply(present(ctx, "Reply to an image.", "رد على صورة."))
         return
     with scratch_dir() as root:
         path = await download_reply(ctx, root)
         if path is None:
-            await ctx.reply(tr(ctx, "Could not download that image.", "تعذر تنزيل الصورة."))
+            await ctx.reply(present(ctx, "Could not download that image.", "تعذر تنزيل الصورة."))
             return
 
         async def _update() -> bool:
             return await ctx.client.set_profile_photo(photo=str(path))
 
         await ctx.limiter.run(_update)
-    await ctx.reply(tr(ctx, "Profile photo updated.", "تم تحديث صورة الحساب."))
+    await ctx.reply(present(ctx, "Profile photo updated.", "تم تحديث صورة الحساب."))
 
 
 plugin = ProfilePlugin()

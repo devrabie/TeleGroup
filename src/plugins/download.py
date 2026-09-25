@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from src.config import get_settings
-from src.plugins.common import aliases, missing_dependency, tr
+from src.plugins.common import aliases, missing_dependency, present, tr
 from src.plugins.files import scratch_dir
 from src.plugins.proxy_url import account_proxy_url
 from src.plugins.slots import cancel_kind, release, try_acquire
@@ -105,9 +105,9 @@ class DownloadPlugin(Plugin):
         if ctx.command in _STOP:
             count = cancel_kind(ctx.account_id, "download")
             if count:
-                await ctx.reply(tr(ctx, "Stopping the download.", "جارٍ إيقاف التنزيل."))
+                await ctx.reply(present(ctx, "Stopping the download.", "جارٍ إيقاف التنزيل."))
             else:
-                await ctx.reply(tr(ctx, "No download is running.", "لا يوجد تنزيل جارٍ."))
+                await ctx.reply(present(ctx, "No download is running.", "لا يوجد تنزيل جارٍ."))
             return
         if ctx.command in _SEARCH:
             await _search(ctx)
@@ -166,7 +166,7 @@ def _explain(ctx: CommandContext, code: str) -> str:
     value = messages.get(code, messages["failed"])
     if isinstance(value, str):
         return value
-    return tr(ctx, value[0], value[1])
+    return present(ctx, value[0], value[1])
 
 
 async def _search(ctx: CommandContext) -> None:
@@ -182,7 +182,7 @@ async def _search(ctx: CommandContext) -> None:
     if slot is None:
         await ctx.reply(_explain(ctx, "busy"))
         return
-    status = await ctx.reply(tr(ctx, "Searching…", "جارٍ البحث…"))
+    status = await ctx.reply(present(ctx, "Searching…", "جارٍ البحث…"))
     try:
         result = await run_named(
             ctx.account_id,
@@ -204,7 +204,7 @@ async def _search(ctx: CommandContext) -> None:
         return
     rows = result.get("results") or []
     if not rows:
-        await edit_status(ctx, status, tr(ctx, "Nothing was found.", "لم يُعثر على شيء."))
+        await edit_status(ctx, status, present(ctx, "Nothing was found.", "لم يُعثر على شيء."))
         return
     lines = []
     for index, row in enumerate(rows, start=1):
@@ -231,7 +231,7 @@ async def _download(ctx: CommandContext, kind: str) -> None:
     if slot is None:
         await ctx.reply(_explain(ctx, "busy"))
         return
-    status = await ctx.reply(tr(ctx, "Downloading…", "جارٍ التنزيل…"))
+    status = await ctx.reply(present(ctx, "Downloading…", "جارٍ التنزيل…"))
     try:
         with scratch_dir() as root:
             result = await run_named(
@@ -270,7 +270,7 @@ async def _download(ctx: CommandContext, kind: str) -> None:
                     "أُرسل كملف لأن ffmpeg غير مثبت.",
                 )
                 caption = f"{caption}\n{note}".strip()
-            await edit_status(ctx, status, tr(ctx, "Uploading…", "جارٍ الرفع…"))
+            await edit_status(ctx, status, present(ctx, "Uploading…", "جارٍ الرفع…"))
             await send_path(
                 ctx,
                 path,

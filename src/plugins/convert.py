@@ -6,7 +6,7 @@ from pathlib import Path
 
 from src.config import get_settings
 from src.media_jobs import GIF_MAX_SECONDS
-from src.plugins.common import aliases, missing_dependency, tr
+from src.plugins.common import aliases, missing_dependency, present
 from src.plugins.files import download_reply, message_file_size, scratch_dir
 from src.plugins.uploads import clear_status, edit_status, send_path
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta
@@ -41,7 +41,7 @@ class ConvertPlugin(Plugin):
         reply = getattr(ctx.message, "reply_to_message", None)
         if reply is None:
             await ctx.reply(
-                tr(ctx, "Reply to a video or an audio file.", "رد على فيديو أو ملف صوت.")
+                present(ctx, "Reply to a video or an audio file.", "رد على فيديو أو ملف صوت.")
             )
             return
         if ctx.command in _GIF:
@@ -61,21 +61,27 @@ class ConvertPlugin(Plugin):
         max_bytes = get_settings().download_max_mb * 1024 * 1024
         size = message_file_size(reply)
         if size is not None and size > max_bytes:
-            await ctx.reply(tr(ctx, "That file is larger than the limit.", "الملف أكبر من الحد."))
+            await ctx.reply(
+                present(
+                    ctx,
+                    "That file is larger than the limit.",
+                    "الملف أكبر من الحد.",
+                )
+            )
             return
-        status = await ctx.reply(tr(ctx, "Converting…", "جارٍ التحويل…"))
+        status = await ctx.reply(present(ctx, "Converting…", "جارٍ التحويل…"))
         with scratch_dir() as root:
             source = await download_reply(ctx, root)
             if source is None:
                 await edit_status(
-                    ctx, status, tr(ctx, "Could not download that file.", "تعذر تنزيل الملف.")
+                    ctx, status, present(ctx, "Could not download that file.", "تعذر تنزيل الملف.")
                 )
                 return
             if source.stat().st_size > max_bytes:
                 await edit_status(
                     ctx,
                     status,
-                    tr(ctx, "That file is larger than the limit.", "الملف أكبر من الحد."),
+                    present(ctx, "That file is larger than the limit.", "الملف أكبر من الحد."),
                 )
                 return
             dest = root / dest_name
@@ -95,12 +101,16 @@ class ConvertPlugin(Plugin):
                 if result.get("error") == "missing":
                     text = missing_dependency(ctx, "ffmpeg")
                 elif result.get("error") == "size":
-                    text = tr(ctx, "The result is larger than the limit.", "الناتج أكبر من الحد.")
+                    text = present(
+                        ctx,
+                        "The result is larger than the limit.",
+                        "الناتج أكبر من الحد.",
+                    )
                 else:
-                    text = tr(ctx, "Could not convert that file.", "تعذر تحويل الملف.")
+                    text = present(ctx, "Could not convert that file.", "تعذر تحويل الملف.")
                 await edit_status(ctx, status, text)
                 return
-            await edit_status(ctx, status, tr(ctx, "Uploading…", "جارٍ الرفع…"))
+            await edit_status(ctx, status, present(ctx, "Uploading…", "جارٍ الرفع…"))
             await send_path(
                 ctx,
                 Path(str(result["path"])),

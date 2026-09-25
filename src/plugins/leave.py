@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.plugins.common import aliases, chat_id_of, chat_kind, tr
+from src.plugins.common import aliases, chat_id_of, chat_kind, present
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta
 
 _CMD = ("مغادرة", "leave")
@@ -37,10 +37,14 @@ class LeavePlugin(Plugin):
         me = getattr(ctx.client, "me", None)
         if not can_leave(kind, chat_id, getattr(me, "id", None)):
             await ctx.reply(
-                tr(ctx, "This command leaves groups and channels.", "هذا الأمر للمجموعات والقنوات.")
+                present(
+                    ctx,
+                    "This command leaves groups and channels.",
+                    "هذا الأمر للمجموعات والقنوات.",
+                )
             )
             return
-        await ctx.reply(tr(ctx, "Leaving.", "جارٍ المغادرة."))
+        await ctx.reply(present(ctx, "Leaving.", "جارٍ المغادرة."))
         await ctx.limiter.run(lambda: ctx.client.leave_chat(chat_id))
 
 

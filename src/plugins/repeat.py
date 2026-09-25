@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from src.plugins.common import aliases, message_text, tr
+from src.plugins.common import aliases, message_text, present
 from src.plugins.slots import cancel_kind, release, try_acquire
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta, SettingField
 
@@ -76,9 +76,9 @@ class RepeatPlugin(Plugin):
     async def handle(self, ctx: CommandContext) -> None:
         if ctx.command in _STOP:
             if cancel_kind(ctx.account_id, "repeat"):
-                await ctx.reply(tr(ctx, "Stopping.", "جارٍ الإيقاف."))
+                await ctx.reply(present(ctx, "Stopping.", "جارٍ الإيقاف."))
             else:
-                await ctx.reply(tr(ctx, "Nothing is repeating.", "لا يوجد تكرار جارٍ."))
+                await ctx.reply(present(ctx, "Nothing is repeating.", "لا يوجد تكرار جارٍ."))
             return
         raw_cap = ctx.settings.get("max_count", 5)
         try:
@@ -93,11 +93,11 @@ class RepeatPlugin(Plugin):
             cap=cap,
         )
         if error == "cap":
-            await ctx.reply(tr(ctx, f"The maximum is {cap}.", f"الحد الأقصى {cap}."))
+            await ctx.reply(present(ctx, f"The maximum is {cap}.", f"الحد الأقصى {cap}."))
             return
         if error:
             await ctx.reply(
-                tr(
+                present(
                     ctx,
                     "Use a count from 1 to the limit, then short text.",
                     "أرسل عدداً ضمن الحد ثم نصاً قصيراً.",
@@ -105,11 +105,11 @@ class RepeatPlugin(Plugin):
             )
             return
         if text.startswith(ctx.prefix):
-            await ctx.reply(tr(ctx, "Commands are not repeated.", "لا يُكرر أمر."))
+            await ctx.reply(present(ctx, "Commands are not repeated.", "لا يُكرر أمر."))
             return
         slot = try_acquire(ctx.account_id, "repeat", 1)
         if slot is None:
-            await ctx.reply(tr(ctx, "A repeat is already running.", "هناك تكرار جارٍ."))
+            await ctx.reply(present(ctx, "A repeat is already running.", "هناك تكرار جارٍ."))
             return
         delay = ctx.settings.get("delay", 2)
         try:

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from src.runtime.plugins import BotCommand, CommandContext, Plugin, PluginMeta
+from src.plugins.common import aliases
+from src.runtime.plugins import CommandContext, Plugin, PluginMeta
+from src.templates import card, field
 
 
 def _latency_ms(message: object) -> float:
@@ -22,15 +24,11 @@ class PingPlugin(Plugin):
         description_en="Reply with this account's latency.",
         description_ar="الرد بزمن استجابة هذا الحساب.",
         commands=(
-            BotCommand(
-                "ping",
+            *aliases(
                 "Reply with this account's latency.",
                 "الرد بزمن استجابة هذا الحساب.",
-            ),
-            BotCommand(
                 "فحص",
-                "Reply with this account's latency.",
-                "الرد بزمن استجابة هذا الحساب.",
+                "ping",
             ),
         ),
         default_enabled=True,
@@ -39,9 +37,14 @@ class PingPlugin(Plugin):
     async def handle(self, ctx: CommandContext) -> None:
         latency = _latency_ms(ctx.message)
         if ctx.language == "ar":
-            await ctx.reply(f"🏓 {latency:.0f} مللي ثانية")
+            title = "فحص"
+            label = "الاستجابة"
+            unit = "مللي ثانية"
         else:
-            await ctx.reply(f"🏓 {latency:.0f} ms")
+            title = "Ping"
+            label = "Latency"
+            unit = "ms"
+        await ctx.reply(card(ctx.language, f"🏓 {title}", field(label, f"{latency:.0f} {unit}")))
 
 
 plugin = PingPlugin()

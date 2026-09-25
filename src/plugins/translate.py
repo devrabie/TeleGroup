@@ -6,7 +6,7 @@ import logging
 import re
 
 from src.config import get_settings
-from src.plugins.common import aliases, message_text, tr
+from src.plugins.common import aliases, message_text, present, tr
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta, SettingField
 
 log = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ class TranslatePlugin(Plugin):
         parsed = split_translate_args(ctx.args or "", message_text(reply) if reply else "", default)
         if parsed is None:
             await ctx.reply(
-                tr(
+                present(
                     ctx,
                     "Use a language code and text, or reply to a message.",
                     "أرسل رمز اللغة والنص، أو رد على رسالة.",
@@ -86,7 +86,7 @@ class TranslatePlugin(Plugin):
             translated = await translate_text(text, target, source)
         except Exception:
             log.info("translate failed account=%s", ctx.account_id)
-            await ctx.reply(tr(ctx, "Translation failed.", "فشلت الترجمة."))
+            await ctx.reply(present(ctx, "Translation failed.", "فشلت الترجمة."))
             return
         if (
             len((ctx.args or "") + message_text(reply) if reply else "") > _MAX

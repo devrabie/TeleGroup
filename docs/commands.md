@@ -1,6 +1,40 @@
 # Userbot commands
 
-Phase 4 commands are in the first table. Phase 3 commands follow. Outgoing messages from the managed account start with `USERBOT_PREFIX` (default `.`). Arabic is the primary name. English is an alias. `.الاوامر download` (or `.help download`) prints one plugin's descriptions.
+Outgoing messages from the managed account start with `USERBOT_PREFIX` (default `.`). Arabic is the primary name. English is an alias. Replies use one frame: a short header, the separator `⋆┄─┄─┄─┄┄─┄─┄─┄─┄┄⋆`, then the sentence. Arabic is used when the owner's control-bot language is Arabic. Any other language gets the English text.
+
+## Sections and help
+
+Commands are grouped into eight sections: الادارة، الحماية، التحميل، الوسائط، الأدوات، الحساب، الترفيه، النظام.
+
+| Command | What it shows |
+| --- | --- |
+| `.الاوامر` / `.help` | The sections, then each enabled plugin's commands |
+| `.الاوامر الادارة` | One section. English: `.help management` |
+| `.الاوامر admin` | One plugin, with usage for each command |
+| `.الاوامر حظر` | One command: description, usage, and an example |
+| `.اللوحة` / `.panel` | The inline button panel in the current chat |
+| `.الاوامر لوحة` | Same panel |
+
+`.help panel` opens the panel too. The Arabic guide for the buttons is [panel-ar.md](panel-ar.md).
+
+## Inline panel
+
+`.اللوحة` asks the control bot, through inline mode, to post a message with buttons. The owner can browse sections, read a command, turn a plugin on or off for that account, and change simple settings (on/off, or a number). Plugins missing from the plan are shown with a lock and cannot be enabled. Only the managed account itself and the registered owner may press the buttons. Other people get an alert.
+
+The toggle is written to `account_plugins` (or the existing group-creation and code-monitor columns). The worker reads enablement on every command, and background listeners re-check it about every two seconds. A `runtime_signals` row and Postgres `NOTIFY telegroup_runtime` wake that wait immediately, so a toggle applies without restarting the worker. Setting changes from the panel use the same wake-up.
+
+### Enable inline mode once
+
+The control bot must have inline mode turned on, or Telegram refuses the panel:
+
+1. Open [@BotFather](https://t.me/BotFather).
+2. Send `/setinline`.
+3. Choose the control bot.
+4. Send the placeholder shown while someone searches, for example `لوحة`.
+
+Until that is done, `.اللوحة` replies with these same steps instead of a button panel.
+
+Phase 4 commands are in the first table. Phase 3 commands follow. `.الاوامر download` (or `.help download`) prints one plugin's descriptions.
 
 Alembic `0004_phase4` grants the phase 4 plugins to every existing plan and does not remove anything. New plans include them. Empty allowlists filled by the SQLite importer include them too.
 

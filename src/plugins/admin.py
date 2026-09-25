@@ -6,7 +6,14 @@ import logging
 
 from pyrogram.types import ChatPermissions, ChatPrivileges
 
-from src.plugins.common import aliases, chat_id_of, chat_kind, is_group_or_channel, resolve_user, tr
+from src.plugins.common import (
+    aliases,
+    chat_id_of,
+    chat_kind,
+    is_group_or_channel,
+    present,
+    resolve_user,
+)
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta
 
 log = logging.getLogger(__name__)
@@ -97,14 +104,20 @@ class AdminPlugin(Plugin):
             return
         if not is_group_or_channel(ctx.message):
             await ctx.reply(
-                tr(ctx, "Use this in a group or channel.", "استخدم هذا في مجموعة أو قناة.")
+                present(ctx, "Use this in a group or channel.", "استخدم هذا في مجموعة أو قناة.")
             )
             return
         try:
             await action(ctx)
         except Exception:
             log.exception("Admin command %s failed for account %s", ctx.command, ctx.account_id)
-            await ctx.reply(tr(ctx, "Telegram refused that action.", "رفض تيليجرام هذا الإجراء."))
+            await ctx.reply(
+                present(
+                    ctx,
+                    "Telegram refused that action.",
+                    "رفض تيليجرام هذا الإجراء.",
+                )
+            )
 
 
 async def _ban(ctx: CommandContext) -> None:
@@ -114,7 +127,7 @@ async def _ban(ctx: CommandContext) -> None:
         return
     chat_id = chat_id_of(ctx.message)
     await ctx.limiter.run(ctx.client.ban_chat_member, chat_id, user_id)
-    await ctx.reply(tr(ctx, "Banned.", "تم الحظر."))
+    await ctx.reply(present(ctx, "Banned.", "تم الحظر."))
 
 
 async def _unban(ctx: CommandContext) -> None:
@@ -124,7 +137,7 @@ async def _unban(ctx: CommandContext) -> None:
         return
     chat_id = chat_id_of(ctx.message)
     await ctx.limiter.run(ctx.client.unban_chat_member, chat_id, user_id)
-    await ctx.reply(tr(ctx, "Ban removed.", "تم إلغاء الحظر."))
+    await ctx.reply(present(ctx, "Ban removed.", "تم إلغاء الحظر."))
 
 
 async def _kick(ctx: CommandContext) -> None:
@@ -135,7 +148,7 @@ async def _kick(ctx: CommandContext) -> None:
     chat_id = chat_id_of(ctx.message)
     await ctx.limiter.run(ctx.client.ban_chat_member, chat_id, user_id)
     await ctx.limiter.run(ctx.client.unban_chat_member, chat_id, user_id)
-    await ctx.reply(tr(ctx, "Kicked.", "تم الطرد."))
+    await ctx.reply(present(ctx, "Kicked.", "تم الطرد."))
 
 
 async def _mute(ctx: CommandContext) -> None:
@@ -148,7 +161,7 @@ async def _unmute(ctx: CommandContext) -> None:
 
 async def _restrict(ctx: CommandContext, permissions: ChatPermissions, en: str, ar: str) -> None:
     if chat_kind(ctx.message) == "channel":
-        await ctx.reply(tr(ctx, "Mute works in groups.", "الكتم يعمل في المجموعات."))
+        await ctx.reply(present(ctx, "Mute works in groups.", "الكتم يعمل في المجموعات."))
         return
     user_id, error = await resolve_user(ctx)
     if error:
@@ -157,7 +170,7 @@ async def _restrict(ctx: CommandContext, permissions: ChatPermissions, en: str, 
     await ctx.limiter.run(
         ctx.client.restrict_chat_member, chat_id_of(ctx.message), user_id, permissions
     )
-    await ctx.reply(tr(ctx, en, ar))
+    await ctx.reply(present(ctx, en, ar))
 
 
 async def _promote(ctx: CommandContext) -> None:
@@ -176,27 +189,31 @@ async def _rank(ctx: CommandContext, privileges: ChatPrivileges, en: str, ar: st
     await ctx.limiter.run(
         ctx.client.promote_chat_member, chat_id_of(ctx.message), user_id, privileges
     )
-    await ctx.reply(tr(ctx, en, ar))
+    await ctx.reply(present(ctx, en, ar))
 
 
 async def _pin(ctx: CommandContext) -> None:
     message_id = _target_message_id(ctx)
     if message_id is None:
         await ctx.reply(
-            tr(ctx, "Reply to the message you want to pin.", "رد على الرسالة التي تريد تثبيتها.")
+            present(
+                ctx,
+                "Reply to the message you want to pin.",
+                "رد على الرسالة التي تريد تثبيتها.",
+            )
         )
         return
     await ctx.limiter.run(ctx.client.pin_chat_message, chat_id_of(ctx.message), message_id)
-    await ctx.reply(tr(ctx, "Pinned.", "تم التثبيت."))
+    await ctx.reply(present(ctx, "Pinned.", "تم التثبيت."))
 
 
 async def _unpin(ctx: CommandContext) -> None:
     message_id = _target_message_id(ctx)
     if message_id is None:
-        await ctx.reply(tr(ctx, "Reply to the pinned message.", "رد على الرسالة المثبتة."))
+        await ctx.reply(present(ctx, "Reply to the pinned message.", "رد على الرسالة المثبتة."))
         return
     await ctx.limiter.run(ctx.client.unpin_chat_message, chat_id_of(ctx.message), message_id)
-    await ctx.reply(tr(ctx, "Unpinned.", "تم إلغاء التثبيت."))
+    await ctx.reply(present(ctx, "Unpinned.", "تم إلغاء التثبيت."))
 
 
 async def _delete(ctx: CommandContext) -> None:
@@ -204,11 +221,15 @@ async def _delete(ctx: CommandContext) -> None:
     reply_id = getattr(reply, "id", None)
     if reply_id is None:
         await ctx.reply(
-            tr(ctx, "Reply to the message you want to delete.", "رد على الرسالة التي تريد حذفها.")
+            present(
+                ctx,
+                "Reply to the message you want to delete.",
+                "رد على الرسالة التي تريد حذفها.",
+            )
         )
         return
     await ctx.limiter.run(ctx.client.delete_messages, chat_id_of(ctx.message), [reply_id])
-    await ctx.reply(tr(ctx, "Deleted.", "تم الحذف."))
+    await ctx.reply(present(ctx, "Deleted.", "تم الحذف."))
 
 
 async def _purge(ctx: CommandContext) -> None:
@@ -217,12 +238,12 @@ async def _purge(ctx: CommandContext) -> None:
     end = getattr(ctx.message, "id", None)
     if start is None or end is None:
         await ctx.reply(
-            tr(ctx, "Reply to the first message to purge.", "رد على أول رسالة تريد تنظيفها.")
+            present(ctx, "Reply to the first message to purge.", "رد على أول رسالة تريد تنظيفها.")
         )
         return
     if end < start or (end - start) > _MAX_PURGE:
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 f"Purge covers at most {_MAX_PURGE} messages. Reply closer to this command.",
                 f"التنظيف يحذف {_MAX_PURGE} رسالة كحد أقصى. رد على رسالة أقرب.",
@@ -231,7 +252,7 @@ async def _purge(ctx: CommandContext) -> None:
         return
     ids = list(range(int(start), int(end))) or [int(start)]
     await ctx.limiter.run(ctx.client.delete_messages, chat_id_of(ctx.message), ids)
-    await ctx.reply(tr(ctx, f"Deleted {len(ids)} messages.", f"تم حذف {len(ids)} رسالة."))
+    await ctx.reply(present(ctx, f"Deleted {len(ids)} messages.", f"تم حذف {len(ids)} رسالة."))
 
 
 def _target_message_id(ctx: CommandContext) -> int | None:
@@ -244,7 +265,7 @@ def _target_message_id(ctx: CommandContext) -> int | None:
 
 async def _need_target(ctx: CommandContext) -> None:
     await ctx.reply(
-        tr(
+        present(
             ctx,
             "Reply to a user, or pass @username or a numeric id.",
             "رد على المستخدم، أو أرسل @username أو المعرّف.",

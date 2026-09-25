@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable
 
-from src.plugins.common import aliases, chat_id_of, is_group_chat, lock_matches, tr
+from src.plugins.common import aliases, chat_id_of, is_group_chat, lock_matches, present
 from src.plugins.listeners import watch
 from src.runtime.plugin_data import add_lock, list_locks, remove_lock
 from src.runtime.plugins import AccountSession, CommandContext, Plugin, PluginMeta, is_self_outgoing
@@ -55,37 +55,37 @@ class LocksPlugin(Plugin):
 
     async def handle(self, ctx: CommandContext) -> None:
         if not is_group_chat(ctx.message):
-            await ctx.reply(tr(ctx, "Locks work in groups.", "الأقفال تعمل في المجموعات."))
+            await ctx.reply(present(ctx, "Locks work in groups.", "الأقفال تعمل في المجموعات."))
             return
         chat_id = chat_id_of(ctx.message)
         if not isinstance(chat_id, int):
-            await ctx.reply(tr(ctx, "This chat has no id.", "هذه المحادثة بلا معرّف."))
+            await ctx.reply(present(ctx, "This chat has no id.", "هذه المحادثة بلا معرّف."))
             return
         if ctx.command in {"الاقفال", "locks"}:
             names = list_locks(ctx.account_id, chat_id)
             if not names:
-                await ctx.reply(tr(ctx, "Nothing is locked here.", "لا يوجد قفل هنا."))
+                await ctx.reply(present(ctx, "Nothing is locked here.", "لا يوجد قفل هنا."))
                 return
             shown = ", ".join(
                 _TYPES.get(name, name) if ctx.language == "ar" else name for name in names
             )
-            await ctx.reply(tr(ctx, f"Locked: {shown}", f"المقفول: {shown}"))
+            await ctx.reply(present(ctx, f"Locked: {shown}", f"المقفول: {shown}"))
             return
         kind = _BY_ALIAS.get((ctx.args or "").strip().casefold()) or _BY_ALIAS.get(
             (ctx.args or "").strip()
         )
         if kind is None:
             choices = "، ".join(_TYPES.values()) if ctx.language == "ar" else ", ".join(_TYPES)
-            await ctx.reply(tr(ctx, f"Choose one of: {choices}", f"اختر واحداً من: {choices}"))
+            await ctx.reply(present(ctx, f"Choose one of: {choices}", f"اختر واحداً من: {choices}"))
             return
         if ctx.command in {"قفل", "lock"}:
             add_lock(ctx.account_id, chat_id, kind)
-            await ctx.reply(tr(ctx, f"Locked {kind}.", f"تم قفل {_TYPES[kind]}."))
+            await ctx.reply(present(ctx, f"Locked {kind}.", f"تم قفل {_TYPES[kind]}."))
             return
         if remove_lock(ctx.account_id, chat_id, kind):
-            await ctx.reply(tr(ctx, f"Unlocked {kind}.", f"تم فتح {_TYPES[kind]}."))
+            await ctx.reply(present(ctx, f"Unlocked {kind}.", f"تم فتح {_TYPES[kind]}."))
         else:
-            await ctx.reply(tr(ctx, "That type was not locked.", "هذا النوع لم يكن مقفولاً."))
+            await ctx.reply(present(ctx, "That type was not locked.", "هذا النوع لم يكن مقفولاً."))
 
 
 async def on_message(session: AccountSession, message: object) -> None:

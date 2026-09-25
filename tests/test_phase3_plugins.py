@@ -258,7 +258,7 @@ async def test_admin_actions_use_reply_username_and_id(tmp_path, monkeypatch):
 
     client.sent.clear()
     await _run(account_id, client, ".ban", chat_type="private")
-    assert client.sent[-1][1].startswith("Use this in a group")
+    assert "Use this in a group" in client.sent[-1][1]
     assert admin_plugin.meta.commands
 
 

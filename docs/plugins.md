@@ -30,6 +30,8 @@ plugin = PingPlugin()
 ```
 
 - `name` is the stable id stored in `plan_plugins` and `account_plugins`.
+- Put the plugin in `PLUGIN_CATEGORY` in `src/command_catalog.py`, and add usage plus an example for every command name in `COMMAND_HELP`. `{p}` becomes the account prefix in help text.
+- User-facing status text goes through `present()` in `src/plugins/common.py`, which applies the shared frame from `src/templates.py`. Keep `tr()` for a fragment that is joined into a larger sentence.
 - `commands` are matched without the prefix. Latin names are case-insensitive. Arabic names are matched as written.
 - The longest command name wins, so `.رد عام` is not handled as `.رد`. A name must end at a space or the end of the message.
 - `default_enabled` applies when the account has no row in `account_plugins`. `groups` and `codemon` are special: they follow `managed_accounts.is_active` and `code_monitor_enabled`.

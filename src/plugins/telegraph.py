@@ -6,7 +6,7 @@ import json
 import logging
 from pathlib import Path
 
-from src.plugins.common import aliases, message_text, tr
+from src.plugins.common import aliases, message_text, present
 from src.plugins.files import download_reply, message_file_size, scratch_dir
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta
 
@@ -45,19 +45,25 @@ class TelegraphPlugin(Plugin):
             await _image(ctx, reply)
             return
         if not text:
-            await ctx.reply(tr(ctx, "Send text or reply to an image.", "أرسل نصاً أو رد على صورة."))
+            await ctx.reply(
+                present(
+                    ctx,
+                    "Send text or reply to an image.",
+                    "أرسل نصاً أو رد على صورة.",
+                )
+            )
             return
         token = str(ctx.settings.get("token", "") or "")
         try:
             token, url = await publish_text(text[:_MAX_TEXT], token)
         except Exception:
             log.info("telegraph text failed account=%s", ctx.account_id)
-            await ctx.reply(tr(ctx, "Telegraph upload failed.", "فشل الرفع إلى تيليغراف."))
+            await ctx.reply(present(ctx, "Telegraph upload failed.", "فشل الرفع إلى تيليغراف."))
             return
         if token:
             ctx.settings.set("token", token)
         if not url:
-            await ctx.reply(tr(ctx, "Telegraph upload failed.", "فشل الرفع إلى تيليغراف."))
+            await ctx.reply(present(ctx, "Telegraph upload failed.", "فشل الرفع إلى تيليغراف."))
             return
         await ctx.reply(url)
 
@@ -66,17 +72,21 @@ async def _image(ctx: CommandContext, reply: object) -> None:
     size = message_file_size(reply)
     if size is not None and size > _MAX_IMAGE:
         await ctx.reply(
-            tr(ctx, "Telegraph accepts images up to 5 MB.", "تيليغراف يقبل صوراً حتى 5 ميغابايت.")
+            present(
+                ctx,
+                "Telegraph accepts images up to 5 MB.",
+                "تيليغراف يقبل صوراً حتى 5 ميغابايت.",
+            )
         )
         return
     with scratch_dir() as root:
         path = await download_reply(ctx, root)
         if path is None:
-            await ctx.reply(tr(ctx, "Could not download that image.", "تعذر تنزيل الصورة."))
+            await ctx.reply(present(ctx, "Could not download that image.", "تعذر تنزيل الصورة."))
             return
         if path.stat().st_size > _MAX_IMAGE:
             await ctx.reply(
-                tr(
+                present(
                     ctx,
                     "Telegraph accepts images up to 5 MB.",
                     "تيليغراف يقبل صوراً حتى 5 ميغابايت.",
@@ -87,7 +97,7 @@ async def _image(ctx: CommandContext, reply: object) -> None:
             url = await publish_file(path)
         except Exception:
             log.info("telegraph file failed account=%s", ctx.account_id)
-            await ctx.reply(tr(ctx, "Telegraph upload failed.", "فشل الرفع إلى تيليغراف."))
+            await ctx.reply(present(ctx, "Telegraph upload failed.", "فشل الرفع إلى تيليغراف."))
             return
     await ctx.reply(url)
 

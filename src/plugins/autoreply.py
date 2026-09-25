@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable
 
-from src.plugins.common import aliases, chat_id_of, message_text, tr
+from src.plugins.common import aliases, chat_id_of, message_text, present, tr
 from src.plugins.listeners import watch
 from src.runtime.plugin_data import (
     GLOBAL_CHAT_ID,
@@ -113,40 +113,49 @@ def _chat(ctx: CommandContext) -> int:
 
 async def _save(ctx: CommandContext, chat_id: int) -> None:
     if chat_id == 0 and ctx.command in {"رد", "filter"}:
-        await ctx.reply(tr(ctx, "Open the chat first.", "افتح المحادثة أولاً."))
+        await ctx.reply(present(ctx, "Open the chat first.", "افتح المحادثة أولاً."))
         return
     parsed = _split_rule(ctx.args or "")
     if parsed is None:
-        await ctx.reply(tr(ctx, "Usage: keyword | reply", "الاستخدام: الكلمة | الرد"))
+        await ctx.reply(present(ctx, "Usage: keyword | reply", "الاستخدام: الكلمة | الرد"))
         return
     keyword, response = parsed
     result = upsert_auto_reply(ctx.account_id, chat_id, _norm(keyword), response)
     if result == "limit":
-        await ctx.reply(tr(ctx, "This list is full (100 rules).", "القائمة ممتلئة (100 قاعدة)."))
+        await ctx.reply(
+            present(
+                ctx,
+                "This list is full (100 rules).",
+                "القائمة ممتلئة (100 قاعدة).",
+            )
+        )
         return
     if result != "saved":
-        await ctx.reply(tr(ctx, "That rule is not valid.", "هذه القاعدة غير صالحة."))
+        await ctx.reply(present(ctx, "That rule is not valid.", "هذه القاعدة غير صالحة."))
         return
-    await ctx.reply(tr(ctx, "Reply saved.", "تم حفظ الرد."))
+    await ctx.reply(present(ctx, "Reply saved.", "تم حفظ الرد."))
 
 
 async def _delete(ctx: CommandContext, chat_id: int) -> None:
     keyword = _norm(ctx.args or "")
     if not keyword:
-        await ctx.reply(tr(ctx, "Send the keyword to delete.", "أرسل الكلمة التي تريد حذفها."))
+        await ctx.reply(present(ctx, "Send the keyword to delete.", "أرسل الكلمة التي تريد حذفها."))
         return
     if delete_auto_reply(ctx.account_id, chat_id, keyword):
-        await ctx.reply(tr(ctx, "Reply deleted.", "تم حذف الرد."))
+        await ctx.reply(present(ctx, "Reply deleted.", "تم حذف الرد."))
     else:
-        await ctx.reply(tr(ctx, "No reply uses that keyword.", "لا يوجد رد بهذه الكلمة."))
+        await ctx.reply(present(ctx, "No reply uses that keyword.", "لا يوجد رد بهذه الكلمة."))
 
 
 async def _list(ctx: CommandContext, chat_id: int) -> None:
     rows = list_auto_replies(ctx.account_id, chat_id)
     if not rows:
-        await ctx.reply(tr(ctx, "No replies saved.", "لا توجد ردود محفوظة."))
+        await ctx.reply(present(ctx, "No replies saved.", "لا توجد ردود محفوظة."))
         return
-    lines = [tr(ctx, "Replies:", "الردود:")]
+    from src.templates import section
+
+    title = section(tr(ctx, "Replies", "الردود"))
+    lines = [title]
     for row in rows[:30]:
         lines.append(f"• {row['keyword']} → {row['response'][:80]}")
     await ctx.reply("\n".join(lines))

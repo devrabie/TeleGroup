@@ -10,7 +10,7 @@ import logging
 import time
 from typing import Any
 
-from src.plugins.common import aliases, chat_id_of, is_saved_chat, resolve_user, tr
+from src.plugins.common import aliases, chat_id_of, is_saved_chat, present, resolve_user
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta
 
 log = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ class CreateChatPlugin(Plugin):
 async def _create(ctx: CommandContext, kind: str) -> None:
     title = (ctx.args or "").strip()
     if not title or len(title) > 128:
-        await ctx.reply(tr(ctx, "Send a title after the command.", "أرسل الاسم بعد الأمر."))
+        await ctx.reply(present(ctx, "Send a title after the command.", "أرسل الاسم بعد الأمر."))
         return
     try:
         if kind == "channel":
@@ -86,24 +86,28 @@ async def _create(ctx: CommandContext, kind: str) -> None:
     except Exception:
         log.exception("Create %s failed for account %s", kind, ctx.account_id)
         await ctx.reply(
-            tr(ctx, "Telegram refused to create that chat.", "رفض تيليجرام إنشاء المحادثة.")
+            present(ctx, "Telegram refused to create that chat.", "رفض تيليجرام إنشاء المحادثة.")
         )
         return
     chat_id = getattr(chat, "id", None)
-    await ctx.reply(tr(ctx, f"Created {title} ({chat_id}).", f"تم إنشاء {title} ({chat_id})."))
+    await ctx.reply(present(ctx, f"Created {title} ({chat_id}).", f"تم إنشاء {title} ({chat_id})."))
 
 
 async def _begin_transfer(ctx: CommandContext) -> None:
     chat_id = chat_id_of(ctx.message)
     if not isinstance(chat_id, int):
         await ctx.reply(
-            tr(ctx, "Run this inside the group or channel.", "نفّذ هذا داخل المجموعة أو القناة.")
+            present(
+                ctx,
+                "Run this inside the group or channel.",
+                "نفّذ هذا داخل المجموعة أو القناة.",
+            )
         )
         return
     user, error = await resolve_user(ctx)
     if error or user is None:
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 "Reply to the new owner, or pass @username or a numeric id.",
                 "رد على المالك الجديد، أو أرسل @username أو المعرّف.",
@@ -116,7 +120,7 @@ async def _begin_transfer(ctx: CommandContext) -> None:
         "at": time.monotonic(),
     }
     await ctx.reply(
-        tr(
+        present(
             ctx,
             f"Send {ctx.prefix}cloudpass and the 2FA password in Saved Messages. "
             "That message is deleted and the password is not saved.",
@@ -131,7 +135,7 @@ async def _password(ctx: CommandContext) -> None:
     await _delete_command(ctx)
     if not is_saved_chat(ctx.message, ctx.client):
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 "Send the password in Saved Messages only.",
                 "أرسل كلمة السر في الرسائل المحفوظة فقط.",
@@ -141,11 +145,17 @@ async def _password(ctx: CommandContext) -> None:
     pending = _pending.get(ctx.account_id)
     if pending is None or time.monotonic() - float(pending["at"]) > _PENDING_SECONDS:
         _pending.pop(ctx.account_id, None)
-        await ctx.reply(tr(ctx, "No transfer is waiting.", "لا يوجد نقل ملكية بانتظار التأكيد."))
+        await ctx.reply(
+            present(
+                ctx,
+                "No transfer is waiting.",
+                "لا يوجد نقل ملكية بانتظار التأكيد.",
+            )
+        )
         return
     if not password:
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 "The password was empty. Start the transfer again.",
                 "كلمة السر فارغة. ابدأ النقل من جديد.",
@@ -163,14 +173,14 @@ async def _password(ctx: CommandContext) -> None:
     except Exception:
         log.warning("Ownership transfer failed for account %s", ctx.account_id)
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 "Transfer failed. The password was rejected or this account is not the owner.",
                 "فشل النقل. رُفضت كلمة السر أو أن هذا الحساب ليس المالك.",
             )
         )
         return
-    await ctx.reply(tr(ctx, "Ownership transferred.", "تم نقل الملكية."))
+    await ctx.reply(present(ctx, "Ownership transferred.", "تم نقل الملكية."))
 
 
 async def _delete_command(ctx: CommandContext) -> None:

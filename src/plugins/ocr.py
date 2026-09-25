@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.plugins.common import aliases, missing_dependency, tr
+from src.plugins.common import aliases, missing_dependency, present
 from src.plugins.files import download_reply, message_file_size, scratch_dir
 from src.plugins.uploads import edit_status
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta, SettingField
@@ -40,24 +40,30 @@ class OcrPlugin(Plugin):
 
         reply = getattr(ctx.message, "reply_to_message", None)
         if reply is None:
-            await ctx.reply(tr(ctx, "Reply to an image.", "رد على صورة."))
+            await ctx.reply(present(ctx, "Reply to an image.", "رد على صورة."))
             return
         size = message_file_size(reply)
         if size is not None and size > _MAX_BYTES:
-            await ctx.reply(tr(ctx, "That image is too large.", "الصورة كبيرة جداً."))
+            await ctx.reply(present(ctx, "That image is too large.", "الصورة كبيرة جداً."))
             return
         lang = (ctx.args or "").strip() or str(ctx.settings.get("lang", "ara+eng") or "ara+eng")
-        status = await ctx.reply(tr(ctx, "Reading…", "جارٍ القراءة…"))
+        status = await ctx.reply(present(ctx, "Reading…", "جارٍ القراءة…"))
         with scratch_dir() as root:
             source = await download_reply(ctx, root)
             if source is None:
                 await edit_status(
-                    ctx, status, tr(ctx, "Could not download that image.", "تعذر تنزيل الصورة.")
+                    ctx,
+                    status,
+                    present(
+                        ctx,
+                        "Could not download that image.",
+                        "تعذر تنزيل الصورة.",
+                    ),
                 )
                 return
             if source.stat().st_size > _MAX_BYTES:
                 await edit_status(
-                    ctx, status, tr(ctx, "That image is too large.", "الصورة كبيرة جداً.")
+                    ctx, status, present(ctx, "That image is too large.", "الصورة كبيرة جداً.")
                 )
                 return
             result = await run_named(
@@ -70,10 +76,18 @@ class OcrPlugin(Plugin):
             if result.get("error") == "missing":
                 await edit_status(ctx, status, missing_dependency(ctx, "tesseract"))
             elif result.get("error") == "empty":
-                await edit_status(ctx, status, tr(ctx, "No text was found.", "لم يُعثر على نص."))
+                await edit_status(
+                    ctx,
+                    status,
+                    present(
+                        ctx,
+                        "No text was found.",
+                        "لم يُعثر على نص.",
+                    ),
+                )
             else:
                 await edit_status(
-                    ctx, status, tr(ctx, "Could not read that image.", "تعذرت قراءة الصورة.")
+                    ctx, status, present(ctx, "Could not read that image.", "تعذرت قراءة الصورة.")
                 )
             return
         await edit_status(ctx, status, str(result.get("text") or "")[:3900])

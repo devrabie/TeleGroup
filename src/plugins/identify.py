@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from src.runtime.plugins import BotCommand, CommandContext, Plugin, PluginMeta
+from src.plugins.common import aliases
+from src.runtime.plugins import CommandContext, Plugin, PluginMeta
+from src.templates import card
 
 
 class IdentifyPlugin(Plugin):
@@ -11,15 +13,11 @@ class IdentifyPlugin(Plugin):
         description_en="Show the user id and the current chat id.",
         description_ar="عرض معرّف المستخدم ومعرّف المحادثة الحالية.",
         commands=(
-            BotCommand(
-                "id",
+            *aliases(
                 "Show the user id and the current chat id.",
                 "عرض معرّف المستخدم ومعرّف المحادثة الحالية.",
-            ),
-            BotCommand(
                 "ايدي",
-                "Show the user id and the current chat id.",
-                "عرض معرّف المستخدم ومعرّف المحادثة الحالية.",
+                "id",
             ),
         ),
         default_enabled=True,
@@ -34,10 +32,12 @@ class IdentifyPlugin(Plugin):
         chat = getattr(ctx.message, "chat", None)
         chat_id = getattr(chat, "id", None)
         if ctx.language == "ar":
+            title = "المعرّف"
             text = f"المستخدم: `{user_id}`\nالمحادثة: `{chat_id}`"
         else:
+            title = "Id"
             text = f"User: `{user_id}`\nChat: `{chat_id}`"
-        await ctx.reply(text)
+        await ctx.reply(card(ctx.language, title, text))
 
 
 plugin = IdentifyPlugin()

@@ -18,6 +18,8 @@ from telegram.ext import (
     PreCheckoutQueryHandler,
 )
 
+from src.panel_bot import panel_handlers
+
 import pyrogram
 from pyrogram.errors import (
     SessionPasswordNeeded,
@@ -2631,6 +2633,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
 
 # --- Handler Registration ---
 user_handlers_list = [
+    *panel_handlers(),
     CommandHandler("help", help_handler),
     CommandHandler("subscribe", subscribe_handler),
     CallbackQueryHandler(select_plan_handler, pattern="^select_plan_"),

@@ -26,14 +26,34 @@ CORE_PLUGIN = "core"
 
 @dataclass(frozen=True)
 class BotCommand:
+    """One userbot command.
+
+    ``usage_*`` and ``example_*`` may contain ``{p}``, replaced with the
+    account prefix when help text is rendered.
+    """
+
     name: str
     description_en: str
     description_ar: str
+    usage_en: str = ""
+    usage_ar: str = ""
+    example_en: str = ""
+    example_ar: str = ""
 
     def description(self, language: str) -> str:
         if language == "ar":
             return self.description_ar
         return self.description_en
+
+    def usage(self, language: str) -> str:
+        if language == "ar":
+            return self.usage_ar or self.usage_en
+        return self.usage_en or self.usage_ar
+
+    def example(self, language: str) -> str:
+        if language == "ar":
+            return self.example_ar or self.example_en
+        return self.example_en or self.example_ar
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.plugins.common import aliases, tr
+from src.plugins.common import aliases, present
 from src.plugins.jobs import begin_job, cancel_job, finish_job
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta, SettingField
 from src.runtime.settings_form import current_setting
@@ -67,9 +67,9 @@ class BroadcastPlugin(Plugin):
     async def handle(self, ctx: CommandContext) -> None:
         if ctx.command in {"ايقاف الاذاعة", "broadcaststop"}:
             if cancel_job(ctx.account_id, JOB):
-                await ctx.reply(tr(ctx, "Stopping the broadcast.", "سيتم إيقاف الإذاعة."))
+                await ctx.reply(present(ctx, "Stopping the broadcast.", "سيتم إيقاف الإذاعة."))
             else:
-                await ctx.reply(tr(ctx, "No broadcast is running.", "لا توجد إذاعة تعمل."))
+                await ctx.reply(present(ctx, "No broadcast is running.", "لا توجد إذاعة تعمل."))
             return
         if ctx.command in {"تأكيد الاذاعة", "confirmbroadcast"}:
             await _run(ctx)
@@ -78,17 +78,17 @@ class BroadcastPlugin(Plugin):
         text = (ctx.args or "").strip()
         if not text:
             await ctx.reply(
-                tr(ctx, "Write the message after the command.", "اكتب الرسالة بعد الأمر.")
+                present(ctx, "Write the message after the command.", "اكتب الرسالة بعد الأمر.")
             )
             return
         if len(text) > 3500:
-            await ctx.reply(tr(ctx, "That message is too long.", "هذه الرسالة طويلة جداً."))
+            await ctx.reply(present(ctx, "That message is too long.", "هذه الرسالة طويلة جداً."))
             return
         _pending[ctx.account_id] = {"scope": scope, "text": text}
         label = "private chats" if scope == "private" else "groups"
         label_ar = "المحادثات الخاصة" if scope == "private" else "المجموعات"
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 f"Ready to send to {label}. Nothing was sent. "
                 f"Send {ctx.prefix}confirmbroadcast to start, "
@@ -103,7 +103,7 @@ async def _run(ctx: CommandContext) -> None:
     pending = _pending.get(ctx.account_id)
     if not pending:
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 "Nothing is waiting. Prepare a broadcast first.",
                 "لا شيء بانتظار الإرسال. جهّز الإذاعة أولاً.",
@@ -112,7 +112,7 @@ async def _run(ctx: CommandContext) -> None:
         return
     cancel = begin_job(ctx.account_id, JOB)
     if cancel is None:
-        await ctx.reply(tr(ctx, "A broadcast is already running.", "الإذاعة تعمل بالفعل."))
+        await ctx.reply(present(ctx, "A broadcast is already running.", "الإذاعة تعمل بالفعل."))
         return
     scope = str(pending["scope"])
     text = str(pending["text"])
@@ -134,7 +134,7 @@ async def _run(ctx: CommandContext) -> None:
 
     try:
         targets = await ctx.limiter.run(_collect)
-        status = await ctx.reply(tr(ctx, "Broadcast started.", "بدأت الإذاعة."))
+        status = await ctx.reply(present(ctx, "Broadcast started.", "بدأت الإذاعة."))
         for chat_id in targets:
             if cancel.is_set():
                 break
@@ -147,7 +147,7 @@ async def _run(ctx: CommandContext) -> None:
             if sent and sent % 5 == 0:
                 await _edit_status(ctx, status, sent, failed)
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 f"Done. Sent {sent}, failed {failed}, cancelled: {cancel.is_set()}. Cap {cap}.",
                 f"انتهى. أُرسل {sent}، فشل {failed}، أُلغي: {cancel.is_set()}. الحد {cap}.",
@@ -155,7 +155,13 @@ async def _run(ctx: CommandContext) -> None:
         )
     except Exception:
         log.exception("Broadcast failed for account %s", ctx.account_id)
-        await ctx.reply(tr(ctx, "The broadcast stopped on an error.", "توقفت الإذاعة بسبب خطأ."))
+        await ctx.reply(
+            present(
+                ctx,
+                "The broadcast stopped on an error.",
+                "توقفت الإذاعة بسبب خطأ.",
+            )
+        )
     finally:
         finish_job(ctx.account_id, JOB)
 
@@ -175,7 +181,7 @@ async def _edit_status(ctx: CommandContext, status: Any, sent: int, failed: int)
             edit,
             chat_id,
             message_id,
-            tr(
+            present(
                 ctx,
                 f"Sent {sent}, failed {failed}.",
                 f"أُرسل {sent}، فشل {failed}.",
