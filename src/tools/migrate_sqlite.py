@@ -7,7 +7,8 @@ deletes the copied tables before inserting. A second plain run is not a sync.
 
 Plans copied after Alembic 0002 have no ``plan_plugins`` rows, so no account
 would start. Plans that still have an empty allowlist receive the default
-plugins. Plans that already have any plugin row are left unchanged.
+plugins, including the phase 4 names. Plans that already have any plugin row
+are left unchanged. Alembic 0004 grants those phase 4 names to existing plans.
 
 Failed inserts are logged and the process exits non-zero. ``--verify`` compares
 row counts and reports plans that still have no plugins.

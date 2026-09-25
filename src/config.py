@@ -74,6 +74,14 @@ class Settings(BaseSettings):
     flood_min_interval_seconds: float = 1
     flood_retry_threshold_seconds: int = 30
 
+    # Phase 4 media jobs. Keep these low on a 2-CPU host with no swap.
+    media_workers: int = 1
+    download_max_mb: int = 50
+    download_max_seconds: int = 600
+    translate_provider: str = "mymemory"
+    translate_url: str | None = None
+    translate_api_key: str | None = None
+
     @field_validator("admin_ids", mode="before")
     @classmethod
     def split_admin_ids(cls, value: object) -> list[int]:
@@ -157,6 +165,35 @@ class Settings(BaseSettings):
             raise ValueError("FLOOD_RETRY_THRESHOLD_SECONDS must be zero or greater")
         return value
 
+    @field_validator("media_workers")
+    @classmethod
+    def media_workers_are_small(cls, value: int) -> int:
+        if value not in {1, 2}:
+            raise ValueError("MEDIA_WORKERS must be 1 or 2")
+        return value
+
+    @field_validator("download_max_mb")
+    @classmethod
+    def download_mb_range(cls, value: int) -> int:
+        if not 5 <= value <= 100:
+            raise ValueError("DOWNLOAD_MAX_MB must be from 5 to 100")
+        return value
+
+    @field_validator("download_max_seconds")
+    @classmethod
+    def download_seconds_range(cls, value: int) -> int:
+        if not 15 <= value <= 1800:
+            raise ValueError("DOWNLOAD_MAX_SECONDS must be from 15 to 1800")
+        return value
+
+    @field_validator("translate_provider")
+    @classmethod
+    def translate_provider_name(cls, value: str) -> str:
+        name = value.strip().lower() or "mymemory"
+        if name not in {"mymemory", "libre"}:
+            raise ValueError("TRANSLATE_PROVIDER must be mymemory or libre")
+        return name
+
     @model_validator(mode="after")
     def shard_fits_count(self) -> Settings:
         if self.worker_shard_count < 1:
@@ -175,7 +212,13 @@ class Settings(BaseSettings):
         return value
 
     @field_validator(
-        "webhook_url", "webhook_secret", "proxy_username", "proxy_password", mode="before"
+        "webhook_url",
+        "webhook_secret",
+        "proxy_username",
+        "proxy_password",
+        "translate_url",
+        "translate_api_key",
+        mode="before",
     )
     @classmethod
     def empty_optional_is_none(cls, value: object) -> object:

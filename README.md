@@ -15,7 +15,7 @@ Multi-account Telegram control bot. The interface uses `python-telegram-bot`. Ma
 - Session explorer, proxy rotation with per-proxy SOCKS5 credentials
 - Scheduled supergroup creation, flood-wait backoff, and proxy health checks
 - Account runtime: one Kurigram client per subscribed account, plugin commands, and plan gating
-- Userbot commands: group admin, logging, auto-reply, AFK, PM protection, locks, mentions, broadcast, chat creation, star gifts, and an opt-in game notice
+- Userbot commands: group admin, logging, auto-reply, AFK, PM protection, locks, mentions, broadcast, chat creation, star gifts, an opt-in game notice, downloads, stickers, translation, speech, optional OCR, ffmpeg conversion, and small account tools
 
 الخطط والاشتراك بنجوم تيليجرام وCrypto Pay، لوحة الإدارة، صفحات المعلومات، العربية والإنجليزية، إضافة الحساب مع ملفات الجهاز وإعادة محاولة تسجيل الدخول، مراقبة أكواد الدخول، التحقق بخطوتين، الحذف المنطقي، تصفح الملف والهدايا والمحادثات الخاصة، مديرو الفريق وروابط الدعوة ونقل الحساب، تدوير البروكسي، وإنشاء المجموعات المجدولة، ومحرك الحسابات مع أوامر الإضافات.
 
@@ -37,9 +37,38 @@ Accounts with an active subscription start when at least one allowed plugin is e
 
 Phase 2 tables: `plan_plugins`, `account_plugins`, `plugin_settings`, `runtime_signals`, `session_leases`.
 
-Phase 3 tables: `auto_replies`, `pm_permits`, `chat_locks`. The migration does not grant the new plugins to plans that already have an allowlist. Open the plan editor and allow `admin`, `storage`, `autoreply`, `afk`, `pmpermit`, `locks`, `tagall`, `broadcast`, `create`, `gifts`, and `games`. New plans include every plugin registered when the plan is created. The SQLite importer fills allowlists that are still empty; see below. The Plugins screen can edit each plugin's settings (warning limit, log chat, mention cap, and so on).
+Phase 3 tables: `auto_replies`, `pm_permits`, `chat_locks`. Revision 0003 does not grant those plugins to plans that already have an allowlist. Open the plan editor and allow `admin`, `storage`, `autoreply`, `afk`, `pmpermit`, `locks`, `tagall`, `broadcast`, `create`, `gifts`, and `games` if the plan was created before them. New plans include every plugin registered when the plan is created. The SQLite importer fills allowlists that are still empty; see below. The Plugins screen can edit each plugin's settings (warning limit, log chat, mention cap, and so on).
 
-Sharding is configured per process; there is no automatic assignment of accounts to workers yet. Downloads, sticker tools, converters, and the remaining userbot commands are phase 4.
+Revision `0004_phase4` grants `download`, `stickers`, `translate`, `tts`, `ocr`, `convert`, `telegraph`, `info`, `leave`, `repeat`, `profile`, `clock`, and `calc` to every plan that already exists. It only inserts missing rows. It does not turn plugins off and it does not delete allowlist rows. Run `alembic upgrade head` before starting the worker. Downgrade removes only those phase 4 names.
+
+Sharding is configured per process; there is no automatic assignment of accounts to workers yet.
+
+### Phase 4 media / الوسائط
+
+Downloads (`yt-dlp`) and ffmpeg conversions run in a short-lived child process, not on the account's event loop. `MEDIA_WORKERS` is 1 or 2 (default 1). Each account defaults to one download at a time. `DOWNLOAD_MAX_MB` (default 50) and `DOWNLOAD_MAX_SECONDS` (default 600) are hard ceilings. Temporary files are deleted after upload. The account's existing proxy is passed to yt-dlp when the plugin setting `use_proxy` is on.
+
+The account's proxy comes from the proxy already stored for that account (`build_proxy_dict`). There is no second proxy list.
+
+If `ffmpeg`, `tesseract`, `yt-dlp`, `Pillow`, or `gTTS` is missing, the command tells you and the worker keeps running.
+
+System packages:
+
+| Where | Package | Needed for |
+| --- | --- | --- |
+| Docker image and the host | `ffmpeg` | gif, voice notes, mp3, YouTube audio extraction |
+| Host only, optional | `tesseract-ocr`, `tesseract-ocr-eng`, `tesseract-ocr-ara` | `.استخراج` / `.ocr` |
+
+The Docker image installs `ffmpeg` and does not install tesseract. Native install notes are in [deploy/README.md](deploy/README.md).
+
+```bash
+sudo apt-get install -y ffmpeg
+# optional OCR
+sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-ara
+```
+
+Python packages `yt-dlp`, `Pillow`, and `gTTS` are installed with the project. Translation uses MyMemory (no key, 450 characters) unless `TRANSLATE_PROVIDER=libre` and `TRANSLATE_URL` point at a LibreTranslate server.
+
+Still out of scope: playing other people's group games, cookies for private or age-restricted posts, animated sticker packs, and playlist downloads.
 
 ## Bug status on this branch / حالة الأخطاء
 
@@ -89,7 +118,7 @@ alembic upgrade head
 python -m src.tools.migrate_sqlite --sqlite data/bot.db --verify
 ```
 
-The script copies the current tables into `DATABASE_URL`, keeps ids, and encrypts session strings. Alembic 0002 grants plugins only to plans that exist when it runs. Plans copied afterwards would otherwise have an empty allowlist, and no account would start. The importer grants `ping`, `id`, `help`, `groups`, `codemon`, `admin`, `storage`, `autoreply`, `afk`, `pmpermit`, `locks`, `tagall`, `broadcast`, `create`, `gifts`, and `games` to every plan that still has no plugin rows. Plans that already have an allowlist are not changed.
+The script copies the current tables into `DATABASE_URL`, keeps ids, and encrypts session strings. Alembic 0002 grants the original plugins only to plans that exist when it runs. Plans copied afterwards would otherwise have an empty allowlist, and no account would start. The importer grants `ping`, `id`, `help`, `groups`, `codemon`, `admin`, `storage`, `autoreply`, `afk`, `pmpermit`, `locks`, `tagall`, `broadcast`, `create`, `gifts`, `games`, and the phase 4 plugins to every plan that still has no plugin rows. Plans that already have an allowlist are not changed. On a new database, `alembic upgrade head` runs while `plans` is still empty, so revision 0004 inserts nothing. The importer then fills those empty allowlists with the full default list. A production database that already has plans receives the phase 4 names from revision 0004 itself.
 
 The default mode skips rows that already exist (`ON CONFLICT DO NOTHING`) and does not update them. A faithful copy needs an empty target database, which is what `alembic upgrade head` on a new PostgreSQL database gives you.
 
@@ -133,7 +162,7 @@ pybabel compile -D base -d locales
 
 Translation catalogs are `locales/*/LC_MESSAGES/base.po`. The gettext domain is `base`. `pybabel compile` needs `-D base`; without it, pybabel looks for `messages.po`. Startup still compiles catalogs through `compile_translations()`, and the Docker image does the same.
 
-Logs are JSON, one object per line. Shutdown stops the code monitor, the bot, the webhook server when it is running, and disposes the database engine.
+Logs are JSON, one object per line. Webhook startup lines record the host and port only. The bot token, the webhook secret, and the Crypto Pay token are removed from every JSON log line, including exception text. Shutdown stops the code monitor, the bot, the webhook server when it is running, and disposes the database engine.
 
 ## Commands / الأوامر
 

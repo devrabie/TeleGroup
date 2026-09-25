@@ -20,7 +20,7 @@ from src.database import (
     warn_if_no_working_proxies,
 )
 from src.db.engine import dispose_engine
-from src.logging_setup import configure_logging
+from src.logging_setup import configure_logging, webhook_log_target
 from src.proxy_manager import update_proxies_from_url
 from src.translation import compile_translations
 from src.user_handlers import user_handlers_list
@@ -206,11 +206,10 @@ async def _serve(application: Application) -> web.AppRunner | None:
             secret_token=webhook_secret,
             drop_pending_updates=True,
         )
-        log.info("Bot webhook set to: %s", full_bot_webhook_url)
+        log.info("Bot webhook set at %s", webhook_log_target(full_bot_webhook_url))
         log.warning(
-            "Ensure your Crypto Pay app is configured to send webhooks to: %s%s",
-            webhook_url.rstrip("/"),
-            crypto_webhook_path,
+            "Point Crypto Pay webhooks at %s",
+            webhook_log_target(f"{webhook_url.rstrip('/')}{crypto_webhook_path}"),
         )
 
         # --- Define aiohttp handlers ---

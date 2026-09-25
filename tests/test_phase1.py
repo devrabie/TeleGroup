@@ -15,7 +15,7 @@ from alembic.config import Config
 from pydantic import ValidationError
 from src.config import Settings
 from src.crypto import decrypt_session, encrypt_session, is_encrypted_session
-from src.logging_setup import JsonFormatter
+from src.logging_setup import JsonFormatter, webhook_log_target
 from src.payments import (
     AMOUNT_MISMATCH,
     BAD_CURRENCY,
@@ -123,6 +123,47 @@ def test_json_log_formatter_emits_one_object():
     assert payload["message"] == "hello"
     assert payload["level"] == "INFO"
     assert payload["logger"] == "src.test"
+
+
+def test_webhook_log_hides_token_path():
+    token_path = "AAHthisIsTheBotTokenPath"
+    crypto_prefix = "cryptoTok1"
+    bot_url = f"https://user:pass@bot.example.com:8443/{token_path}?x=1"
+    crypto_url = f"https://bot.example.com/webhooks/cryptopay/{crypto_prefix}"
+    assert webhook_log_target(bot_url) == "https://bot.example.com:8443"
+    assert webhook_log_target(crypto_url) == "https://bot.example.com"
+    assert webhook_log_target("not a url") == "webhook"
+    assert token_path not in webhook_log_target(bot_url)
+
+    formatter = JsonFormatter(secrets=[f"1000:{token_path}", token_path, crypto_prefix])
+    startup = logging.LogRecord(
+        "src.main",
+        logging.INFO,
+        __file__,
+        1,
+        "Bot webhook set to: %s",
+        (bot_url,),
+        None,
+    )
+    leaked = logging.LogRecord(
+        "src.main",
+        logging.ERROR,
+        __file__,
+        1,
+        "request failed for %s",
+        (crypto_url,),
+        (ValueError, ValueError(f"path /{token_path}"), None),
+    )
+    startup_line = formatter.format(startup)
+    leaked_line = formatter.format(leaked)
+    assert token_path not in startup_line
+    assert crypto_prefix not in leaked_line
+    assert token_path not in leaked_line
+    assert "bot.example.com" in startup_line
+    assert (
+        json.loads(startup_line)["message"]
+        == "Bot webhook set to: https://user:pass@bot.example.com:8443/***?x=1"
+    )
 
 
 def test_managed_account_session_is_encrypted_at_rest(tmp_path):

@@ -50,13 +50,25 @@ class HelpPlugin(Plugin):
             empty = "No plugins are enabled."
         if not enabled:
             lines.append(empty)
+            await ctx.reply("\n".join(lines))
+            return
+        detailed = list(lines)
         for view in enabled:
-            lines.append(f"{view['name']}: {view['description']}")
+            detailed.append(f"{view['name']}: {view['description']}")
             if view["commands"]:
-                lines.append(" ".join(f"{ctx.prefix}{name}" for name in view["commands"]))
-        text = "\n".join(lines)
+                detailed.append(" ".join(f"{ctx.prefix}{name}" for name in view["commands"]))
+        text = "\n".join(detailed)
         if len(text) > 3900:
-            text = text[:3800] + "\n…"
+            compact = list(lines)
+            if ctx.language == "ar":
+                compact.append("القائمة طويلة، وأسماء الأوامر في التفاصيل.")
+            else:
+                compact.append("The list is long, so command names are in the details.")
+            for view in enabled:
+                compact.append(f"{view['name']}: {view['description']}")
+            text = "\n".join(compact)
+            if len(text) > 3900:
+                text = text[:3800] + "\n…"
         await ctx.reply(text)
 
     async def _detail(self, ctx: CommandContext, query: str, enabled: list, plugins: dict) -> None:

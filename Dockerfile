@@ -5,8 +5,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# ffmpeg is required for voice notes, gifs, and audio extraction.
+# tesseract is optional (OCR) and is not installed in this image.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libffi-dev \
+    && apt-get install -y --no-install-recommends build-essential libffi-dev ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md alembic.ini ./
