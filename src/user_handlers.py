@@ -42,7 +42,9 @@ from src.database import (
     resolve_sharing_token, transfer_managed_account,
 )
 from src.payments import parse_invoice_payload, validate_stars_payment
+from src.plugin_menu import show_plugins_menu, toggle_account_plugin
 from src.runtime import build_user_client
+from src.runtime.lease import use_account_client
 from src.translation import get_translation_func_for_user
 from src.code_monitor import build_proxy_dict, code_monitor_manager, is_socks_auth_error
 from src.account_explorer import display_name, format_session_health_text, get_cached_identity
@@ -1870,29 +1872,28 @@ async def group_tools_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, a
         await query.edit_message_text(_("Error: Could not retrieve session for this account."))
         return
 
-    client = None
     try:
-        client = _account_client(account_id, f"user_session_tools_{account_id}", session_string)
-        await client.connect()
-        me = await client.get_me()
+        async with use_account_client(
+            account_id,
+            lambda: _account_client(account_id, f"user_session_tools_{account_id}", session_string),
+        ) as client:
+            me = await client.get_me()
 
-        owned_groups = []
-        normal_groups = []
+            owned_groups = []
+            normal_groups = []
 
-        async for dialog in client.get_dialogs():
-            if dialog.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
-                try:
-                    member = await client.get_chat_member(dialog.chat.id, me.id)
-                    if member.status == ChatMemberStatus.OWNER:
-                        owned_groups.append(dialog.chat)
-                        if dialog.chat.type == ChatType.GROUP:
-                            normal_groups.append(dialog.chat)
-                except UserNotParticipant:
-                    pass
-                except Exception as e:
-                    log.warning(f"Could not get member for chat {dialog.chat.id}: {e}")
-
-        await client.disconnect()
+            async for dialog in client.get_dialogs():
+                if dialog.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+                    try:
+                        member = await client.get_chat_member(dialog.chat.id, me.id)
+                        if member.status == ChatMemberStatus.OWNER:
+                            owned_groups.append(dialog.chat)
+                            if dialog.chat.type == ChatType.GROUP:
+                                normal_groups.append(dialog.chat)
+                    except UserNotParticipant:
+                        pass
+                    except Exception as e:
+                        log.warning(f"Could not get member for chat {dialog.chat.id}: {e}")
 
         text = _("<b>Group Statistics</b>\n\n"
                  "Total owned groups: {owned_count}\n"
@@ -1911,8 +1912,6 @@ async def group_tools_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, a
     except Exception as e:
         log.error(f"Error in group_tools_menu for user {user_id}, account {account_id}: {e}")
         await query.edit_message_text(_("An error occurred while fetching group data."))
-        if client is not None and client.is_connected:
-            await client.disconnect()
 
 
 async def view_left_channels(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id: int, offset: int):
@@ -1933,14 +1932,14 @@ async def view_left_channels(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await query.edit_message_text(_("Error: Could not retrieve session for this account."))
         return
 
-    client = None
     try:
-        client = _account_client(account_id, f"user_session_reader_{account_id}", session_string)
-        await client.connect()
-        # A takeout session might be required for this to work long-term,
-        # but we try without it first.
-        res = await client.invoke(GetLeftChannels(offset=offset))
-        await client.disconnect()
+        async with use_account_client(
+            account_id,
+            lambda: _account_client(account_id, f"user_session_reader_{account_id}", session_string),
+        ) as client:
+            # A takeout session might be required for this to work long-term,
+            # but we try without it first.
+            res = await client.invoke(GetLeftChannels(offset=offset))
 
         chats = res.chats
         if not chats:
@@ -1968,8 +1967,6 @@ async def view_left_channels(update: Update, context: ContextTypes.DEFAULT_TYPE,
     except Exception as e:
         log.error(f"Error fetching left channels for user {user_id}, account {account_id}: {e}")
         await query.edit_message_text(_("An error occurred while fetching left chats."))
-        if client is not None and client.is_connected:
-            await client.disconnect()
 
 
 async def upgrade_normal_groups(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id: int):
@@ -1990,43 +1987,41 @@ async def upgrade_normal_groups(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text(_("Error: Could not retrieve session for this account."))
         return
 
-    client = None
     try:
-        client = _account_client(account_id, f"user_session_upgrader_{account_id}", session_string)
-        await client.connect()
-        me = await client.get_me()
-        normal_groups = []
-        async for dialog in client.get_dialogs():
-            if dialog.chat.type == ChatType.GROUP:
+        async with use_account_client(
+            account_id,
+            lambda: _account_client(account_id, f"user_session_upgrader_{account_id}", session_string),
+        ) as client:
+            me = await client.get_me()
+            normal_groups = []
+            async for dialog in client.get_dialogs():
+                if dialog.chat.type == ChatType.GROUP:
+                    try:
+                        member = await client.get_chat_member(dialog.chat.id, me.id)
+                        if member.status == ChatMemberStatus.OWNER:
+                            normal_groups.append(dialog.chat)
+                    except UserNotParticipant:
+                        pass
+                    except Exception:
+                        pass
+
+            for group in normal_groups:
                 try:
-                    member = await client.get_chat_member(dialog.chat.id, me.id)
-                    if member.status == ChatMemberStatus.OWNER:
-                        normal_groups.append(dialog.chat)
-                except UserNotParticipant:
-                    pass
-                except Exception:
-                    pass
-
-        for group in normal_groups:
-            try:
-                await client.invoke(
-                    pyrogram.raw.functions.messages.MigrateChat(
-                        chat_id=_positive_basic_group_id(group.id)
+                    await client.invoke(
+                        pyrogram.raw.functions.messages.MigrateChat(
+                            chat_id=_positive_basic_group_id(group.id)
+                        )
                     )
-                )
-                await asyncio.sleep(1)
-            except Exception as e:
-                log.error(f"Could not upgrade group {group.id} for user {user_id}: {e}")
+                    await asyncio.sleep(1)
+                except Exception as e:
+                    log.error(f"Could not upgrade group {group.id} for user {user_id}: {e}")
 
-        await client.disconnect()
         await query.edit_message_text(_("All upgradable groups have been processed."))
         await group_tools_menu(update, context, account_id, query.message.message_id)
 
     except Exception as e:
         log.error(f"Error upgrading groups for user {user_id}, account {account_id}: {e}")
         await query.edit_message_text(_("An error occurred during the upgrade process."))
-        if client is not None and client.is_connected:
-            await client.disconnect()
 
 
 async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id: int, message_id: int):
@@ -2050,9 +2045,7 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     identity = await load_identity_for_menu(account_id, acc)
     acc = get_account_details(account_id) or acc
-    if acc.get("code_monitor_enabled") and not code_monitor_manager.is_connected(account_id):
-        code_monitor_manager.set_bot(context.bot)
-        asyncio.create_task(code_monitor_manager.on_enabled(account_id))
+    code_monitor_manager.set_bot(context.bot)
 
     # Determine group-creation status string
     status_str = _("⚪️ Off")
@@ -2074,10 +2067,11 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
                 pass
 
     monitor_on = bool(acc.get('code_monitor_enabled'))
+    runtime_on = bool(acc.get("is_running")) or code_monitor_manager.is_connected(account_id)
     if session_is_invalid(acc):
         monitor_str = _("❌ Invalid — sign in again")
     elif monitor_on:
-        if code_monitor_manager.is_connected(account_id):
+        if runtime_on:
             monitor_str = _("🟢 On (connected)")
         else:
             monitor_str = _("🟡 On (connecting)")
@@ -2102,6 +2096,8 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     text += "\n"
     text += _("\n<b>Group Creation:</b> {status}").format(status=status_str)
     text += _("\n<b>Code Monitor:</b> {status}").format(status=monitor_str)
+    runtime_label = _("🟢 Connected") if runtime_on else _("⚪️ Offline")
+    text += _("\n<b>Userbot:</b> {status}").format(status=runtime_label)
 
     proxy_host = None
     if acc.get("proxy_string"):
@@ -2161,6 +2157,7 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         [
             InlineKeyboardButton(_("📢 Channels & Groups"), callback_data=f"mng_channels_{acc['id']}")
         ],
+        [InlineKeyboardButton(_("🧩 Plugins"), callback_data=f"mng_plugins_{acc['id']}")],
         [InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc['id']}")],
         [InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")]
     ]
@@ -2190,49 +2187,32 @@ async def async_generate_group_report(update: Update, context: ContextTypes.DEFA
         )
         return
 
-    device_profile = get_device_profile_by_account_id(account_id)
-    if not device_profile:
-        log.warning(f"No device profile found for account {account_id}. Using default client settings.")
-        client = build_user_client(f"user_session_reporter_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
-    else:
-        client = build_user_client(
-            f"user_session_reporter_{account_id}",
-            session_string=session_string,
-            api_id=config.API_ID or device_profile.get('api_id'),
-            api_hash=config.API_HASH or device_profile.get('api_hash'),
-            device_model=device_profile.get('device_model'),
-            system_version=device_profile.get('system_version'),
-            app_version=device_profile.get('app_version'),
-            lang_code=device_profile.get('lang_code'),
-            in_memory=True
-        )
-
     try:
-        await client.connect()
+        async with use_account_client(
+            account_id,
+            lambda: _account_client(account_id, f"user_session_reporter_{account_id}", session_string),
+        ) as client:
+            owned_groups = 0
+            normal_groups_count = 0
+            supergroups_count = 0
+            upgradable_groups = []
 
-        owned_groups = 0
-        normal_groups_count = 0
-        supergroups_count = 0
-        upgradable_groups = []
+            async for dialog in client.get_dialogs():
+                if dialog.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+                    continue
 
-        async for dialog in client.get_dialogs():
-            if dialog.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
-                continue
-
-            try:
-                member = await client.get_chat_member(dialog.chat.id, "me")
-                if member.status == ChatMemberStatus.OWNER:
-                    owned_groups += 1
-                    if dialog.chat.type == ChatType.GROUP:
-                        normal_groups_count += 1
-                        upgradable_groups.append(dialog.chat)
-                    else:
-                        supergroups_count += 1
-            except Exception as e:
-                log.warning(f"Could not get member status for chat {dialog.chat.id} ({dialog.chat.title}): {e}")
-                continue
-
-        await client.disconnect()
+                try:
+                    member = await client.get_chat_member(dialog.chat.id, "me")
+                    if member.status == ChatMemberStatus.OWNER:
+                        owned_groups += 1
+                        if dialog.chat.type == ChatType.GROUP:
+                            normal_groups_count += 1
+                            upgradable_groups.append(dialog.chat)
+                        else:
+                            supergroups_count += 1
+                except Exception as e:
+                    log.warning(f"Could not get member status for chat {dialog.chat.id} ({dialog.chat.title}): {e}")
+                    continue
 
         # Convert chat objects to simple dicts for safer caching
         upgradable_groups_data = [{'id': chat.id, 'title': chat.title} for chat in upgradable_groups]
@@ -2266,8 +2246,6 @@ async def async_generate_group_report(update: Update, context: ContextTypes.DEFA
             message_id=query.message.message_id,
             text=_("An error occurred while generating the report. The session might be invalid or revoked.")
         )
-        if client.is_connected:
-            await client.disconnect()
 
 
 async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2281,7 +2259,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
         from datetime import timedelta
         action_parts = query.data.split("_")
         action = action_parts[1] if len(action_parts) > 1 else ""
-        if action not in {"proxy", "toggle", "monitor", "deleteconfirm"}:
+        if action not in {"proxy", "toggle", "monitor", "deleteconfirm", "plugtog"}:
             await _safe_answer_query(query)
 
         if action == "cancel":
@@ -2297,6 +2275,14 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
         if action == "select":
             account_id = int(action_parts[2])
             await account_detail_menu(update, context, account_id, query.message.message_id)
+            return
+
+        if action == "plugins":
+            await show_plugins_menu(update, context, int(action_parts[2]))
+            return
+
+        if action == "plugtog":
+            await toggle_account_plugin(update, context, int(action_parts[2]), action_parts[3])
             return
 
         if action == "channels":
@@ -2366,32 +2352,15 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                 await query.edit_message_text(_("Error: Could not retrieve session for this account."))
                 return
 
-            device_profile = get_device_profile_by_account_id(account_id)
-            if not device_profile:
-                log.warning(f"No device profile found for account {account_id}. Using default client settings.")
-                client = build_user_client(f"user_session_reader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
-            else:
-                client = build_user_client(
-                    f"user_session_reader_{account_id}",
-                    session_string=session_string,
-                    api_id=config.API_ID or device_profile.get('api_id'),
-                    api_hash=config.API_HASH or device_profile.get('api_hash'),
-                    device_model=device_profile.get('device_model'),
-                    system_version=device_profile.get('system_version'),
-                    app_version=device_profile.get('app_version'),
-                    lang_code=device_profile.get('lang_code'),
-                    in_memory=True
-                )
-
             try:
-                await client.connect()
-
-                all_groups = []
-                async for dialog in client.get_dialogs():
-                    if dialog.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
-                        all_groups.append(dialog.chat.title)
-
-                await client.disconnect()
+                async with use_account_client(
+                    account_id,
+                    lambda: _account_client(account_id, f"user_session_reader_{account_id}", session_string),
+                ) as client:
+                    all_groups = []
+                    async for dialog in client.get_dialogs():
+                        if dialog.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+                            all_groups.append(dialog.chat.title)
 
                 if not all_groups:
                     text = _("This account is not a member of any groups.")
@@ -2426,8 +2395,6 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             except Exception as e:
                 log.error(f"Error fetching groups for user {user_id}, account {account_id}: {e}")
                 await query.edit_message_text(_("An error occurred while fetching groups. The session might be invalid or revoked."))
-                if client.is_connected:
-                    await client.disconnect()
         elif action == "grouptools":
             account_id = int(action_parts[2])
             await group_tools_menu(update, context, account_id, query.message.message_id)
@@ -2487,36 +2454,21 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                 await query.edit_message_text(_("Error: Could not retrieve session for this account."))
                 return
 
-            device_profile = get_device_profile_by_account_id(account_id)
-            if not device_profile:
-                log.warning(f"No device profile found for account {account_id}. Using default client settings.")
-                client = build_user_client(f"user_session_upgrader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
-            else:
-                client = build_user_client(
-                    f"user_session_upgrader_{account_id}",
-                    session_string=session_string,
-                    api_id=config.API_ID or device_profile.get('api_id'),
-                    api_hash=config.API_HASH or device_profile.get('api_hash'),
-                    device_model=device_profile.get('device_model'),
-                    system_version=device_profile.get('system_version'),
-                    app_version=device_profile.get('app_version'),
-                    lang_code=device_profile.get('lang_code'),
-                    in_memory=True
-                )
-
             try:
-                await client.connect()
+                async with use_account_client(
+                    account_id,
+                    lambda: _account_client(account_id, f"user_session_upgrader_{account_id}", session_string),
+                ) as client:
+                    # messages.MigrateChat requires the positive group ID.
+                    if chat_id > 0:
+                        # This is a safeguard, but chat IDs from pyrogram for groups are typically negative.
+                        raise ValueError("chat_id for a basic group should be negative")
 
-                # messages.MigrateChat requires the positive group ID.
-                if chat_id > 0:
-                    # This is a safeguard, but chat IDs from pyrogram for groups are typically negative.
-                    raise ValueError("chat_id for a basic group should be negative")
-
-                await client.invoke(
-                    pyrogram.raw.functions.messages.MigrateChat(
-                        chat_id=-chat_id
+                    await client.invoke(
+                        pyrogram.raw.functions.messages.MigrateChat(
+                            chat_id=-chat_id
+                        )
                     )
-                )
 
                 # Smartly update the cache instead of invalidating it
                 cache_key = f"group_report_cache_{account_id}"
@@ -2538,16 +2490,12 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                         context.bot_data[cache_key] = cached_report
                         log.info(f"Updated group report cache for account {account_id} after upgrade.")
 
-                await client.disconnect()
-
                 text = _("✅ Group has been successfully upgraded to a Supergroup!")
                 await _safe_answer_query(query, _("Success!"))
 
             except Exception as e:
                 log.error(f"Error upgrading group {chat_id} for user {user_id}, account {account_id}: {e}", exc_info=True)
                 text = _("❌ An error occurred while upgrading the group: {error}").format(error=str(e))
-                if client.is_connected:
-                    await client.disconnect()
 
             # Button to go back to the report
             buttons = [[InlineKeyboardButton(_("🔙 Back to Group Report"), callback_data=f"mng_groupreport_{account_id}")]]
@@ -2596,7 +2544,6 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
                         _("Code monitor enabled. Login codes and security notices will be forwarded here."),
                     )
                     code_monitor_manager.set_bot(context.bot)
-                    asyncio.create_task(code_monitor_manager.on_enabled(account_id))
                 await account_detail_menu(update, context, account_id, query.message.message_id)
             else:
                 await code_monitor_manager.stop_account(account_id)

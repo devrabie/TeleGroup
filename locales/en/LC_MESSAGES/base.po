@@ -1595,6 +1595,66 @@ msgstr "All upgradable groups have been processed."
 msgid "An error occurred during the upgrade process."
 msgstr "An error occurred during the upgrade process."
 
+msgid "🧩 Plugins"
+msgstr "🧩 Plugins"
+
+msgid "🟢 Connected"
+msgstr "🟢 Connected"
+
+msgid "⚪️ Offline"
+msgstr "⚪️ Offline"
+
+msgid ""
+"\n"
+"<b>Userbot:</b> {status}"
+msgstr ""
+"\n"
+"<b>Userbot:</b> {status}"
+
+msgid ""
+"<b>Plugins</b>\n"
+"Choose which features this account runs. Locked plugins are not included in the current plan."
+msgstr ""
+"<b>Plugins</b>\n"
+"Choose which features this account runs. Locked plugins are not included in the current plan."
+
+msgid "Not in your plan"
+msgstr "Not in your plan"
+
+msgid "Plugin enabled."
+msgstr "Plugin enabled."
+
+msgid "Plugin disabled."
+msgstr "Plugin disabled."
+
+msgid "This plugin is not included in the current plan."
+msgstr "This plugin is not included in the current plan."
+
+msgid "Could not change this plugin."
+msgstr "Could not change this plugin."
+
+msgid "🧩 Plan Plugins"
+msgstr "🧩 Plan Plugins"
+
+msgid ""
+"<b>Plan plugins</b>\n"
+"Choose which plugins this plan allows."
+msgstr ""
+"<b>Plan plugins</b>\n"
+"Choose which plugins this plan allows."
+
+msgid "Allowed"
+msgstr "Allowed"
+
+msgid "Blocked"
+msgstr "Blocked"
+
+msgid "Plugin access updated."
+msgstr "Plugin access updated."
+
+msgid "⚠️ The session for <code>{phone}</code> is invalid or revoked. The account was stopped. Delete it and add it again."
+msgstr "⚠️ The session for <code>{phone}</code> is invalid or revoked. The account was stopped. Delete it and add it again."
+
 msgid "Amount does not match the plan price"
 msgstr "Amount does not match the plan price"
 

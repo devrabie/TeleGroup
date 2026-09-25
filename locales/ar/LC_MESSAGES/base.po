@@ -1946,3 +1946,63 @@ msgstr "تمت معالجة جميع المجموعات القابلة للتر�
 msgid "An error occurred during the upgrade process."
 msgstr "حدث خطأ أثناء عملية الترقية."
 
+msgid "🧩 Plugins"
+msgstr "🧩 الإضافات"
+
+msgid "🟢 Connected"
+msgstr "🟢 متصل"
+
+msgid "⚪️ Offline"
+msgstr "⚪️ غير متصل"
+
+msgid ""
+"\n"
+"<b>Userbot:</b> {status}"
+msgstr ""
+"\n"
+"<b>يوزربوت:</b> {status}"
+
+msgid ""
+"<b>Plugins</b>\n"
+"Choose which features this account runs. Locked plugins are not included in the current plan."
+msgstr ""
+"<b>الإضافات</b>\n"
+"اختر الميزات التي يعمل بها هذا الحساب. الإضافات المقفلة غير مشمولة في الخطة الحالية."
+
+msgid "Not in your plan"
+msgstr "غير مشمولة في خطتك"
+
+msgid "Plugin enabled."
+msgstr "تم تفعيل الإضافة."
+
+msgid "Plugin disabled."
+msgstr "تم إيقاف الإضافة."
+
+msgid "This plugin is not included in the current plan."
+msgstr "هذه الإضافة غير مشمولة في الخطة الحالية."
+
+msgid "Could not change this plugin."
+msgstr "تعذر تغيير هذه الإضافة."
+
+msgid "🧩 Plan Plugins"
+msgstr "🧩 إضافات الخطة"
+
+msgid ""
+"<b>Plan plugins</b>\n"
+"Choose which plugins this plan allows."
+msgstr ""
+"<b>إضافات الخطة</b>\n"
+"اختر الإضافات التي تسمح بها هذه الخطة."
+
+msgid "Allowed"
+msgstr "مسموح"
+
+msgid "Blocked"
+msgstr "ممنوع"
+
+msgid "Plugin access updated."
+msgstr "تم تحديث صلاحية الإضافة."
+
+msgid "⚠️ The session for <code>{phone}</code> is invalid or revoked. The account was stopped. Delete it and add it again."
+msgstr "⚠️ جلسة <code>{phone}</code> غير صالحة أو مُلغاة. تم إيقاف الحساب. احذفه ثم أضفه من جديد."
+
