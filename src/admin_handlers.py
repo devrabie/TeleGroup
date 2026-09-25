@@ -5,8 +5,9 @@ from telegram.ext import ContextTypes, CommandHandler, filters, CallbackQueryHan
 from telegram.constants import ParseMode
 
 from src import config
+from src.admin_grants import grant_admin_handlers
 from src.database import (
-    add_plan, get_all_plans, get_all_users, get_user_details, grant_subscription,
+    add_plan, get_all_plans, get_all_users, get_user_details,
     get_system_stats, get_plan_by_id, update_plan, get_info_page_content, update_info_page_content
 )
 from src.plugin_menu import show_plan_plugins, toggle_plan_plugin
@@ -29,6 +30,8 @@ async def admin_panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     keyboard = [
         [InlineKeyboardButton(_("📊 Statistics"), callback_data='admin_view_stats')],
         [InlineKeyboardButton(_("👥 Manage Users"), callback_data='admin_menu_users')],
+        [InlineKeyboardButton(_("🎁 Grant a Plan"), callback_data='admin_grant_open')],
+        [InlineKeyboardButton(_("🔗 Activation Links"), callback_data='admin_codes_open')],
         [InlineKeyboardButton(_("📋 Manage Plans"), callback_data='admin_menu_plans')],
         [InlineKeyboardButton(_("📝 Manage Content"), callback_data='admin_menu_content')],
     ]
@@ -450,7 +453,8 @@ async def users_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text = _("<b>Manage Users</b>\n\nSelect an option from below.")
     keyboard = [
         [InlineKeyboardButton(_("📜 List All Users"), callback_data='admin_users_list_0')],
-        # [InlineKeyboardButton(_("🔎 Find User by ID"), callback_data='admin_user_find_start')], # Will implement later
+        [InlineKeyboardButton(_("🎁 Grant a Plan"), callback_data='admin_grant_open')],
+        [InlineKeyboardButton(_("🔗 Activation Links"), callback_data='admin_codes_open')],
         [InlineKeyboardButton(_("🔙 Back"), callback_data='admin_menu_main')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -568,8 +572,12 @@ async def user_view_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [InlineKeyboardButton(_("🎁 Grant Subscription"), callback_data=f"admin_grant_start_{user_id}")],
-        [InlineKeyboardButton(_("🔙 Back to User List"), callback_data='admin_users_list_0')]
     ]
+    if sub:
+        keyboard.append([
+            InlineKeyboardButton(_("🛑 End Subscription"), callback_data=f"admin_revoke_ask_{user_id}")
+        ])
+    keyboard.append([InlineKeyboardButton(_("🔙 Back to User List"), callback_data='admin_users_list_0')])
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(reply, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
@@ -588,110 +596,6 @@ async def conv_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     # We don't know which menu to return to, so we just end.
     # A more advanced setup could store the "return menu" in user_data.
     return ConversationHandler.END
-
-
-# --- Grant Subscription Conversation Handlers ---
-
-(GRANT_CHOOSE_PLAN, GRANT_DURATION) = range(20, 22)
-
-
-async def grant_sub_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Starts the grant subscription conversation by showing available plans."""
-    query = update.callback_query
-    await query.answer()
-    _ = get_translation_func_for_user(update.effective_user.id)
-
-    user_id_to_grant = int(query.data.split('_')[-1])
-    context.user_data['grant_sub_user_id'] = user_id_to_grant
-
-    plans = get_all_plans(active_only=True)
-    if not plans:
-        await query.edit_message_text(_("There are no active plans to grant. Please create one first."))
-        return ConversationHandler.END
-
-    keyboard = []
-    for plan in plans:
-        keyboard.append([
-            InlineKeyboardButton(
-                _("{name} - {price} Stars").format(name=plan['name'], price=plan['price_stars']),
-                callback_data=f"admin_grant_selectplan_{plan['id']}"
-            )
-        ])
-    keyboard.append([InlineKeyboardButton(_("❌ Cancel"), callback_data='admin_grant_cancel')])
-
-    text = _("Please choose a plan to grant to user <code>{user_id}</code>:").format(user_id=user_id_to_grant)
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
-    return GRANT_CHOOSE_PLAN
-
-
-async def grant_sub_receive_plan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receives the chosen plan and asks for the duration."""
-    query = update.callback_query
-    await query.answer()
-    _ = get_translation_func_for_user(update.effective_user.id)
-
-    plan_id = int(query.data.split('_')[-1])
-    context.user_data['grant_sub_plan_id'] = plan_id
-
-    text = _("Please enter the duration for this subscription in days (e.g., 30).\n\nOr send /cancel to abort.")
-    await query.edit_message_text(text)
-    return GRANT_DURATION
-
-
-async def grant_sub_receive_duration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receives the duration and confirms the grant."""
-    _ = get_translation_func_for_user(update.effective_user.id)
-
-    try:
-        duration = int(update.message.text)
-        user_id = context.user_data['grant_sub_user_id']
-        plan_id = context.user_data['grant_sub_plan_id']
-
-        success, msg_key = grant_subscription(user_id, plan_id, duration)
-
-        if success:
-            await update.message.reply_text(f"✅ {_(msg_key)}")
-        else:
-            await update.message.reply_text(f"❌ {_(msg_key)}")
-
-    except (ValueError, KeyError):
-        await update.message.reply_text(_("An error occurred. Please try again."))
-
-    context.user_data.pop('grant_sub_user_id', None)
-    context.user_data.pop('grant_sub_plan_id', None)
-
-    # Can't easily return to the user view, so just end.
-    return ConversationHandler.END
-
-
-async def grant_sub_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Cancels the grant subscription process."""
-    query = update.callback_query
-    await query.answer()
-    _ = get_translation_func_for_user(update.effective_user.id)
-
-    context.user_data.pop('grant_sub_user_id', None)
-    context.user_data.pop('grant_sub_plan_id', None)
-
-    await query.edit_message_text(_("Grant subscription cancelled."))
-    return ConversationHandler.END
-
-grant_sub_conv_handler = ConversationHandler(
-    entry_points=[CallbackQueryHandler(grant_sub_start, pattern='^admin_grant_start_')],
-    states={
-        GRANT_CHOOSE_PLAN: [
-            CallbackQueryHandler(grant_sub_receive_plan, pattern='^admin_grant_selectplan_'),
-        ],
-        GRANT_DURATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, grant_sub_receive_duration)],
-    },
-    fallbacks=[
-        CommandHandler('cancel', conv_cancel),
-        CallbackQueryHandler(grant_sub_cancel, pattern='^admin_grant_cancel$')
-    ],
-    block=False,
-    per_message=False,
-)
 
 
 async def plans_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -962,6 +866,10 @@ create_plan_conv_handler = ConversationHandler(
 async def admin_callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Main router for all admin callbacks starting with 'admin_'."""
     query = update.callback_query
+    user = update.effective_user
+    if user is None or user.id not in config.ADMIN_IDS:
+        await query.answer()
+        return
     action = query.data
 
     if action == 'admin_menu_main':
@@ -1003,7 +911,7 @@ admin_handlers_list = [
     CommandHandler("admin", admin_panel_handler, filters=admin_filter),
     # Conversation handlers must come before the generic callback router to catch their entry points
     create_plan_conv_handler,
-    grant_sub_conv_handler,
+    *grant_admin_handlers,
     edit_plan_conv_handler,
     edit_content_conv_handler,
     # Generic callback router for menus

@@ -246,6 +246,18 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await main_menu(update, context)
         return ConversationHandler.END
 
+    if payload.startswith("act_"):
+        from src.admin_grants import activation_reply
+        from src.subscription_grants import redeem_activation_code
+
+        outcome = redeem_activation_code(payload, user.id)
+        await update.message.reply_text(
+            activation_reply(outcome, _),
+            parse_mode=ParseMode.HTML,
+        )
+        await main_menu(update, context)
+        return ConversationHandler.END
+
     await main_menu(update, context)
     return ConversationHandler.END
 
@@ -310,6 +322,9 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "<b>/list_users</b> - List all bot users.\n"
             "<b>/view_user</b> - View details for a specific user.\n"
             "<b>/grant_subscription</b> - Manually grant a subscription."
+        )
+        admin_help_text += _(
+            "\n<b>/admin</b> - Grant a plan, end a subscription, or create one-time activation links."
         )
         help_text += admin_help_text
 

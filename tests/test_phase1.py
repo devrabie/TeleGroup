@@ -224,6 +224,8 @@ def test_alembic_upgrade_and_downgrade(tmp_path, monkeypatch):
         "auto_replies",
         "pm_permits",
         "chat_locks",
+        "activation_codes",
+        "plan_grants",
     ):
         assert name in tables
 
