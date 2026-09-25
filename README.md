@@ -162,7 +162,7 @@ pybabel compile -D base -d locales
 
 Translation catalogs are `locales/*/LC_MESSAGES/base.po`. The gettext domain is `base`. `pybabel compile` needs `-D base`; without it, pybabel looks for `messages.po`. Startup still compiles catalogs through `compile_translations()`, and the Docker image does the same.
 
-Logs are JSON, one object per line. Shutdown stops the code monitor, the bot, the webhook server when it is running, and disposes the database engine.
+Logs are JSON, one object per line. Webhook startup lines record the host and port only. The bot token, the webhook secret, and the Crypto Pay token are removed from every JSON log line, including exception text. Shutdown stops the code monitor, the bot, the webhook server when it is running, and disposes the database engine.
 
 ## Commands / الأوامر
 
