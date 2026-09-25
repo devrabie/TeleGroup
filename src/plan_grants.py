@@ -2,11 +2,22 @@
 
 Alembic revision 0004 calls ``grant_named_plugins``. The insert skips names
 that are already present and never deletes a row.
+
+Each statement binds ``:name`` once. PostgreSQL rejects the same parameter
+when one use is an untyped ``SELECT`` item and another is compared with
+``plugin_name`` (``varchar``): ``inconsistent types deduced for parameter``.
 """
 
 from __future__ import annotations
 
 from typing import Any
+
+# Existence is checked first, then a plain INSERT. Reusing ``:name`` in
+# ``INSERT ... SELECT ... WHERE NOT EXISTS`` is what PostgreSQL rejects.
+INSERT_PLAN_PLUGIN_SQL = "INSERT INTO plan_plugins (plan_id, plugin_name) VALUES (:plan_id, :name)"
+PLAN_PLUGIN_EXISTS_SQL = (
+    "SELECT 1 FROM plan_plugins WHERE plan_id = :plan_id AND plugin_name = :name"
+)
 
 PHASE4_PLUGIN_NAMES: tuple[str, ...] = (
     "download",
@@ -38,12 +49,8 @@ def grant_named_plugins(bind: Any, names: tuple[str, ...]) -> int:
     if "plans" not in _table_names(bind) or "plan_plugins" not in _table_names(bind):
         return 0
     plan_ids = [row[0] for row in bind.execute(sa.text("SELECT id FROM plans")).fetchall()]
-    insert = sa.text(
-        "INSERT INTO plan_plugins (plan_id, plugin_name) "
-        "SELECT :plan_id, :name WHERE NOT EXISTS ("
-        "SELECT 1 FROM plan_plugins WHERE plan_id = :plan_id AND plugin_name = :name)"
-    )
-    exists = sa.text("SELECT 1 FROM plan_plugins WHERE plan_id = :plan_id AND plugin_name = :name")
+    insert = sa.text(INSERT_PLAN_PLUGIN_SQL)
+    exists = sa.text(PLAN_PLUGIN_EXISTS_SQL)
     added = 0
     for plan_id in plan_ids:
         for name in names:
