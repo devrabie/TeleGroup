@@ -456,10 +456,11 @@ class Dispatcher:
         else:
             if matched is None:
                 return False
-            role = classify_actor(account_id, message)
-            if role is None:
+            classified = classify_actor(account_id, message)
+            if classified is None:
                 log.debug("Account %s ignored message: not from this account", account_id)
                 return False
+            role = classified
         plugin, command, args = matched
         if not plugin_is_enabled(account_id, plugin):
             log.debug(

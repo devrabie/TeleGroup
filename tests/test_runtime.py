@@ -738,7 +738,9 @@ async def test_kurigram_awaits_saved_message_commands_and_other_groups(tmp_path,
         saved = _account_text(".فحص", outgoing=False, is_self=True, chat_id=5)
         stranger = _account_text(".ping", outgoing=False, is_self=False)
         assert await command_handlers[0].check(inner, saved)
-        assert not await command_handlers[0].check(inner, stranger)
+        # Incoming text is accepted so the owner and admins can command.
+        # The dispatcher, not the filter, drops everyone else.
+        assert await command_handlers[0].check(inner, stranger)
 
         await deliver(saved)
         assert bridge.sent
