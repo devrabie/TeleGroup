@@ -1,9 +1,12 @@
-"""Alembic environment. Uses DATABASE_URL and does not import bot secrets."""
+"""Alembic environment.
+
+``DATABASE_URL`` in the process environment wins. Otherwise the URL is loaded
+from ``.env`` the same way the application settings are.
+"""
 
 from __future__ import annotations
 
 import asyncio
-import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -18,10 +21,9 @@ target_metadata = Base.metadata
 
 
 def _database_url() -> str:
-    url = os.environ.get("DATABASE_URL")
-    if not url:
-        raise RuntimeError("DATABASE_URL is required to run Alembic")
-    return url
+    from src.config import resolve_database_url
+
+    return resolve_database_url()
 
 
 def run_migrations_offline() -> None:

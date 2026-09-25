@@ -2003,6 +2003,28 @@ msgstr "ممنوع"
 msgid "Plugin access updated."
 msgstr "تم تحديث صلاحية الإضافة."
 
+msgid "⚙️ Settings"
+msgstr "⚙️ الإعدادات"
+
+msgid ""
+"<b>{name} settings</b>\n"
+"Booleans switch when tapped. Other fields ask for a new value."
+msgstr ""
+"<b>إعدادات {name}</b>\n"
+"القيم المنطقية تتبدل عند الضغط. الحقول الأخرى تطلب قيمة جديدة."
+
+msgid "This plugin has no settings."
+msgstr "هذه الإضافة بلا إعدادات."
+
+msgid "Setting saved."
+msgstr "تم حفظ الإعداد."
+
+msgid "Send the new value for <b>{label}</b>. Send - to reset, or cancel to stop."
+msgstr "أرسل القيمة الجديدة لـ <b>{label}</b>. أرسل - للتصفير، أو الغاء للإيقاف."
+
+msgid "That value is not valid."
+msgstr "هذه القيمة غير صالحة."
+
 msgid "⚠️ The session for <code>{phone}</code> is invalid or revoked. The account was stopped. Delete it and add it again."
 msgstr "⚠️ جلسة <code>{phone}</code> غير صالحة أو مُلغاة. تم إيقاف الحساب. احذفه ثم أضفه من جديد."
 

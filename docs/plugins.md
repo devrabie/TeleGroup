@@ -31,8 +31,9 @@ plugin = PingPlugin()
 
 - `name` is the stable id stored in `plan_plugins` and `account_plugins`.
 - `commands` are matched without the prefix. Latin names are case-insensitive. Arabic names are matched as written.
+- The longest command name wins, so `.رد عام` is not handled as `.رد`. A name must end at a space or the end of the message.
 - `default_enabled` applies when the account has no row in `account_plugins`. `groups` and `codemon` are special: they follow `managed_accounts.is_active` and `code_monitor_enabled`.
-- New plugins are not added to existing plans. `add_plan` grants whatever is registered at creation time. Admins change the allowlist from the plan editor.
+- New plugins are not added to existing plans. `add_plan` grants whatever is registered at creation time. Admins change the allowlist from the plan editor. The SQLite importer grants the default plugins only to plans that have no allowlist rows.
 
 ## Commands
 
@@ -84,4 +85,8 @@ The account menu's Plugins screen flips the toggle. The admin plan screen edits 
 
 Construct Kurigram clients only with `build_user_client` (the runtime already did that). Do not call `client.start()` from a plugin. Do not catch `FloodWait` yourself unless you need custom scheduling; `ctx.limiter` records the wait and retries short waits once.
 
-Phase 3 will add the rest of the userbot command set on top of this registry. Keep each command in its own plugin module rather than growing a single handler file.
+`settings` on `PluginMeta` is a tuple of `SettingField` (`bool`, `int`, or `str`). The account's Plugins screen shows a Settings button for plugins that declare fields. Values still live in `plugin_settings`. Passwords are not settings.
+
+Phase 3 command plugins live in `src/plugins/` (`admin`, `storage`, `autoreply`, `afk`, `pmpermit`, `locks`, `tagall`, `broadcast`, `create`, `gifts`, `games`). The command list is in [commands.md](commands.md). Listeners attach from `spawn` and call Telegram through `session.limiter`. Long jobs (`tagall`, `broadcast`) are cancellable. New plugins are not added to plans that already exist; an admin turns them on from the plan editor. `add_plan` grants whatever is registered at creation time.
+
+Keep each command family in its own plugin module rather than growing a single handler file. Downloads, stickers, converters, and the rest of the old userbot command set are left for phase 4.

@@ -42,7 +42,13 @@ from src.database import (
     resolve_sharing_token, transfer_managed_account,
 )
 from src.payments import parse_invoice_payload, validate_stars_payment
-from src.plugin_menu import show_plugins_menu, toggle_account_plugin
+from src.plugin_menu import (
+    edit_plugin_setting,
+    receive_plugin_setting,
+    show_plugin_settings,
+    show_plugins_menu,
+    toggle_account_plugin,
+)
 from src.runtime import build_user_client
 from src.runtime.lease import use_account_client
 from src.translation import get_translation_func_for_user
@@ -2259,7 +2265,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
         from datetime import timedelta
         action_parts = query.data.split("_")
         action = action_parts[1] if len(action_parts) > 1 else ""
-        if action not in {"proxy", "toggle", "monitor", "deleteconfirm", "plugtog"}:
+        if action not in {"proxy", "toggle", "monitor", "deleteconfirm", "plugtog", "pf"}:
             await _safe_answer_query(query)
 
         if action == "cancel":
@@ -2283,6 +2289,20 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
 
         if action == "plugtog":
             await toggle_account_plugin(update, context, int(action_parts[2]), action_parts[3])
+            return
+
+        if action == "plugcfg":
+            await show_plugin_settings(update, context, int(action_parts[2]), action_parts[3])
+            return
+
+        if action == "pf":
+            await edit_plugin_setting(
+                update,
+                context,
+                int(action_parts[2]),
+                action_parts[3],
+                "_".join(action_parts[4:]),
+            )
             return
 
         if action == "channels":
@@ -2610,6 +2630,7 @@ user_handlers_list = [
     two_step_conv_handler,
     team_add_conv_handler,
     CallbackQueryHandler(manage_account_callback, pattern="^mng_"),
+    MessageHandler(filters.TEXT & ~filters.COMMAND, receive_plugin_setting),
     CallbackQueryHandler(team_callback, pattern="^team_"),
     CallbackQueryHandler(invite_callback, pattern="^invite_"),
     CallbackQueryHandler(info_page_callback, pattern="^info_"),

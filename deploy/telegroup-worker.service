@@ -1,0 +1,22 @@
+# Example unit for a non-Docker install. Start it with the bot unit.
+# The bot unit runs alembic upgrade head before the control bot; this unit
+# does not migrate. Environment= overrides RUNTIME_ROLE from the env file.
+
+[Unit]
+Description=TeleGroup account worker
+After=network-online.target postgresql.service telegroup-bot.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=telegroup
+Group=telegroup
+WorkingDirectory=/opt/telegroup
+EnvironmentFile=/opt/telegroup/.env
+Environment=RUNTIME_ROLE=worker
+ExecStart=/opt/telegroup/venv/bin/python -m src.worker
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

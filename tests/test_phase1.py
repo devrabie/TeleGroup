@@ -180,6 +180,9 @@ def test_alembic_upgrade_and_downgrade(tmp_path, monkeypatch):
         "plugin_settings",
         "runtime_signals",
         "session_leases",
+        "auto_replies",
+        "pm_permits",
+        "chat_locks",
     ):
         assert name in tables
 
