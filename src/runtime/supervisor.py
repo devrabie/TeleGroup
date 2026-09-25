@@ -41,6 +41,13 @@ log = logging.getLogger(__name__)
 _AUTH_NAMES = {error.__name__ for error in AUTH_ERRORS}
 _CURRENT: Supervisor | None = None
 
+# Kurigram runs the first matching handler in a group and then moves on to the
+# next group. Commands sit alone in this group so listeners in other groups
+# still see the same outgoing text. Saved Messages are not ``outgoing``;
+# ``filters.me`` includes those (``from_user.is_self``) and ordinary sends.
+COMMAND_HANDLER_GROUP = -1
+_COMMAND_FILTER = (filters.outgoing | filters.me) & filters.text
+
 
 def request_reconcile() -> None:
     current = _CURRENT
@@ -376,13 +383,12 @@ class Supervisor:
         )
         dispatcher = Dispatcher(self._plugins)
         tasks: list[asyncio.Task[None]] = []
-        handler = MessageHandler(
-            lambda _client, message: self._dispatch(
-                dispatcher, account_id, client, message, limiter
-            ),
-            filters.outgoing & filters.text,
-        )
-        client.add_handler(handler)
+
+        async def _on_command(_kurigram: Any, message: Any) -> None:
+            await self._dispatch(dispatcher, account_id, client, message, limiter)
+
+        handler = MessageHandler(_on_command, _COMMAND_FILTER)
+        client.add_handler(handler, COMMAND_HANDLER_GROUP)
         for plugin in self._plugins_for_account():
             spawned = plugin.spawn(session)
             if spawned is None:
@@ -411,7 +417,7 @@ class Supervisor:
             remove = getattr(client, "remove_handler", None)
             if remove is not None:
                 try:
-                    remove(handler)
+                    remove(handler, COMMAND_HANDLER_GROUP)
                 except Exception:
                     log.debug("Could not remove the command handler", exc_info=True)
 

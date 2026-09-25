@@ -352,7 +352,11 @@ def _message_text(message: Any) -> str:
 
 
 def is_self_outgoing(message: Any) -> bool:
-    """True when the managed account sent the message."""
+    """True when the managed account sent the message.
+
+    Kurigram does not mark Saved Messages as ``outgoing``. Those still have
+    ``from_user.is_self``, which is the same check as ``filters.me``.
+    """
     if getattr(message, "outgoing", False):
         return True
     sender = getattr(message, "from_user", None)
@@ -372,7 +376,7 @@ def parse_command(text: str, prefix: str) -> tuple[str, str] | None:
 
 
 class Dispatcher:
-    """Route one outgoing message to at most one plugin."""
+    """Route one message from the account itself to at most one plugin."""
 
     def __init__(self, plugins: list[Plugin] | None = None) -> None:
         self.plugins = plugins
@@ -387,16 +391,34 @@ class Dispatcher:
         language: str = "en",
     ) -> bool:
         if not is_self_outgoing(message):
+            log.debug("Account %s ignored message: not from this account", account_id)
             return False
+        text = _message_text(message)
         prefix = command_prefix(account_id)
-        matched = resolve_command(_message_text(message), prefix, self.plugins)
+        matched = resolve_command(text, prefix, self.plugins)
         if matched is None:
+            if prefix and text.startswith(prefix) and text[len(prefix) :].strip():
+                log.debug("Account %s ignored command: unknown command", account_id)
+            else:
+                log.debug("Account %s ignored message: not a command", account_id)
             return False
         plugin, command, args = matched
         from src.runtime.gating import plugin_is_enabled
 
         if not plugin_is_enabled(account_id, plugin):
+            log.debug(
+                "Account %s ignored command %s: plugin %s disabled",
+                account_id,
+                command.name,
+                plugin.meta.name,
+            )
             return False
+        log.debug(
+            "Account %s dispatched command %s to plugin %s",
+            account_id,
+            command.name,
+            plugin.meta.name,
+        )
         ctx = CommandContext(
             client=client,
             account_id=account_id,
