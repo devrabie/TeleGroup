@@ -13,7 +13,7 @@ import logging
 import time
 from collections.abc import Awaitable
 
-from src.plugins.common import aliases, chat_id_of, is_group_chat, tr
+from src.plugins.common import aliases, chat_id_of, is_group_chat, present
 from src.plugins.listeners import watch
 from src.runtime.plugins import (
     AccountSession,
@@ -69,11 +69,17 @@ class GamesPlugin(Plugin):
 
     async def handle(self, ctx: CommandContext) -> None:
         if not is_group_chat(ctx.message):
-            await ctx.reply(tr(ctx, "Turn this on inside the group.", "فعّل هذا داخل المجموعة."))
+            await ctx.reply(
+                present(
+                    ctx,
+                    "Turn this on inside the group.",
+                    "فعّل هذا داخل المجموعة.",
+                )
+            )
             return
         chat_id = chat_id_of(ctx.message)
         if not isinstance(chat_id, int):
-            await ctx.reply(tr(ctx, "This chat has no id.", "هذه المحادثة بلا معرّف."))
+            await ctx.reply(present(ctx, "This chat has no id.", "هذه المحادثة بلا معرّف."))
             return
         chats = [int(item) for item in (ctx.settings.get("chats") or [])]
         enable = ctx.command in {"تفعيل اللعبة", "gamewatch"}
@@ -84,7 +90,7 @@ class GamesPlugin(Plugin):
         ctx.settings.set("chats", chats)
         if enable:
             await ctx.reply(
-                tr(
+                present(
                     ctx,
                     "Watching this group. Notices go to Saved Messages only. "
                     "The account will not answer.",
@@ -92,7 +98,13 @@ class GamesPlugin(Plugin):
                 )
             )
         else:
-            await ctx.reply(tr(ctx, "Stopped watching this group.", "توقفت مراقبة هذه المجموعة."))
+            await ctx.reply(
+                present(
+                    ctx,
+                    "Stopped watching this group.",
+                    "توقفت مراقبة هذه المجموعة.",
+                )
+            )
 
 
 async def on_message(session: AccountSession, message: object) -> None:
@@ -121,9 +133,13 @@ async def on_message(session: AccountSession, message: object) -> None:
         return
     seen[str(chat_id)] = now
     settings.set("seen", seen)
+    from src.templates import SEP, section
+
     title = getattr(getattr(message, "chat", None), "title", None) or chat_id
     text = str(getattr(message, "text", None) or getattr(message, "caption", None) or "")
-    notice = f"Game bot in {title} ({chat_id}).\n{text[:300]}".strip()
+    notice = (
+        f"{section('🎮 لعبة')}\n{SEP}\nGame bot in {title} ({chat_id}).\n{text[:300]}"
+    ).strip()
     try:
         await session.limiter.run(session.client.send_message, "me", notice)
     except Exception:

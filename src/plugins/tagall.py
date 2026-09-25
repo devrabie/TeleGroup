@@ -4,7 +4,15 @@ from __future__ import annotations
 
 import logging
 
-from src.plugins.common import aliases, chat_id_of, html_name, is_group_chat, tr, user_mention
+from src.plugins.common import (
+    aliases,
+    chat_id_of,
+    html_name,
+    is_group_chat,
+    present,
+    tr,
+    user_mention,
+)
 from src.plugins.jobs import begin_job, cancel_job, finish_job
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta, SettingField
 from src.runtime.settings_form import current_setting
@@ -42,20 +50,20 @@ class TagAllPlugin(Plugin):
     async def handle(self, ctx: CommandContext) -> None:
         if ctx.command in {"ايقاف التاك", "tagstop"}:
             if cancel_job(ctx.account_id, JOB):
-                await ctx.reply(tr(ctx, "Stopping mentions.", "سيتم إيقاف الإشارة."))
+                await ctx.reply(present(ctx, "Stopping mentions.", "سيتم إيقاف الإشارة."))
             else:
-                await ctx.reply(tr(ctx, "No mention run is active.", "لا توجد إشارة تعمل."))
+                await ctx.reply(present(ctx, "No mention run is active.", "لا توجد إشارة تعمل."))
             return
         if not is_group_chat(ctx.message):
-            await ctx.reply(tr(ctx, "Use this in a group.", "استخدم هذا في مجموعة."))
+            await ctx.reply(present(ctx, "Use this in a group.", "استخدم هذا في مجموعة."))
             return
         chat_id = chat_id_of(ctx.message)
         if not isinstance(chat_id, int):
-            await ctx.reply(tr(ctx, "This chat has no id.", "هذه المحادثة بلا معرّف."))
+            await ctx.reply(present(ctx, "This chat has no id.", "هذه المحادثة بلا معرّف."))
             return
         cancel = begin_job(ctx.account_id, JOB)
         if cancel is None:
-            await ctx.reply(tr(ctx, "A mention run is already going.", "الإشارة تعمل بالفعل."))
+            await ctx.reply(present(ctx, "A mention run is already going.", "الإشارة تعمل بالفعل."))
             return
         note = (ctx.args or "").strip()
         batch = int(current_setting(ctx.account_id, self.meta.name, self.meta.settings[0]) or 5)
@@ -103,7 +111,7 @@ class TagAllPlugin(Plugin):
                     sent += 1
             stopped = tr(ctx, "Stopped.", "تم الإيقاف.") if cancel.is_set() else ""
             await ctx.reply(
-                tr(
+                present(
                     ctx,
                     f"Mentioned {mentioned} members in {sent} messages. {stopped}".strip(),
                     f"تمت إشارة {mentioned} عضو في {sent} رسالة. {stopped}".strip(),
@@ -112,7 +120,7 @@ class TagAllPlugin(Plugin):
         except Exception:
             log.exception("Tag-all failed for account %s", ctx.account_id)
             await ctx.reply(
-                tr(
+                present(
                     ctx,
                     "Mentioning stopped because Telegram returned an error.",
                     "توقفت الإشارة بسبب خطأ من تيليجرام.",

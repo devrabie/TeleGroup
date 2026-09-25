@@ -6,7 +6,9 @@ import re
 from html import escape
 from typing import Any
 
+from src.command_catalog import help_for
 from src.runtime.plugins import BotCommand, CommandContext
+from src.templates import guess_tone, tone_line
 
 _LINK = re.compile(r"(https?://|t\.me/|telegram\.me/|www\.)", re.IGNORECASE)
 
@@ -15,6 +17,11 @@ def tr(ctx: CommandContext, en: str, ar: str) -> str:
     if ctx.language == "ar":
         return ar
     return en
+
+
+def present(ctx: CommandContext, en: str, ar: str) -> str:
+    """Frame a full status sentence. Fragments should keep using ``tr``."""
+    return tone_line(ctx.language, guess_tone(en), tr(ctx, en, ar))
 
 
 def missing_dependency(ctx: CommandContext, name: str) -> str:
@@ -45,11 +52,25 @@ def missing_dependency(ctx: CommandContext, name: str) -> str:
         name,
         (f"{name} is not available on this server.", f"{name} غير متاح على الخادم."),
     )
-    return tr(ctx, en, ar)
+    return present(ctx, en, ar)
 
 
 def aliases(description_en: str, description_ar: str, *names: str) -> tuple[BotCommand, ...]:
-    return tuple(BotCommand(name, description_en, description_ar) for name in names)
+    commands: list[BotCommand] = []
+    for name in names:
+        usage_en, usage_ar, example_en, example_ar = help_for(name)
+        commands.append(
+            BotCommand(
+                name,
+                description_en,
+                description_ar,
+                usage_en,
+                usage_ar,
+                example_en,
+                example_ar,
+            )
+        )
+    return tuple(commands)
 
 
 def message_text(message: Any) -> str:

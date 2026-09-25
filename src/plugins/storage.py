@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable
 
-from src.plugins.common import aliases, chat_id_of, chat_kind, is_saved_chat, tr
+from src.plugins.common import aliases, chat_id_of, chat_kind, is_saved_chat, present
 from src.plugins.listeners import watch
 from src.runtime.plugins import (
     AccountSession,
@@ -61,18 +61,18 @@ class StoragePlugin(Plugin):
         arg = (ctx.args or "").strip().casefold()
         if arg in {"on", "تشغيل", "1"}:
             ctx.settings.set("enabled", True)
-            await ctx.reply(tr(ctx, "Logging is on.", "تم تشغيل التخزين."))
+            await ctx.reply(present(ctx, "Logging is on.", "تم تشغيل التخزين."))
             return
         if arg in {"off", "ايقاف", "0"}:
             ctx.settings.set("enabled", False)
-            await ctx.reply(tr(ctx, "Logging is off.", "تم إيقاف التخزين."))
+            await ctx.reply(present(ctx, "Logging is off.", "تم إيقاف التخزين."))
             return
         enabled = bool(ctx.settings.get("enabled", False))
         log_chat = ctx.settings.get("log_chat", "me")
         state = "on" if enabled else "off"
         state_ar = "يعمل" if enabled else "متوقف"
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 f"Logging is {state}. Log chat: {log_chat}.",
                 f"التخزين {state_ar}. محادثة السجل: {log_chat}.",
@@ -91,7 +91,7 @@ async def _set_log(ctx: CommandContext) -> None:
         target = int(arg)
     else:
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 "Use here, me, or a numeric chat id.",
                 "استخدم هنا أو محفوظات أو معرّف محادثة.",
@@ -100,7 +100,7 @@ async def _set_log(ctx: CommandContext) -> None:
         return
     ctx.settings.set("log_chat", target)
     ctx.settings.set("enabled", True)
-    await ctx.reply(tr(ctx, f"Log chat set to {target}.", f"تم تعيين السجل إلى {target}."))
+    await ctx.reply(present(ctx, f"Log chat set to {target}.", f"تم تعيين السجل إلى {target}."))
 
 
 async def on_message(session: AccountSession, message: object) -> None:

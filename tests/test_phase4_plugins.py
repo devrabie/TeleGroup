@@ -598,11 +598,11 @@ async def test_telegraph_info_leave_repeat_profile_clock_calc(monkeypatch):
     assert ":" in clock.sent[-1][1]
     day = FakeClient()
     await clock_plugin.handle(_ctx(day, "clock", "التاريخ", "", account_id=61))
-    assert day.sent[-1][1][:4].isdigit()
+    assert any(line[:4].isdigit() for line in day.sent[-1][1].splitlines())
 
     calc = FakeClient()
     await calc_plugin.handle(_ctx(calc, "calc", "احسب", "2+2", account_id=62))
-    assert calc.sent[-1][1] == "4"
+    assert calc.sent[-1][1].rstrip().endswith("4")
     blocked = FakeClient()
     await calc_plugin.handle(_ctx(blocked, "calc", "احسب", "__import__('os')", account_id=63))
     assert "not allowed" in blocked.sent[-1][1]

@@ -27,7 +27,7 @@ Kurigram clients are constructed only in `src/runtime/client_factory.py`.
 
 The worker supervises the Kurigram clients for accounts on its shard (`account_id % WORKER_SHARD_COUNT == WORKER_SHARD_ID`). It reconnects with backoff, stops on a revoked session, and messages the owner. The bot wakes it with a `runtime_signals` row and Postgres `NOTIFY telegroup_runtime`. A poll covers missed notifications and SQLite.
 
-Userbot commands use `USERBOT_PREFIX` (default `.`) and only outgoing messages from the account itself. `.help` / `.الاوامر` lists what the current plan allows. Arabic names are the primary commands, with English aliases. The full list is in [docs/commands.md](docs/commands.md). See [docs/plugins.md](docs/plugins.md) for how to add a plugin.
+Userbot commands use `USERBOT_PREFIX` (default `.`) and only outgoing messages from the account itself. `.help` / `.الاوامر` lists commands by section. `.الاوامر حظر` shows usage and an example. `.اللوحة` / `.panel` posts an inline button panel in the current chat (categories, command help, plugin on/off, and simple settings). The control bot needs inline mode: in BotFather send `/setinline`, choose this bot, and set a placeholder such as `لوحة`. Arabic names are the primary commands, with English aliases. The full list is in [docs/commands.md](docs/commands.md). The Arabic panel guide is [docs/panel-ar.md](docs/panel-ar.md). See [docs/plugins.md](docs/plugins.md) for how to add a plugin.
 
 Each account menu has a Plugins screen. Admins choose which plugins a plan allows from the plan editor. New plans allow every plugin registered at creation time. A migration grants the built-in plugins to plans that already exist.
 

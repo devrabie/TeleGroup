@@ -6,7 +6,7 @@ import logging
 import time
 from typing import Any
 
-from src.plugins.common import aliases, resolve_user, tr
+from src.plugins.common import aliases, present, resolve_user, tr
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta
 
 log = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ class GiftsPlugin(Plugin):
         if ctx.command in {"الغاء الهدية", "giftcancel"}:
             _pending.pop(ctx.account_id, None)
             await ctx.reply(
-                tr(ctx, "Gift cancelled. Nothing was sent.", "أُلغيت الهدية. لم يُرسل شيء.")
+                present(ctx, "Gift cancelled. Nothing was sent.", "أُلغيت الهدية. لم يُرسل شيء.")
             )
             return
         await _prepare(ctx)
@@ -83,7 +83,7 @@ async def _prices(ctx: CommandContext) -> None:
         gifts = await ctx.limiter.run(ctx.client.get_available_gifts)
     except Exception:
         log.exception("Gift list failed for account %s", ctx.account_id)
-        await ctx.reply(tr(ctx, "Could not load gift prices.", "تعذر تحميل أسعار الهدايا."))
+        await ctx.reply(present(ctx, "Could not load gift prices.", "تعذر تحميل أسعار الهدايا."))
         return
     balance = None
     get_balance = getattr(ctx.client, "get_stars_balance", None)
@@ -94,12 +94,19 @@ async def _prices(ctx: CommandContext) -> None:
             log.debug("Star balance failed", exc_info=True)
     lines = [format_gift_line(gift, ctx.language) for gift in list(gifts or [])[:30]]
     if not lines:
-        await ctx.reply(tr(ctx, "No gifts are on sale.", "لا توجد هدايا معروضة."))
+        await ctx.reply(present(ctx, "No gifts are on sale.", "لا توجد هدايا معروضة."))
         return
-    header = tr(ctx, "Gift prices", "أسعار الهدايا")
+    from src.templates import card
+
     if balance is not None:
-        header += tr(ctx, f" — balance {balance}⭐", f" — الرصيد {balance}⭐")
-    await ctx.reply(header + "\n" + "\n".join(lines))
+        title = tr(
+            ctx,
+            f"Gift prices — balance {balance}⭐",
+            f"أسعار الهدايا — الرصيد {balance}⭐",
+        )
+    else:
+        title = tr(ctx, "Gift prices", "أسعار الهدايا")
+    await ctx.reply(card(ctx.language, title, "\n".join(lines)))
 
 
 async def _prepare(ctx: CommandContext) -> None:
@@ -119,7 +126,7 @@ async def _prepare(ctx: CommandContext) -> None:
         gift_token = parts[0]
     if user is None or not gift_token.isdigit():
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 "Reply to someone with the gift id, or send @username and the gift id.",
                 "رد على شخص مع معرّف الهدية، أو أرسل @username ومعرّف الهدية.",
@@ -129,7 +136,7 @@ async def _prepare(ctx: CommandContext) -> None:
     gift_id = int(gift_token)
     price = await _lookup_price(ctx, gift_id)
     if price == "sold":
-        await ctx.reply(tr(ctx, "That gift is sold out.", "هذه الهدية نفدت."))
+        await ctx.reply(present(ctx, "That gift is sold out.", "هذه الهدية نفدت."))
         return
     _pending[ctx.account_id] = {
         "user": user,
@@ -139,7 +146,7 @@ async def _prepare(ctx: CommandContext) -> None:
     }
     cost = price if isinstance(price, int) else "?"
     await ctx.reply(
-        tr(
+        present(
             ctx,
             f"Gift {gift_id} to {user} costs {cost}⭐. Nothing was sent. "
             f"Send {ctx.prefix}giftconfirm to spend Stars, or {ctx.prefix}giftcancel.",
@@ -167,7 +174,7 @@ async def _confirm(ctx: CommandContext) -> None:
     pending = _pending.get(ctx.account_id)
     if pending is None or time.monotonic() - float(pending["at"]) > _PENDING_SECONDS:
         _pending.pop(ctx.account_id, None)
-        await ctx.reply(tr(ctx, "No gift is waiting.", "لا توجد هدية بانتظار التأكيد."))
+        await ctx.reply(present(ctx, "No gift is waiting.", "لا توجد هدية بانتظار التأكيد."))
         return
     _pending.pop(ctx.account_id, None)
     try:
@@ -179,14 +186,14 @@ async def _confirm(ctx: CommandContext) -> None:
     except Exception:
         log.exception("Gift send failed for account %s", ctx.account_id)
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 "Telegram refused the gift. Stars were not confirmed spent.",
                 "رفض تيليجرام الهدية.",
             )
         )
         return
-    await ctx.reply(tr(ctx, "Gift sent.", "تم إرسال الهدية."))
+    await ctx.reply(present(ctx, "Gift sent.", "تم إرسال الهدية."))
 
 
 plugin = GiftsPlugin()

@@ -294,8 +294,10 @@ def set_plugin_setting(account_id: int, plugin_name: str, key: str, value: Any) 
                 )
             else:
                 row.setting_value = encoded
+            await enqueue_signal(session, account_id, "reload")
 
     _run(_go())
+    _kick()
 
 
 def delete_plugin_setting(account_id: int, plugin_name: str, key: str) -> None:

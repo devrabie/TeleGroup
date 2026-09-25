@@ -6,7 +6,7 @@ import logging
 from collections.abc import Awaitable
 from datetime import UTC, datetime
 
-from src.plugins.common import aliases, tr
+from src.plugins.common import aliases, present
 from src.plugins.listeners import watch
 from src.runtime.plugins import (
     AccountSession,
@@ -56,7 +56,7 @@ class AfkPlugin(Plugin):
     async def handle(self, ctx: CommandContext) -> None:
         if ctx.command in {"الغاء الغياب", "unafk"}:
             _clear(ctx.settings)
-            await ctx.reply(tr(ctx, "Away mode is off.", "تم إيقاف وضع الغياب."))
+            await ctx.reply(present(ctx, "Away mode is off.", "تم إيقاف وضع الغياب."))
             return
         custom = (ctx.args or "").strip()
         message = custom or str(ctx.settings.get("message") or "I'm away right now.")
@@ -64,7 +64,7 @@ class AfkPlugin(Plugin):
         ctx.settings.set("message", message)
         ctx.settings.set("since", datetime.now(UTC).isoformat())
         ctx.settings.set("told", [])
-        await ctx.reply(tr(ctx, "Away mode is on.", "تم تشغيل وضع الغياب."))
+        await ctx.reply(present(ctx, "Away mode is on.", "تم تشغيل وضع الغياب."))
 
 
 def _clear(settings) -> None:

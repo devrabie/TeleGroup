@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from src.media_jobs import STICKER_PACK_LIMIT
-from src.plugins.common import aliases, missing_dependency, tr
+from src.plugins.common import aliases, missing_dependency, present
 from src.plugins.files import download_reply, message_file_size, scratch_dir
 from src.plugins.uploads import send_path
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta
@@ -117,7 +117,7 @@ async def _prepare_webp(ctx: CommandContext, root: Path) -> dict[str, Any] | Non
     kind = _static_media(reply)
     if kind == "animated":
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 "Animated and video stickers are not supported.",
                 "الملصقات المتحركة وملصقات الفيديو غير مدعومة.",
@@ -125,18 +125,18 @@ async def _prepare_webp(ctx: CommandContext, root: Path) -> dict[str, Any] | Non
         )
         return None
     if kind != "image":
-        await ctx.reply(tr(ctx, "Reply to a sticker or an image.", "رد على ملصق أو صورة."))
+        await ctx.reply(present(ctx, "Reply to a sticker or an image.", "رد على ملصق أو صورة."))
         return None
     size = message_file_size(reply)
     if size is not None and size > _MAX_BYTES:
-        await ctx.reply(tr(ctx, "That file is too large.", "الملف كبير جداً."))
+        await ctx.reply(present(ctx, "That file is too large.", "الملف كبير جداً."))
         return None
     source = await download_reply(ctx, root)
     if source is None:
-        await ctx.reply(tr(ctx, "Could not download that file.", "تعذر تنزيل الملف."))
+        await ctx.reply(present(ctx, "Could not download that file.", "تعذر تنزيل الملف."))
         return None
     if source.stat().st_size > _MAX_BYTES:
-        await ctx.reply(tr(ctx, "That file is too large.", "الملف كبير جداً."))
+        await ctx.reply(present(ctx, "That file is too large.", "الملف كبير جداً."))
         return None
     dest = root / "sticker.webp"
     result = await run_named(
@@ -150,7 +150,7 @@ async def _prepare_webp(ctx: CommandContext, root: Path) -> dict[str, Any] | Non
         if result.get("error") == "missing":
             await ctx.reply(missing_dependency(ctx, detail))
         else:
-            await ctx.reply(tr(ctx, "Could not convert that image.", "تعذر تحويل الصورة."))
+            await ctx.reply(present(ctx, "Could not convert that image.", "تعذر تحويل الصورة."))
         return None
     return result
 
@@ -158,7 +158,7 @@ async def _prepare_webp(ctx: CommandContext, root: Path) -> dict[str, Any] | Non
 async def _kang(ctx: CommandContext) -> None:
     reply = _reply(ctx)
     if reply is None:
-        await ctx.reply(tr(ctx, "Reply to a sticker or an image.", "رد على ملصق أو صورة."))
+        await ctx.reply(present(ctx, "Reply to a sticker or an image.", "رد على ملصق أو صورة."))
         return
     me = getattr(ctx.client, "me", None)
     user_id = getattr(me, "id", None)
@@ -166,7 +166,7 @@ async def _kang(ctx: CommandContext) -> None:
         me = await ctx.limiter.run(ctx.client.get_me)
         user_id = getattr(me, "id", None)
     if user_id is None:
-        await ctx.reply(tr(ctx, "Could not read this account.", "تعذر قراءة هذا الحساب."))
+        await ctx.reply(present(ctx, "Could not read this account.", "تعذر قراءة هذا الحساب."))
         return
     owner_id = int(user_id)
     emoji = sticker_emoji(ctx.args or "", getattr(reply, "sticker", None))
@@ -185,7 +185,7 @@ async def _kang(ctx: CommandContext) -> None:
         )
         if short is None:
             return
-        status = await ctx.reply(tr(ctx, "Uploading…", "جارٍ الرفع…"))
+        status = await ctx.reply(present(ctx, "Uploading…", "جارٍ الرفع…"))
         await send_path(ctx, path, kind="sticker", caption="", status=status)
     await ctx.reply(f"https://t.me/addstickers/{short}")
 
@@ -213,13 +213,13 @@ async def _install(
         except Exception:
             log.exception("Sticker pack failed for account %s", ctx.account_id)
             await ctx.reply(
-                tr(ctx, "Could not update the sticker pack.", "تعذر تحديث حزمة الملصقات.")
+                present(ctx, "Could not update the sticker pack.", "تعذر تحديث حزمة الملصقات.")
             )
             return None
         ctx.settings.set("pack_index", index)
         ctx.settings.set("pack", short)
         return short
-    await ctx.reply(tr(ctx, "Could not open a new sticker pack.", "تعذر إنشاء حزمة جديدة."))
+    await ctx.reply(present(ctx, "Could not open a new sticker pack.", "تعذر إنشاء حزمة جديدة."))
     return None
 
 
@@ -310,14 +310,14 @@ async def _input_document(
 
 async def _to_sticker(ctx: CommandContext) -> None:
     if _reply(ctx) is None:
-        await ctx.reply(tr(ctx, "Reply to an image.", "رد على صورة."))
+        await ctx.reply(present(ctx, "Reply to an image.", "رد على صورة."))
         return
     with scratch_dir() as root:
         prepared = await _prepare_webp(ctx, root)
         if prepared is None:
             return
         path = Path(str(prepared["path"]))
-        status = await ctx.reply(tr(ctx, "Uploading…", "جارٍ الرفع…"))
+        status = await ctx.reply(present(ctx, "Uploading…", "جارٍ الرفع…"))
         await send_path(ctx, path, kind="sticker", caption="", status=status)
 
 
@@ -326,18 +326,22 @@ async def _to_image(ctx: CommandContext) -> None:
 
     reply = _reply(ctx)
     if reply is None or getattr(reply, "sticker", None) is None:
-        await ctx.reply(tr(ctx, "Reply to a sticker.", "رد على ملصق."))
+        await ctx.reply(present(ctx, "Reply to a sticker.", "رد على ملصق."))
         return
     sticker = reply.sticker
     if getattr(sticker, "is_animated", False):
         await ctx.reply(
-            tr(ctx, "Animated stickers cannot be converted.", "لا يمكن تحويل الملصقات المتحركة.")
+            present(
+                ctx,
+                "Animated stickers cannot be converted.",
+                "لا يمكن تحويل الملصقات المتحركة.",
+            )
         )
         return
     with scratch_dir() as root:
         source = await download_reply(ctx, root)
         if source is None:
-            await ctx.reply(tr(ctx, "Could not download that sticker.", "تعذر تنزيل الملصق."))
+            await ctx.reply(present(ctx, "Could not download that sticker.", "تعذر تنزيل الملصق."))
             return
         dest = root / "image.jpg"
         job = "frame" if getattr(sticker, "is_video", False) else "jpeg"
@@ -351,9 +355,15 @@ async def _to_image(ctx: CommandContext) -> None:
             if result.get("error") == "missing":
                 await ctx.reply(missing_dependency(ctx, str(result.get("detail") or "Pillow")))
             else:
-                await ctx.reply(tr(ctx, "Could not convert that sticker.", "تعذر تحويل الملصق."))
+                await ctx.reply(
+                    present(
+                        ctx,
+                        "Could not convert that sticker.",
+                        "تعذر تحويل الملصق.",
+                    )
+                )
             return
-        status = await ctx.reply(tr(ctx, "Uploading…", "جارٍ الرفع…"))
+        status = await ctx.reply(present(ctx, "Uploading…", "جارٍ الرفع…"))
         await send_path(ctx, Path(str(result["path"])), kind="photo", caption="", status=status)
 
 
@@ -363,9 +373,13 @@ def format_pack(found: Any, language: str) -> str:
     short = getattr(sticker_set, "short_name", "") or ""
     count = getattr(sticker_set, "count", 0)
     link = f"https://t.me/addstickers/{short}" if short else ""
+    from src.templates import card, field
+
     if language == "ar":
-        return f"{title}\nالاسم: {short}\nالعدد: {count}\n{link}".strip()
-    return f"{title}\nName: {short}\nCount: {count}\n{link}".strip()
+        body = "\n".join([field("الاسم", short), field("العدد", count), link])
+        return card(language, title or "الملصق", body).strip()
+    body = "\n".join([field("Name", short), field("Count", count), link])
+    return card(language, title or "Pack", body).strip()
 
 
 async def _pack_info(ctx: CommandContext) -> None:
@@ -377,7 +391,7 @@ async def _pack_info(ctx: CommandContext) -> None:
     short = getattr(sticker, "set_name", None)
     if not short:
         await ctx.reply(
-            tr(ctx, "Reply to a sticker that belongs to a pack.", "رد على ملصق داخل حزمة.")
+            present(ctx, "Reply to a sticker that belongs to a pack.", "رد على ملصق داخل حزمة.")
         )
         return
     try:
@@ -390,7 +404,7 @@ async def _pack_info(ctx: CommandContext) -> None:
             )
         )
     except StickersetInvalid:
-        await ctx.reply(tr(ctx, "That pack is not available.", "هذه الحزمة غير متاحة."))
+        await ctx.reply(present(ctx, "That pack is not available.", "هذه الحزمة غير متاحة."))
         return
     await ctx.reply(format_pack(found, ctx.language))
 

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.plugins.common import aliases, chat_id_of, resolve_user, tr
+from src.plugins.common import aliases, chat_id_of, present, resolve_user
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta
+from src.templates import card, field
 
 _CMD = ("معلومات", "info")
 
@@ -37,7 +38,7 @@ def format_chat_info(chat: Any, language: str) -> str:
         if value in ("", None):
             continue
         label = ar if language == "ar" else en
-        lines.append(f"{label}: {value}")
+        lines.append(field(label, value))
     return "\n".join(lines) or ("لا توجد معلومات." if language == "ar" else "No details.")
 
 
@@ -63,16 +64,21 @@ class InfoPlugin(Plugin):
             target, error = await resolve_user(ctx)
             if error:
                 await ctx.reply(
-                    tr(ctx, "Reply, or send @username or an id.", "رد، أو أرسل @username أو معرّفاً.")
+                    present(
+                        ctx,
+                        "Reply, or send @username or an id.",
+                        "رد، أو أرسل @username أو معرّفاً.",
+                    )
                 )
                 return
         else:
             target = chat_id_of(ctx.message)
         if target is None:
-            await ctx.reply(tr(ctx, "No chat to show.", "لا توجد محادثة للعرض."))
+            await ctx.reply(present(ctx, "No chat to show.", "لا توجد محادثة للعرض."))
             return
         chat = await ctx.limiter.run(lambda: ctx.client.get_chat(target))
-        await ctx.reply(format_chat_info(chat, ctx.language))
+        title = "معلومات" if ctx.language == "ar" else "Info"
+        await ctx.reply(card(ctx.language, title, format_chat_info(chat, ctx.language)))
 
 
 plugin = InfoPlugin()

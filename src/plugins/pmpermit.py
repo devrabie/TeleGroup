@@ -5,7 +5,14 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable
 
-from src.plugins.common import aliases, chat_id_of, chat_kind, is_saved_chat, resolve_user, tr
+from src.plugins.common import (
+    aliases,
+    chat_id_of,
+    chat_kind,
+    is_saved_chat,
+    present,
+    resolve_user,
+)
 from src.plugins.listeners import watch
 from src.runtime.plugin_data import get_pm_permit, set_pm_permit
 from src.runtime.plugins import (
@@ -81,18 +88,18 @@ class PmPermitPlugin(Plugin):
         arg = (ctx.args or "").strip().casefold()
         if arg in {"on", "تشغيل"}:
             ctx.settings.set("enabled", True)
-            await ctx.reply(tr(ctx, "PM protection is on.", "تم تشغيل حماية الخاص."))
+            await ctx.reply(present(ctx, "PM protection is on.", "تم تشغيل حماية الخاص."))
             return
         if arg in {"off", "ايقاف"}:
             ctx.settings.set("enabled", False)
-            await ctx.reply(tr(ctx, "PM protection is off.", "تم إيقاف حماية الخاص."))
+            await ctx.reply(present(ctx, "PM protection is off.", "تم إيقاف حماية الخاص."))
             return
         enabled = bool(ctx.settings.get("enabled", False))
         limit = int(ctx.settings.get("warn_limit", 3) or 3)
         state = "on" if enabled else "off"
         state_ar = "تعمل" if enabled else "متوقفة"
         await ctx.reply(
-            tr(
+            present(
                 ctx,
                 f"PM protection is {state}. Block after {limit} warnings.",
                 f"حماية الخاص {state_ar}. الحظر بعد {limit} تحذيرات.",
@@ -121,7 +128,11 @@ async def _set_approval(ctx: CommandContext, *, approved: bool) -> None:
     user_id = await _user_id(ctx)
     if user_id is None:
         await ctx.reply(
-            tr(ctx, "Reply to the user or pass their numeric id.", "رد على المستخدم أو أرسل معرّفه.")
+            present(
+                ctx,
+                "Reply to the user or pass their numeric id.",
+                "رد على المستخدم أو أرسل معرّفه.",
+            )
         )
         return
     set_pm_permit(
@@ -132,9 +143,9 @@ async def _set_approval(ctx: CommandContext, *, approved: bool) -> None:
         blocked=False,
     )
     if approved:
-        await ctx.reply(tr(ctx, "Approved.", "تم السماح."))
+        await ctx.reply(present(ctx, "Approved.", "تم السماح."))
     else:
-        await ctx.reply(tr(ctx, "Approval removed.", "تم الرفض."))
+        await ctx.reply(present(ctx, "Approval removed.", "تم الرفض."))
 
 
 async def _set_limit(ctx: CommandContext) -> None:
@@ -144,10 +155,10 @@ async def _set_limit(ctx: CommandContext) -> None:
     except ValueError:
         value = 0
     if value < 1 or value > 10:
-        await ctx.reply(tr(ctx, "Pick a number from 1 to 10.", "اختر رقماً من 1 إلى 10."))
+        await ctx.reply(present(ctx, "Pick a number from 1 to 10.", "اختر رقماً من 1 إلى 10."))
         return
     ctx.settings.set("warn_limit", value)
-    await ctx.reply(tr(ctx, f"Warning limit is {value}.", f"حد التحذير هو {value}."))
+    await ctx.reply(present(ctx, f"Warning limit is {value}.", f"حد التحذير هو {value}."))
 
 
 async def on_message(session: AccountSession, message: object) -> None:

@@ -7,8 +7,9 @@ import math
 import operator
 from collections.abc import Callable
 
-from src.plugins.common import aliases, tr
+from src.plugins.common import aliases, present
 from src.runtime.plugins import CommandContext, Plugin, PluginMeta
+from src.templates import result_card
 
 _CMD = ("احسب", "calc")
 _BIN: dict[type, Callable[[float, float], float]] = {
@@ -87,19 +88,19 @@ class CalcPlugin(Plugin):
     async def handle(self, ctx: CommandContext) -> None:
         expression = (ctx.args or "").strip()
         if not expression:
-            await ctx.reply(tr(ctx, "Send an expression.", "أرسل تعبيراً."))
+            await ctx.reply(present(ctx, "Send an expression.", "أرسل تعبيراً."))
             return
         try:
             result = safe_calc(expression)
         except CalcError as exc:
             if str(exc) == "zero":
-                await ctx.reply(tr(ctx, "Division by zero.", "القسمة على صفر."))
+                await ctx.reply(present(ctx, "Division by zero.", "القسمة على صفر."))
             else:
                 await ctx.reply(
-                    tr(ctx, "That expression is not allowed.", "هذا التعبير غير مسموح.")
+                    present(ctx, "That expression is not allowed.", "هذا التعبير غير مسموح.")
                 )
             return
-        await ctx.reply(result)
+        await ctx.reply(result_card(ctx.language, result))
 
 
 plugin = CalcPlugin()

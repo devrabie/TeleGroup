@@ -1,98 +1,59 @@
-"""List the plugins enabled for this account."""
+"""Categorized command index and the inline control panel."""
 
 from __future__ import annotations
 
-from src.runtime.plugins import BotCommand, CommandContext, Plugin, PluginMeta
+from src.help_text import render_index, render_query
+from src.panel_open import open_panel
+from src.plugins.common import aliases
+from src.runtime.plugins import CommandContext, Plugin, PluginMeta
+from src.templates import inline_disabled, panel_failed
+
+_PANEL_ARGS = {"لوحة", "اللوحة", "panel"}
+_PANEL_COMMANDS = {"اللوحة", "panel"}
 
 
 class HelpPlugin(Plugin):
     meta = PluginMeta(
         name="help",
-        description_en="List the plugins and commands enabled for this account.",
-        description_ar="عرض الإضافات والأوامر المفعّلة لهذا الحساب.",
+        description_en="List commands by section, and open the inline control panel.",
+        description_ar="عرض الأوامر حسب القسم، وفتح لوحة التحكم بالأزرار.",
         commands=(
-            BotCommand(
+            *aliases(
+                "List commands. Add a section, plugin, or command for details.",
+                "عرض الأوامر. أضف قسماً أو إضافة أو أمراً للتفاصيل.",
                 "help",
-                "List the plugins and commands enabled for this account.",
-                "عرض الإضافات والأوامر المفعّلة لهذا الحساب.",
-            ),
-            BotCommand(
                 "الاوامر",
-                "List the plugins and commands enabled for this account.",
-                "عرض الإضافات والأوامر المفعّلة لهذا الحساب.",
+                "الأوامر",
+            ),
+            *aliases(
+                "Open the inline button panel in this chat.",
+                "فتح لوحة الأزرار في هذه المحادثة.",
+                "panel",
+                "اللوحة",
             ),
         ),
         default_enabled=True,
     )
 
     async def handle(self, ctx: CommandContext) -> None:
-        from src.runtime.gating import list_plugin_views
-        from src.runtime.plugins import all_plugins
-
         query = (ctx.args or "").strip()
-        plugins = {plugin.meta.name: plugin for plugin in all_plugins()}
-        views = list_plugin_views(ctx.account_id, ctx.language) or []
-        enabled = [view for view in views if view["enabled"]]
+        panel_arg = query.casefold() in _PANEL_ARGS or query in _PANEL_ARGS
+        if ctx.command in _PANEL_COMMANDS or panel_arg:
+            await self._panel(ctx)
+            return
         if query:
-            await self._detail(ctx, query, enabled, plugins)
+            await ctx.reply(render_query(ctx.account_id, ctx.language, ctx.prefix, query))
             return
-        if ctx.language == "ar":
-            lines = [
-                f"الأوامر المفعّلة (البادئة {ctx.prefix})",
-                f"للتفاصيل: {ctx.prefix}الاوامر ثم اسم الإضافة",
-            ]
-            empty = "لا توجد إضافات مفعّلة."
-        else:
-            lines = [
-                f"Enabled commands (prefix {ctx.prefix})",
-                f"Details: {ctx.prefix}help and a plugin name",
-            ]
-            empty = "No plugins are enabled."
-        if not enabled:
-            lines.append(empty)
-            await ctx.reply("\n".join(lines))
-            return
-        detailed = list(lines)
-        for view in enabled:
-            detailed.append(f"{view['name']}: {view['description']}")
-            if view["commands"]:
-                detailed.append(" ".join(f"{ctx.prefix}{name}" for name in view["commands"]))
-        text = "\n".join(detailed)
-        if len(text) > 3900:
-            compact = list(lines)
-            if ctx.language == "ar":
-                compact.append("القائمة طويلة، وأسماء الأوامر في التفاصيل.")
-            else:
-                compact.append("The list is long, so command names are in the details.")
-            for view in enabled:
-                compact.append(f"{view['name']}: {view['description']}")
-            text = "\n".join(compact)
-            if len(text) > 3900:
-                text = text[:3800] + "\n…"
-        await ctx.reply(text)
+        await ctx.reply(render_index(ctx.account_id, ctx.language, ctx.prefix))
 
-    async def _detail(self, ctx: CommandContext, query: str, enabled: list, plugins: dict) -> None:
-        folded = query.casefold()
-        match = None
-        for view in enabled:
-            plugin = plugins.get(view["name"])
-            if plugin is None:
-                continue
-            names = {view["name"].casefold()}
-            names.update(command.name.casefold() for command in plugin.meta.commands)
-            if folded in names or query in {command.name for command in plugin.meta.commands}:
-                match = plugin
-                break
-        if match is None:
-            if ctx.language == "ar":
-                await ctx.reply("لا توجد إضافة مفعّلة بهذا الاسم.")
-            else:
-                await ctx.reply("No enabled plugin uses that name.")
+    async def _panel(self, ctx: CommandContext) -> None:
+        status = await open_panel(ctx)
+        if status == "opened":
             return
-        lines = [match.meta.description(ctx.language)]
-        for command in match.meta.commands:
-            lines.append(f"{ctx.prefix}{command.name} — {command.description(ctx.language)}")
-        await ctx.reply("\n".join(lines))
+        if status == "disabled":
+            await ctx.reply(inline_disabled(ctx.language, ctx.prefix))
+            return
+        await ctx.reply(panel_failed(ctx.language, ctx.prefix))
 
 
 plugin = HelpPlugin()
