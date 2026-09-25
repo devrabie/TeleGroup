@@ -1686,3 +1686,363 @@ msgstr "Amount does not match the plan price"
 #~ "permissions, or the group may already"
 #~ " be a supergroup."
 
+
+#, python-brace-format
+msgid "Plan default ({days} days)"
+msgstr "Plan default ({days} days)"
+
+msgid "7 days"
+msgstr "7 days"
+
+msgid "30 days"
+msgstr "30 days"
+
+msgid "90 days"
+msgstr "90 days"
+
+msgid "✏️ Custom days"
+msgstr "✏️ Custom days"
+
+#, python-brace-format
+msgid "{name} — {days} days"
+msgstr "{name} — {days} days"
+
+msgid ""
+"<b>Grant a plan</b>\n"
+"\n"
+"Send a numeric Telegram ID, an @username, or search by name."
+msgstr ""
+"<b>Grant a plan</b>\n"
+"\n"
+"Send a numeric Telegram ID, an @username, or search by name."
+
+msgid "🔢 Telegram ID or @username"
+msgstr "🔢 Telegram ID or @username"
+
+msgid "🔎 Search by name"
+msgstr "🔎 Search by name"
+
+msgid ""
+"Send the user's numeric Telegram ID or @username.\n"
+"\n"
+"If they have never pressed Start, a numeric ID still works. An @username works only after they have opened the bot.\n"
+"\n"
+"Send /cancel to stop."
+msgstr ""
+"Send the user's numeric Telegram ID or @username.\n"
+"\n"
+"If they have never pressed Start, a numeric ID still works. An @username works only after they have opened the bot.\n"
+"\n"
+"Send /cancel to stop."
+
+msgid ""
+"Send part of the user's name or username.\n"
+"\n"
+"Send /cancel to stop."
+msgstr ""
+"Send part of the user's name or username.\n"
+"\n"
+"Send /cancel to stop."
+
+msgid "That is not a Telegram ID or @username."
+msgstr "That is not a Telegram ID or @username."
+
+#, python-brace-format
+msgid ""
+"No user with username <b>{username}</b> has started the bot, so there is no Telegram ID to attach a plan to. Ask them to press Start, or send their numeric Telegram ID."
+msgstr ""
+"No user with username <b>{username}</b> has started the bot, so there is no Telegram ID to attach a plan to. Ask them to press Start, or send their numeric Telegram ID."
+
+#, python-brace-format
+msgid "No users matched <b>{query}</b>."
+msgstr "No users matched <b>{query}</b>."
+
+msgid "🔎 Search again"
+msgstr "🔎 Search again"
+
+#, python-brace-format
+msgid "Search results for <b>{query}</b> (page {page}):"
+msgstr "Search results for <b>{query}</b> (page {page}):"
+
+msgid "User"
+msgstr "User"
+
+msgid ""
+"This Telegram ID is not in the database. You can still grant a plan: a user record will be created. They will not get a message until they press Start."
+msgstr ""
+"This Telegram ID is not in the database. You can still grant a plan: a user record will be created. They will not get a message until they press Start."
+
+msgid "Subscription: none"
+msgstr "Subscription: none"
+
+#, python-brace-format
+msgid "Subscription: <b>{plan}</b> until <b>{expiry}</b>"
+msgstr "Subscription: <b>{plan}</b> until <b>{expiry}</b>"
+
+#, python-brace-format
+msgid "Subscription: <b>{plan}</b> expired <b>{expiry}</b>"
+msgstr "Subscription: <b>{plan}</b> expired <b>{expiry}</b>"
+
+msgid "🎁 Grant a plan"
+msgstr "🎁 Grant a plan"
+
+msgid "🛑 End subscription"
+msgstr "🛑 End subscription"
+
+msgid "This step has expired. Open /admin and start again."
+msgstr "This step has expired. Open /admin and start again."
+
+#, python-brace-format
+msgid "Choose a plan for <code>{user_id}</code>:"
+msgstr "Choose a plan for <code>{user_id}</code>:"
+
+#, python-brace-format
+msgid "Choose how long <b>{plan}</b> lasts:"
+msgstr "Choose how long <b>{plan}</b> lasts:"
+
+#, python-brace-format
+msgid ""
+"Send the number of days (1–{max_days}).\n"
+"\n"
+"Send /cancel to stop."
+msgstr ""
+"Send the number of days (1–{max_days}).\n"
+"\n"
+"Send /cancel to stop."
+
+msgid "That is not a valid number of days."
+msgstr "That is not a valid number of days."
+
+#, python-brace-format
+msgid ""
+"This user already has <b>{plan}</b> until <b>{expiry}</b>.\n"
+"\n"
+"Extend adds {days} days to that expiry and switches the plan to <b>{new_plan}</b>.\n"
+"Replace ends the current subscription and starts <b>{new_plan}</b> from today for {days} days."
+msgstr ""
+"This user already has <b>{plan}</b> until <b>{expiry}</b>.\n"
+"\n"
+"Extend adds {days} days to that expiry and switches the plan to <b>{new_plan}</b>.\n"
+"Replace ends the current subscription and starts <b>{new_plan}</b> from today for {days} days."
+
+msgid "➕ Extend current subscription"
+msgstr "➕ Extend current subscription"
+
+msgid "🔁 Replace subscription"
+msgstr "🔁 Replace subscription"
+
+#, python-brace-format
+msgid ""
+"✅ <b>{plan}</b> for <code>{user_id}</code> is active until <b>{expiry}</b>."
+msgstr ""
+"✅ <b>{plan}</b> for <code>{user_id}</code> is active until <b>{expiry}</b>."
+
+msgid ""
+"This Telegram ID was not in the database. A user record was created and the plan was saved."
+msgstr ""
+"This Telegram ID was not in the database. A user record was created and the plan was saved."
+
+msgid ""
+"The plan is saved, but the bot could not message the user. They have not started the bot, or they blocked it."
+msgstr ""
+"The plan is saved, but the bot could not message the user. They have not started the bot, or they blocked it."
+
+msgid "🎁 Grant another"
+msgstr "🎁 Grant another"
+
+msgid "This user has no subscription to end."
+msgstr "This user has no subscription to end."
+
+#, python-brace-format
+msgid ""
+"End <b>{plan}</b> for <code>{user_id}</code>?\n"
+"It is currently valid until <b>{expiry}</b>."
+msgstr ""
+"End <b>{plan}</b> for <code>{user_id}</code>?\n"
+"It is currently valid until <b>{expiry}</b>."
+
+msgid "The subscription was ended."
+msgstr "The subscription was ended."
+
+msgid ""
+"The user could not be notified. They have not started the bot, or they blocked it."
+msgstr ""
+"The user could not be notified. They have not started the bot, or they blocked it."
+
+msgid "➕ Generate links"
+msgstr "➕ Generate links"
+
+msgid "🟢 Unused"
+msgstr "🟢 Unused"
+
+msgid "🔵 Used"
+msgstr "🔵 Used"
+
+msgid "⌛ Expired"
+msgstr "⌛ Expired"
+
+msgid "🚫 Revoked"
+msgstr "🚫 Revoked"
+
+msgid ""
+"<b>Activation links</b>\n"
+"\n"
+"Each link works once. Opening it activates the plan for that user."
+msgstr ""
+"<b>Activation links</b>\n"
+"\n"
+"Each link works once. Opening it activates the plan for that user."
+
+msgid "Choose a plan for the activation links:"
+msgstr "Choose a plan for the activation links:"
+
+msgid "How many links? (1–50)"
+msgstr "How many links? (1–50)"
+
+msgid "✏️ Custom count"
+msgstr "✏️ Custom count"
+
+msgid "Send how many links to create (1–50)."
+msgstr "Send how many links to create (1–50)."
+
+msgid "Send a number from 1 to 50."
+msgstr "Send a number from 1 to 50."
+
+msgid "When should unused links expire?"
+msgstr "When should unused links expire?"
+
+msgid "No expiry"
+msgstr "No expiry"
+
+msgid "1 day"
+msgstr "1 day"
+
+msgid "📅 Custom date"
+msgstr "📅 Custom date"
+
+msgid "Send a date as YYYY-MM-DD, or a number of days until the link expires."
+msgstr "Send a date as YYYY-MM-DD, or a number of days until the link expires."
+
+msgid "That expiry is not valid."
+msgstr "That expiry is not valid."
+
+msgid ""
+"That expiry is not valid. Use YYYY-MM-DD or a number of days in the future."
+msgstr ""
+"That expiry is not valid. Use YYYY-MM-DD or a number of days in the future."
+
+#, python-brace-format
+msgid "Created {count} activation links for <b>{plan}</b> ({days} days)."
+msgstr "Created {count} activation links for <b>{plan}</b> ({days} days)."
+
+#, python-brace-format
+msgid "Unused links expire at <b>{expiry}</b>."
+msgstr "Unused links expire at <b>{expiry}</b>."
+
+msgid ""
+"The bot has no public username, so deep links could not be built. Codes:"
+msgstr ""
+"The bot has no public username, so deep links could not be built. Codes:"
+
+msgid "Unused"
+msgstr "Unused"
+
+msgid "Used"
+msgstr "Used"
+
+msgid "Expired"
+msgstr "Expired"
+
+msgid "Revoked"
+msgstr "Revoked"
+
+#, python-brace-format
+msgid "{status} activation codes (page {page})"
+msgstr "{status} activation codes (page {page})"
+
+msgid "No activation codes in this list."
+msgstr "No activation codes in this list."
+
+msgid "This activation code is not valid."
+msgstr "This activation code is not valid."
+
+#, python-brace-format
+msgid ""
+"<b>Activation code</b>\n"
+"<code>{code}</code>\n"
+"<b>Link:</b> <code>{link}</code>\n"
+"<b>Plan:</b> {plan}\n"
+"<b>Days:</b> {days}\n"
+"<b>Status:</b> {status}\n"
+"<b>Created by:</b> <code>{admin_id}</code>\n"
+"<b>Created:</b> {created}\n"
+"<b>Expires:</b> {expires}\n"
+"<b>Redeemed by:</b> {who}\n"
+"<b>Redeemed:</b> {when}"
+msgstr ""
+"<b>Activation code</b>\n"
+"<code>{code}</code>\n"
+"<b>Link:</b> <code>{link}</code>\n"
+"<b>Plan:</b> {plan}\n"
+"<b>Days:</b> {days}\n"
+"<b>Status:</b> {status}\n"
+"<b>Created by:</b> <code>{admin_id}</code>\n"
+"<b>Created:</b> {created}\n"
+"<b>Expires:</b> {expires}\n"
+"<b>Redeemed by:</b> {who}\n"
+"<b>Redeemed:</b> {when}"
+
+msgid "🚫 Revoke code"
+msgstr "🚫 Revoke code"
+
+msgid "Revoke this unused code? It will stop working immediately."
+msgstr "Revoke this unused code? It will stop working immediately."
+
+msgid "The activation code was revoked."
+msgstr "The activation code was revoked."
+
+msgid "This code can no longer be revoked."
+msgstr "This code can no longer be revoked."
+
+msgid "🎁 Grant a Plan"
+msgstr "🎁 Grant a Plan"
+
+msgid "🔗 Activation Links"
+msgstr "🔗 Activation Links"
+
+msgid "🛑 End Subscription"
+msgstr "🛑 End Subscription"
+
+msgid ""
+"\n"
+"<b>/admin</b> - Grant a plan, end a subscription, or create one-time activation links."
+msgstr ""
+"\n"
+"<b>/admin</b> - Grant a plan, end a subscription, or create one-time activation links."
+
+#, python-brace-format
+msgid ""
+"✅ An admin activated the <b>{plan}</b> plan for you.\n"
+"It is valid until <b>{expiry}</b>."
+msgstr ""
+"✅ An admin activated the <b>{plan}</b> plan for you.\n"
+"It is valid until <b>{expiry}</b>."
+
+#, python-brace-format
+msgid "✅ The <b>{plan}</b> plan is active until <b>{expiry}</b>."
+msgstr "✅ The <b>{plan}</b> plan is active until <b>{expiry}</b>."
+
+msgid "This activation code has already been used."
+msgstr "This activation code has already been used."
+
+msgid "This activation code has expired."
+msgstr "This activation code has expired."
+
+msgid "This activation code has been revoked."
+msgstr "This activation code has been revoked."
+
+msgid "Could not activate this code. Please try again later."
+msgstr "Could not activate this code. Please try again later."
+
+msgid "Your subscription was ended by an admin."
+msgstr "Your subscription was ended by an admin."

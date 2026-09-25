@@ -263,3 +263,37 @@ class SharingToken(Base):
     kind: Mapped[str] = mapped_column(Text, nullable=False)
     token: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+
+
+class ActivationCode(Base):
+    """Single-use plan link. ``code`` is the ``/start`` payload."""
+
+    __tablename__ = "activation_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id"), nullable=False)
+    duration_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_by_telegram_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime)
+    used_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    revoked_by_telegram_id: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class PlanGrant(Base):
+    """Audit row for an admin plan change. ``source`` is ``manual`` or ``code``."""
+
+    __tablename__ = "plan_grants"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    admin_telegram_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    target_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id"), nullable=False)
+    duration_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[str] = mapped_column(String(16), nullable=False)
+    action: Mapped[str] = mapped_column(String(16), nullable=False)
+    activation_code_id: Mapped[int | None] = mapped_column(ForeignKey("activation_codes.id"))
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())

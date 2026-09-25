@@ -41,6 +41,8 @@ Phase 3 tables: `auto_replies`, `pm_permits`, `chat_locks`. Revision 0003 does n
 
 Revision `0004_phase4` grants `download`, `stickers`, `translate`, `tts`, `ocr`, `convert`, `telegraph`, `info`, `leave`, `repeat`, `profile`, `clock`, and `calc` to every plan that already exists. It only inserts missing rows. It does not turn plugins off and it does not delete allowlist rows. Run `alembic upgrade head` before starting the worker. Downgrade removes only those phase 4 names.
 
+Revision `0005_plan_grants` follows `0004_phase4`. It adds `activation_codes` and `plan_grants` when those tables are missing, and it does not change existing rows. Apply it after the phase 4 revision.
+
 Sharding is configured per process; there is no automatic assignment of accounts to workers yet.
 
 ### Phase 4 media / الوسائط
@@ -167,4 +169,4 @@ Logs are JSON, one object per line. Webhook startup lines record the host and po
 ## Commands / الأوامر
 
 - `/start`, `/subscribe`, `/add_account`, `/my_accounts`, `/language`
-- Admin: `/create_plan`, `/list_plans`, `/list_users`, `/view_user`, `/grant_subscription`
+- Admin: `/admin` grants a plan (Telegram ID, @username, or search), extends or replaces an active subscription, ends a subscription, and creates one-time activation links (`https://t.me/<bot>?start=act_...`). `/create_plan`, `/list_plans`, `/list_users`, `/view_user`

@@ -69,6 +69,8 @@ _TABLES = (
 
 # Children first so ``--reset`` satisfies PostgreSQL foreign keys.
 _RESET_TABLES = (
+    "plan_grants",
+    "activation_codes",
     "auto_replies",
     "pm_permits",
     "chat_locks",

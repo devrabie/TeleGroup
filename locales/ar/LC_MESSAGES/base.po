@@ -2028,3 +2028,360 @@ msgstr "هذه القيمة غير صالحة."
 msgid "⚠️ The session for <code>{phone}</code> is invalid or revoked. The account was stopped. Delete it and add it again."
 msgstr "⚠️ جلسة <code>{phone}</code> غير صالحة أو مُلغاة. تم إيقاف الحساب. احذفه ثم أضفه من جديد."
 
+
+#, python-brace-format
+msgid "Plan default ({days} days)"
+msgstr "المدة الافتراضية للخطة ({days} يوم)"
+
+msgid "7 days"
+msgstr "7 أيام"
+
+msgid "30 days"
+msgstr "30 يومًا"
+
+msgid "90 days"
+msgstr "90 يومًا"
+
+msgid "✏️ Custom days"
+msgstr "✏️ عدد أيام مخصص"
+
+#, python-brace-format
+msgid "{name} — {days} days"
+msgstr "{name} — {days} يوم"
+
+msgid ""
+"<b>Grant a plan</b>\n"
+"\n"
+"Send a numeric Telegram ID, an @username, or search by name."
+msgstr ""
+"<b>منح خطة</b>\n"
+"\n"
+"أرسل معرّف تيليجرام الرقمي، أو @username، أو ابحث بالاسم."
+
+msgid "🔢 Telegram ID or @username"
+msgstr "🔢 معرّف تيليجرام أو @username"
+
+msgid "🔎 Search by name"
+msgstr "🔎 بحث بالاسم"
+
+msgid ""
+"Send the user's numeric Telegram ID or @username.\n"
+"\n"
+"If they have never pressed Start, a numeric ID still works. An @username works only after they have opened the bot.\n"
+"\n"
+"Send /cancel to stop."
+msgstr ""
+"أرسل معرّف تيليجرام الرقمي للمستخدم أو @username.\n"
+"\n"
+"إذا لم يضغط على ابدأ من قبل، فالمعرّف الرقمي يكفي. اسم المستخدم يعمل فقط بعد فتح البوت.\n"
+"\n"
+"أرسل /cancel للإيقاف."
+
+msgid ""
+"Send part of the user's name or username.\n"
+"\n"
+"Send /cancel to stop."
+msgstr ""
+"أرسل جزءًا من اسم المستخدم أو معرّفه.\n"
+"\n"
+"أرسل /cancel للإيقاف."
+
+msgid "That is not a Telegram ID or @username."
+msgstr "هذا ليس معرّف تيليجرام أو اسم مستخدم."
+
+#, python-brace-format
+msgid ""
+"No user with username <b>{username}</b> has started the bot, so there is no Telegram ID to attach a plan to. Ask them to press Start, or send their numeric Telegram ID."
+msgstr ""
+"لا يوجد مستخدم باسم <b>{username}</b> بدأ البوت، لذلك لا يوجد معرّف تيليجرام لربط الخطة به. اطلب منه الضغط على ابدأ، أو أرسل معرّفه الرقمي."
+
+#, python-brace-format
+msgid "No users matched <b>{query}</b>."
+msgstr "لا يوجد مستخدمون يطابقون <b>{query}</b>."
+
+msgid "🔎 Search again"
+msgstr "🔎 بحث من جديد"
+
+#, python-brace-format
+msgid "Search results for <b>{query}</b> (page {page}):"
+msgstr "نتائج البحث عن <b>{query}</b> (صفحة {page}):"
+
+msgid "User"
+msgstr "المستخدم"
+
+msgid ""
+"This Telegram ID is not in the database. You can still grant a plan: a user record will be created. They will not get a message until they press Start."
+msgstr ""
+"معرّف تيليجرام هذا غير موجود في قاعدة البيانات. يمكنك منح الخطة رغم ذلك: سيُنشأ سجل للمستخدم. لن تصله رسالة حتى يضغط على ابدأ."
+
+msgid "Subscription: none"
+msgstr "الاشتراك: لا يوجد"
+
+#, python-brace-format
+msgid "Subscription: <b>{plan}</b> until <b>{expiry}</b>"
+msgstr "الاشتراك: <b>{plan}</b> حتى <b>{expiry}</b>"
+
+#, python-brace-format
+msgid "Subscription: <b>{plan}</b> expired <b>{expiry}</b>"
+msgstr "الاشتراك: انتهت صلاحية <b>{plan}</b> في <b>{expiry}</b>"
+
+msgid "🎁 Grant a plan"
+msgstr "🎁 منح خطة"
+
+msgid "🛑 End subscription"
+msgstr "🛑 إنهاء الاشتراك"
+
+msgid "This step has expired. Open /admin and start again."
+msgstr "انتهت صلاحية هذه الخطوة. افتح /admin وابدأ من جديد."
+
+#, python-brace-format
+msgid "Choose a plan for <code>{user_id}</code>:"
+msgstr "اختر خطة للمستخدم <code>{user_id}</code>:"
+
+#, python-brace-format
+msgid "Choose how long <b>{plan}</b> lasts:"
+msgstr "اختر مدة خطة <b>{plan}</b>:"
+
+#, python-brace-format
+msgid ""
+"Send the number of days (1–{max_days}).\n"
+"\n"
+"Send /cancel to stop."
+msgstr ""
+"أرسل عدد الأيام (من 1 إلى {max_days}).\n"
+"\n"
+"أرسل /cancel للإيقاف."
+
+msgid "That is not a valid number of days."
+msgstr "عدد الأيام غير صالح."
+
+#, python-brace-format
+msgid ""
+"This user already has <b>{plan}</b> until <b>{expiry}</b>.\n"
+"\n"
+"Extend adds {days} days to that expiry and switches the plan to <b>{new_plan}</b>.\n"
+"Replace ends the current subscription and starts <b>{new_plan}</b> from today for {days} days."
+msgstr ""
+"لدى هذا المستخدم خطة <b>{plan}</b> حتى <b>{expiry}</b>.\n"
+"\n"
+"التمديد يضيف {days} يومًا إلى تاريخ الانتهاء وينقل الخطة إلى <b>{new_plan}</b>.\n"
+"الاستبدال ينهي الاشتراك الحالي ويبدأ خطة <b>{new_plan}</b> من اليوم لمدة {days} يومًا."
+
+msgid "➕ Extend current subscription"
+msgstr "➕ تمديد الاشتراك الحالي"
+
+msgid "🔁 Replace subscription"
+msgstr "🔁 استبدال الاشتراك"
+
+#, python-brace-format
+msgid ""
+"✅ <b>{plan}</b> for <code>{user_id}</code> is active until <b>{expiry}</b>."
+msgstr ""
+"✅ خطة <b>{plan}</b> للمستخدم <code>{user_id}</code> فعّالة حتى <b>{expiry}</b>."
+
+msgid ""
+"This Telegram ID was not in the database. A user record was created and the plan was saved."
+msgstr ""
+"لم يكن معرّف تيليجرام هذا في قاعدة البيانات. أُنشئ سجل للمستخدم وحُفظت الخطة."
+
+msgid ""
+"The plan is saved, but the bot could not message the user. They have not started the bot, or they blocked it."
+msgstr ""
+"حُفظت الخطة، لكن البوت لم يستطع مراسلة المستخدم. إما أنه لم يبدأ البوت، أو أنه حظره."
+
+msgid "🎁 Grant another"
+msgstr "🎁 منح خطة أخرى"
+
+msgid "This user has no subscription to end."
+msgstr "لا يوجد اشتراك لهذا المستخدم لإنهائه."
+
+#, python-brace-format
+msgid ""
+"End <b>{plan}</b> for <code>{user_id}</code>?\n"
+"It is currently valid until <b>{expiry}</b>."
+msgstr ""
+"إنهاء خطة <b>{plan}</b> للمستخدم <code>{user_id}</code>؟\n"
+"الاشتراك ساري حتى <b>{expiry}</b>."
+
+msgid "The subscription was ended."
+msgstr "تم إنهاء الاشتراك."
+
+msgid ""
+"The user could not be notified. They have not started the bot, or they blocked it."
+msgstr "تعذر إشعار المستخدم. إما أنه لم يبدأ البوت، أو أنه حظره."
+
+msgid "➕ Generate links"
+msgstr "➕ إنشاء روابط"
+
+msgid "🟢 Unused"
+msgstr "🟢 غير مستخدمة"
+
+msgid "🔵 Used"
+msgstr "🔵 مستخدمة"
+
+msgid "⌛ Expired"
+msgstr "⌛ منتهية"
+
+msgid "🚫 Revoked"
+msgstr "🚫 ملغاة"
+
+msgid ""
+"<b>Activation links</b>\n"
+"\n"
+"Each link works once. Opening it activates the plan for that user."
+msgstr ""
+"<b>روابط التفعيل</b>\n"
+"\n"
+"كل رابط يُستخدم مرة واحدة. فتحه يفعّل الخطة لذلك المستخدم."
+
+msgid "Choose a plan for the activation links:"
+msgstr "اختر خطة روابط التفعيل:"
+
+msgid "How many links? (1–50)"
+msgstr "كم عدد الروابط؟ (من 1 إلى 50)"
+
+msgid "✏️ Custom count"
+msgstr "✏️ عدد مخصص"
+
+msgid "Send how many links to create (1–50)."
+msgstr "أرسل عدد الروابط المطلوب إنشاؤها (من 1 إلى 50)."
+
+msgid "Send a number from 1 to 50."
+msgstr "أرسل رقمًا من 1 إلى 50."
+
+msgid "When should unused links expire?"
+msgstr "متى تنتهي صلاحية الروابط غير المستخدمة؟"
+
+msgid "No expiry"
+msgstr "بدون تاريخ انتهاء"
+
+msgid "1 day"
+msgstr "يوم واحد"
+
+msgid "📅 Custom date"
+msgstr "📅 تاريخ مخصص"
+
+msgid "Send a date as YYYY-MM-DD, or a number of days until the link expires."
+msgstr "أرسل تاريخًا بصيغة YYYY-MM-DD، أو عدد الأيام حتى انتهاء الرابط."
+
+msgid "That expiry is not valid."
+msgstr "تاريخ الانتهاء غير صالح."
+
+msgid ""
+"That expiry is not valid. Use YYYY-MM-DD or a number of days in the future."
+msgstr "تاريخ الانتهاء غير صالح. استخدم YYYY-MM-DD أو عدد أيام في المستقبل."
+
+#, python-brace-format
+msgid "Created {count} activation links for <b>{plan}</b> ({days} days)."
+msgstr "تم إنشاء {count} رابط تفعيل لخطة <b>{plan}</b> ({days} يومًا)."
+
+#, python-brace-format
+msgid "Unused links expire at <b>{expiry}</b>."
+msgstr "تنتهي الروابط غير المستخدمة في <b>{expiry}</b>."
+
+msgid ""
+"The bot has no public username, so deep links could not be built. Codes:"
+msgstr "ليس للبوت اسم مستخدم عام، لذلك تعذر بناء الروابط. الرموز:"
+
+msgid "Unused"
+msgstr "غير مستخدم"
+
+msgid "Used"
+msgstr "مستخدم"
+
+msgid "Expired"
+msgstr "منتهٍ"
+
+msgid "Revoked"
+msgstr "ملغى"
+
+#, python-brace-format
+msgid "{status} activation codes (page {page})"
+msgstr "رموز التفعيل: {status} (صفحة {page})"
+
+msgid "No activation codes in this list."
+msgstr "لا توجد رموز تفعيل في هذه القائمة."
+
+msgid "This activation code is not valid."
+msgstr "رمز التفعيل غير صالح."
+
+#, python-brace-format
+msgid ""
+"<b>Activation code</b>\n"
+"<code>{code}</code>\n"
+"<b>Link:</b> <code>{link}</code>\n"
+"<b>Plan:</b> {plan}\n"
+"<b>Days:</b> {days}\n"
+"<b>Status:</b> {status}\n"
+"<b>Created by:</b> <code>{admin_id}</code>\n"
+"<b>Created:</b> {created}\n"
+"<b>Expires:</b> {expires}\n"
+"<b>Redeemed by:</b> {who}\n"
+"<b>Redeemed:</b> {when}"
+msgstr ""
+"<b>رمز التفعيل</b>\n"
+"<code>{code}</code>\n"
+"<b>الرابط:</b> <code>{link}</code>\n"
+"<b>الخطة:</b> {plan}\n"
+"<b>الأيام:</b> {days}\n"
+"<b>الحالة:</b> {status}\n"
+"<b>أنشأه:</b> <code>{admin_id}</code>\n"
+"<b>تاريخ الإنشاء:</b> {created}\n"
+"<b>ينتهي:</b> {expires}\n"
+"<b>استخدمه:</b> {who}\n"
+"<b>وقت الاستخدام:</b> {when}"
+
+msgid "🚫 Revoke code"
+msgstr "🚫 إلغاء الرمز"
+
+msgid "Revoke this unused code? It will stop working immediately."
+msgstr "إلغاء هذا الرمز غير المستخدم؟ سيتوقف عن العمل فورًا."
+
+msgid "The activation code was revoked."
+msgstr "تم إلغاء رمز التفعيل."
+
+msgid "This code can no longer be revoked."
+msgstr "لم يعد بالإمكان إلغاء هذا الرمز."
+
+msgid "🎁 Grant a Plan"
+msgstr "🎁 منح خطة"
+
+msgid "🔗 Activation Links"
+msgstr "🔗 روابط التفعيل"
+
+msgid "🛑 End Subscription"
+msgstr "🛑 إنهاء الاشتراك"
+
+msgid ""
+"\n"
+"<b>/admin</b> - Grant a plan, end a subscription, or create one-time activation links."
+msgstr ""
+"\n"
+"<b>/admin</b> - منح خطة، أو إنهاء اشتراك، أو إنشاء روابط تفعيل تُستخدم مرة واحدة."
+
+#, python-brace-format
+msgid ""
+"✅ An admin activated the <b>{plan}</b> plan for you.\n"
+"It is valid until <b>{expiry}</b>."
+msgstr ""
+"✅ فعّل المشرف لك خطة <b>{plan}</b>.\n"
+"وهي سارية حتى <b>{expiry}</b>."
+
+#, python-brace-format
+msgid "✅ The <b>{plan}</b> plan is active until <b>{expiry}</b>."
+msgstr "✅ خطة <b>{plan}</b> فعّالة حتى <b>{expiry}</b>."
+
+msgid "This activation code has already been used."
+msgstr "هذا الرمز استُخدم من قبل ولا يمكن استخدامه مرة أخرى."
+
+msgid "This activation code has expired."
+msgstr "انتهت صلاحية رمز التفعيل."
+
+msgid "This activation code has been revoked."
+msgstr "تم إلغاء رمز التفعيل."
+
+msgid "Could not activate this code. Please try again later."
+msgstr "تعذر تفعيل هذا الرمز. حاول مرة أخرى لاحقًا."
+
+msgid "Your subscription was ended by an admin."
+msgstr "أنهى المشرف اشتراكك."
