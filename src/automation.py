@@ -21,6 +21,7 @@ from src.database import (
     apply_error_backoff,
 )
 from src.runtime import build_user_client
+from src.runtime.flood import FloodDeferred
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +56,13 @@ async def run_group_creation_cycle(context: ContextTypes.DEFAULT_TYPE):
 MAX_PROXY_RETRIES = 3
 
 
-async def _create_group_on_client(user_client: Client, account_details: dict) -> None:
+async def _call_limited(limiter, factory):
+    if limiter is None:
+        return await factory()
+    return await limiter.run(factory)
+
+
+async def _create_group_on_client(user_client: Client, account_details: dict, limiter=None) -> None:
     """Create one supergroup on an already-started client. Does not stop the client."""
     account_id = account_details['account_id']
     total_groups_created = get_account_stats(account_id)
@@ -63,17 +70,42 @@ async def _create_group_on_client(user_client: Client, account_details: dict) ->
     date_str = now.strftime("%Y-%m")
     new_group_name = f"Group {total_groups_created + 1} {date_str}"
 
-    new_group = await asyncio.wait_for(
-        user_client.create_supergroup(title=new_group_name, description=""),
-        timeout=30.0
-    )
+    async def _create():
+        return await asyncio.wait_for(
+            user_client.create_supergroup(title=new_group_name, description=""),
+            timeout=30.0
+        )
+
+    new_group = await _call_limited(limiter, _create)
     log.info(f"Account {account_id} created supergroup '{new_group_name}' (ID: {new_group.id}).")
 
     log_group_creation(account_id, new_group.id, new_group_name)
     update_account_schedule(account_id, account_details['daily_group_limit'])
 
-    await user_client.send_message(new_group.id, f"Hello, group {new_group_name} is ready.")
+    async def _announce():
+        await user_client.send_message(new_group.id, f"Hello, group {new_group_name} is ready.")
+
+    await _call_limited(limiter, _announce)
     log.info(f"Successfully processed group creation for account {account_id}.")
+
+
+async def create_group_using_client(user_client: Client, account_details: dict, limiter=None) -> None:
+    """Create one group on a connected client and keep the existing backoff rules."""
+    account_id = account_details['account_id']
+    try:
+        await _create_group_on_client(user_client, account_details, limiter=limiter)
+    except FloodDeferred as e:
+        log.warning(f"Account {account_id} is flood-waited for {e.seconds} seconds. Applying backoff.")
+        apply_error_backoff(account_id, str(e), e.seconds)
+    except FloodWait as e:
+        log.warning(f"Account {account_id} is flood-waited for {e.value} seconds. Applying backoff.")
+        apply_error_backoff(account_id, str(e), e.value)
+    except (asyncio.TimeoutError, Timeout, ConnectionError) as e:
+        log.warning(f"Timeout/connection error using monitor client for account {account_id}: {e}")
+        apply_error_backoff(account_id, f"Group creation failed on monitor client: {e}")
+    except Exception as e:
+        log.error(f"Group creation failed on monitor client for account {account_id}: {e}", exc_info=True)
+        apply_error_backoff(account_id, str(e))
 
 
 async def process_single_account(account_details: dict):
@@ -87,21 +119,8 @@ async def process_single_account(account_details: dict):
 
     monitor_client = get_running_monitor_client(account_id)
     if monitor_client is not None:
-        try:
-            await _create_group_on_client(monitor_client, account_details)
-            return
-        except FloodWait as e:
-            log.warning(f"Account {account_id} is flood-waited for {e.value} seconds. Applying backoff.")
-            apply_error_backoff(account_id, str(e), e.value)
-            return
-        except (asyncio.TimeoutError, Timeout, ConnectionError) as e:
-            log.warning(f"Timeout/connection error using monitor client for account {account_id}: {e}")
-            apply_error_backoff(account_id, f"Group creation failed on monitor client: {e}")
-            return
-        except Exception as e:
-            log.error(f"Group creation failed on monitor client for account {account_id}: {e}", exc_info=True)
-            apply_error_backoff(account_id, str(e))
-            return
+        await create_group_using_client(monitor_client, account_details)
+        return
 
     for attempt in range(MAX_PROXY_RETRIES):
         user_client = None
