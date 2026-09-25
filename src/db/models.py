@@ -147,6 +147,66 @@ class AccountManager(Base):
     created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
 
 
+class PlanPlugin(Base):
+    """Plugins a subscription plan is allowed to run."""
+
+    __tablename__ = "plan_plugins"
+
+    plan_id: Mapped[int] = mapped_column(
+        ForeignKey("plans.id", ondelete="CASCADE"), primary_key=True
+    )
+    plugin_name: Mapped[str] = mapped_column(String(64), primary_key=True)
+
+
+class AccountPlugin(Base):
+    """Per-account override. Missing rows use the plugin's default."""
+
+    __tablename__ = "account_plugins"
+
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("managed_accounts.id", ondelete="CASCADE"), primary_key=True
+    )
+    plugin_name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+
+
+class PluginSetting(Base):
+    """JSON values scoped to one account and plugin."""
+
+    __tablename__ = "plugin_settings"
+
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("managed_accounts.id", ondelete="CASCADE"), primary_key=True
+    )
+    plugin_name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    setting_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    setting_value: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class RuntimeSignal(Base):
+    """Wake-up row for the account worker. State is read from the account tables."""
+
+    __tablename__ = "runtime_signals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_id: Mapped[int | None] = mapped_column(Integer)
+    event: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+
+
+class SessionLease(Base):
+    """Pauses the worker client so the control bot can open the same session."""
+
+    __tablename__ = "session_leases"
+
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("managed_accounts.id", ondelete="CASCADE"), primary_key=True
+    )
+    holder: Mapped[str] = mapped_column(Text, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    acked: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+
+
 class SharingToken(Base):
     __tablename__ = "sharing_tokens"
     __table_args__ = (

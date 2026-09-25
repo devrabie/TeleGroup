@@ -175,6 +175,11 @@ def test_alembic_upgrade_and_downgrade(tmp_path, monkeypatch):
         "device_profiles",
         "account_managers",
         "sharing_tokens",
+        "plan_plugins",
+        "account_plugins",
+        "plugin_settings",
+        "runtime_signals",
+        "session_leases",
     ):
         assert name in tables
 

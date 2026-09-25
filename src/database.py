@@ -156,6 +156,19 @@ def _run(coro: Any) -> Any:
     return run_db(coro)
 
 
+async def _touch_runtime(session: Any, account_id: int | None, event: str) -> None:
+    """Queue a worker wake-up in the current transaction."""
+    from src.runtime.signals import enqueue_signal
+
+    await enqueue_signal(session, account_id, event)
+
+
+def _kick_runtime() -> None:
+    from src.runtime.signals import kick_runtime
+
+    kick_runtime()
+
+
 def get_db_connection() -> sqlite3.Connection:
     """SQLite connection for tests and diagnostics. PostgreSQL has no equivalent."""
     from src.db import engine as engine_mod
@@ -470,17 +483,19 @@ def add_plan(
     async def _go() -> bool:
         async with session_scope() as session:
             try:
-                session.add(
-                    Plan(
-                        name=name,
-                        price_stars=price_stars,
-                        price_usd=price_usd,
-                        duration_days=duration_days,
-                        max_accounts=max_accounts,
-                        daily_group_limit=daily_group_limit,
-                    )
+                plan = Plan(
+                    name=name,
+                    price_stars=price_stars,
+                    price_usd=price_usd,
+                    duration_days=duration_days,
+                    max_accounts=max_accounts,
+                    daily_group_limit=daily_group_limit,
                 )
+                session.add(plan)
                 await session.flush()
+                from src.runtime.store import grant_default_plan_plugins
+
+                await grant_default_plan_plugins(session, int(plan.id))
                 return True
             except IntegrityError:
                 await session.rollback()
@@ -802,31 +817,35 @@ def add_managed_account(
                 existing.session_status = SESSION_STATUS_OK
                 existing.backoff_level = 0
                 existing.next_creation_time = None
+                await _touch_runtime(session, existing.id, "reload")
                 return True
-            session.add(
-                ManagedAccount(
-                    user_id=internal_user_id,
-                    phone=phone,
-                    session_string=encrypted,
-                    proxy_id=proxy_id,
-                    device_profile_id=device_profile_id,
-                    is_active=False,
-                    is_running=False,
-                    code_monitor_enabled=False,
-                    session_status=SESSION_STATUS_OK,
-                )
+            account = ManagedAccount(
+                user_id=internal_user_id,
+                phone=phone,
+                session_string=encrypted,
+                proxy_id=proxy_id,
+                device_profile_id=device_profile_id,
+                is_active=False,
+                is_running=False,
+                code_monitor_enabled=False,
+                session_status=SESSION_STATUS_OK,
             )
+            session.add(account)
             await session.flush()
+            await _touch_runtime(session, account.id, "reload")
             return True
 
     try:
-        return _run(_go())
+        created = _run(_go())
     except IntegrityError:
         log.warning("Attempted to add a duplicate, active account with phone number %s.", phone)
         return False
     except Exception:
         log.exception("Failed to add or reactivate managed account %s for user %s", phone, user_id)
         return False
+    if created:
+        _kick_runtime()
+    return bool(created)
 
 
 def delete_managed_account(account_id: int, telegram_user_id: int) -> bool:
@@ -837,15 +856,21 @@ def delete_managed_account(account_id: int, telegram_user_id: int) -> bool:
             result = await session.execute(
                 update(ManagedAccount)
                 .where(ManagedAccount.id == account_id, ManagedAccount.deleted_at.is_(None))
-                .values(deleted_at=_utcnow(), is_active=False)
+                .values(deleted_at=_utcnow(), is_active=False, is_running=False)
             )
-            return _rowcount(result) > 0
+            deleted = _rowcount(result) > 0
+            if deleted:
+                await _touch_runtime(session, account_id, "stop")
+            return deleted
 
     try:
-        return _run(_go())
+        deleted = _run(_go())
     except Exception:
         log.exception("Failed to soft-delete account %s", account_id)
         return False
+    if deleted:
+        _kick_runtime()
+    return bool(deleted)
 
 
 def toggle_code_monitor(account_id: int, telegram_user_id: int) -> bool | None:
@@ -866,13 +891,18 @@ def toggle_code_monitor(account_id: int, telegram_user_id: int) -> bool | None:
             if account is None:
                 return None
             account.code_monitor_enabled = not bool(account.code_monitor_enabled)
-            return bool(account.code_monitor_enabled)
+            enabled = bool(account.code_monitor_enabled)
+            await _touch_runtime(session, account_id, "reload")
+            return enabled
 
     try:
-        return _run(_go())
+        enabled = _run(_go())
     except Exception:
         log.exception("Failed to toggle code monitor for account %s", account_id)
         return None
+    if enabled is not None:
+        _kick_runtime()
+    return enabled
 
 
 def toggle_account_status(account_id: int, telegram_user_id: int) -> bool | None:
@@ -898,13 +928,17 @@ def toggle_account_status(account_id: int, telegram_user_id: int) -> bool | None
                 account.next_creation_time = None
                 account.backoff_level = 0
                 account.last_error = None
+            await _touch_runtime(session, account_id, "reload")
             return new_status
 
     try:
-        return _run(_go())
+        new_status = _run(_go())
     except Exception:
         log.exception("Failed to toggle status for account %s", account_id)
         return None
+    if new_status is not None:
+        _kick_runtime()
+    return new_status
 
 
 def reassign_proxy(account_id: int, telegram_user_id: int) -> tuple[bool, str]:
@@ -925,13 +959,17 @@ def reassign_proxy(account_id: int, telegram_user_id: int) -> tuple[bool, str]:
             if new_proxy_id is None:
                 return False, "no_available_proxies"
             account.proxy_id = new_proxy_id
+            await _touch_runtime(session, account_id, "reload")
             return True, "proxy_update_success"
 
     try:
-        return _run(_go())
+        updated = _run(_go())
     except Exception:
         log.exception("Failed to reassign proxy for account %s", account_id)
         return False, "db_error"
+    if updated[0]:
+        _kick_runtime()
+    return updated
 
 
 def get_account_session_string(account_id: int) -> str | None:
@@ -1675,13 +1713,19 @@ def apply_error_backoff(
 def mark_session_status(account_id: int, status: str, error_message: str | None = None) -> bool:
     async def _go() -> bool:
         async with session_scope() as session:
-            return await _mark_session_status(session, account_id, status, error_message)
+            updated = await _mark_session_status(session, account_id, status, error_message)
+            if updated and status == SESSION_STATUS_INVALID:
+                await _touch_runtime(session, account_id, "stop")
+            return updated
 
     try:
-        return _run(_go())
+        updated = _run(_go())
     except Exception:
         log.exception("Failed to set session_status=%s for account %s", status, account_id)
         return False
+    if updated and status == SESSION_STATUS_INVALID:
+        _kick_runtime()
+    return updated
 
 
 def mark_session_invalid(account_id: int, error_message: str | None = None) -> bool:
@@ -1806,6 +1850,7 @@ def get_account_details(account_id: int) -> dict[str, Any] | None:
                 "backoff_level": full["backoff_level"],
                 "last_error": full["last_error"],
                 "session_status": full["session_status"],
+                "is_running": full["is_running"],
                 "last_creation_time": _normalize_value(
                     "last_creation_time", last_creation, decrypt=False
                 ),
@@ -1863,14 +1908,18 @@ def transfer_managed_account(
                 .values(user_id=details["user"]["id"])
             )
             if _rowcount(result) > 0:
+                await _touch_runtime(session, account_id, "reload")
                 return True, "ok", recipient
             return False, "account_not_found", recipient
 
     try:
-        return _run(_go())
+        transferred = _run(_go())
     except Exception:
         log.exception("Failed to transfer account %s", account_id)
         return False, "db_error", None
+    if transferred[0]:
+        _kick_runtime()
+    return transferred
 
 
 def get_system_stats() -> dict[str, int] | None:
