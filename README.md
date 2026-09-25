@@ -14,10 +14,27 @@ Multi-account Telegram control bot. The interface uses `python-telegram-bot`. Ma
 - Team managers, invite links, and account transfer
 - Session explorer, proxy rotation with per-proxy SOCKS5 credentials
 - Scheduled supergroup creation, flood-wait backoff, and proxy health checks
+- Account runtime: one Kurigram client per subscribed account, plugin commands, and plan gating
 
-الخطط والاشتراك بنجوم تيليجرام وCrypto Pay، لوحة الإدارة، صفحات المعلومات، العربية والإنجليزية، إضافة الحساب مع ملفات الجهاز وإعادة محاولة تسجيل الدخول، مراقبة أكواد الدخول، التحقق بخطوتين، الحذف المنطقي، تصفح الملف والهدايا والمحادثات الخاصة، مديرو الفريق وروابط الدعوة ونقل الحساب، تدوير البروكسي، وإنشاء المجموعات المجدولة.
+الخطط والاشتراك بنجوم تيليجرام وCrypto Pay، لوحة الإدارة، صفحات المعلومات، العربية والإنجليزية، إضافة الحساب مع ملفات الجهاز وإعادة محاولة تسجيل الدخول، مراقبة أكواد الدخول، التحقق بخطوتين، الحذف المنطقي، تصفح الملف والهدايا والمحادثات الخاصة، مديرو الفريق وروابط الدعوة ونقل الحساب، تدوير البروكسي، وإنشاء المجموعات المجدولة، ومحرك الحسابات مع أوامر الإضافات.
 
-Phase 2 (not in this change) can add a per-account plugin runtime. Kurigram clients are constructed only in `src/runtime/client_factory.py`.
+Kurigram clients are constructed only in `src/runtime/client_factory.py`.
+
+## Account runtime / محرك الحسابات
+
+`RUNTIME_ROLE=all` (the default) runs the control bot and the account runtime in one process. Docker Compose runs them apart: the `bot` service uses `RUNTIME_ROLE=bot` and the `worker` service uses `RUNTIME_ROLE=worker`.
+
+The worker supervises the Kurigram clients for accounts on its shard (`account_id % WORKER_SHARD_COUNT == WORKER_SHARD_ID`). It reconnects with backoff, stops on a revoked session, and messages the owner. The bot wakes it with a `runtime_signals` row and Postgres `NOTIFY telegroup_runtime`. A poll covers missed notifications and SQLite.
+
+Userbot commands use `USERBOT_PREFIX` (default `.`) and only outgoing messages from the account itself. Sample commands: `.ping` / `.فحص`, `.id` / `.ايدي`, `.help` / `.الاوامر`. Group creation and login-code monitoring are background plugins on the same client. See [docs/plugins.md](docs/plugins.md) for how to add a plugin.
+
+Each account menu has a Plugins screen. Admins choose which plugins a plan allows from the plan editor. New plans allow every plugin registered at creation time. A migration grants the built-in plugins to plans that already exist.
+
+Accounts with an active subscription start when at least one allowed plugin is enabled. `ping`, `id`, and `help` are on by default. Group creation and the code monitor stay off until their existing buttons (or the Plugins screen) turn them on.
+
+`python -m src.main` with `RUNTIME_ROLE=all` is the single-process setup. `python -m src.worker` is the worker. Apply schema changes with `alembic upgrade head` before starting either process. The new tables are `plan_plugins`, `account_plugins`, `plugin_settings`, `runtime_signals`, and `session_leases`.
+
+Phase 3 will add the rest of the userbot command set. Sharding is configured per process; there is no automatic assignment of accounts to workers yet. Plugin setting values are stored, and the control bot does not yet render a generic settings form.
 
 ## Bug status on this branch / حالة الأخطاء
 

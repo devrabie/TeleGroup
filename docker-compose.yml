@@ -19,6 +19,21 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://telegroup:telegroup@db:5432/telegroup
+      RUNTIME_ROLE: bot
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - botdata:/app/data
+
+  worker:
+    build: .
+    command: ["python", "-m", "src.worker"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://telegroup:telegroup@db:5432/telegroup
+      RUNTIME_ROLE: worker
     depends_on:
       db:
         condition: service_healthy

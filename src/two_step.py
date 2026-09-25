@@ -176,22 +176,29 @@ async def _safe_stop(client: Optional[Client]) -> None:
 
 @asynccontextmanager
 async def open_account_client(account_id: int):
-    """Yield a connected Pyrogram client, reusing the code-monitor session when possible."""
+    """Yield a connected Pyrogram client, reusing the runtime session when possible."""
+    from src.runtime.lease import pause_remote_runtime, resume_remote_runtime
+
     async with _account_lock_for(account_id):
         running = get_running_monitor_client(account_id)
         if running is not None:
             yield running
             return
 
+        paused = await pause_remote_runtime(account_id)
         details = get_account_runtime_details(account_id)
         if not details:
+            await resume_remote_runtime(account_id, paused=paused)
             raise TwoStepError("account_unavailable")
 
-        client = await _start_temp_client(details)
         try:
-            yield client
+            client = await _start_temp_client(details)
+            try:
+                yield client
+            finally:
+                await _safe_stop(client)
         finally:
-            await _safe_stop(client)
+            await resume_remote_runtime(account_id, paused=paused)
 
 
 async def get_two_step_status(account_id: int) -> dict:

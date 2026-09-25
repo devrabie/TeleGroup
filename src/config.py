@@ -7,7 +7,7 @@ from functools import lru_cache
 from typing import Annotated
 
 from cryptography.fernet import Fernet
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 _REVOKED_WEBSHARE_TOKEN = "uaykgtjmscislovqzscyrzsooiglcnagpsovmqjy"
@@ -61,6 +61,18 @@ class Settings(BaseSettings):
     redis_url: str | None = None
     log_level: str = "INFO"
 
+    # bot: control bot only. worker: account runtime only. all: both in this process.
+    runtime_role: str = "all"
+    worker_shard_id: int = 0
+    worker_shard_count: int = 1
+    runtime_poll_seconds: float = 5
+    runtime_health_seconds: float = 60
+    runtime_backoff_initial_seconds: float = 2
+    runtime_backoff_max_seconds: float = 300
+    userbot_prefix: str = "."
+    flood_min_interval_seconds: float = 1
+    flood_retry_threshold_seconds: int = 30
+
     @field_validator("admin_ids", mode="before")
     @classmethod
     def split_admin_ids(cls, value: object) -> list[int]:
@@ -108,6 +120,51 @@ class Settings(BaseSettings):
         if name not in logging.getLevelNamesMapping():
             raise ValueError(f"Invalid LOG_LEVEL: {value}")
         return name
+
+    @field_validator("runtime_role")
+    @classmethod
+    def runtime_role_name(cls, value: str) -> str:
+        role = value.strip().lower()
+        if role not in {"bot", "worker", "all"}:
+            raise ValueError("RUNTIME_ROLE must be bot, worker, or all")
+        return role
+
+    @field_validator("userbot_prefix")
+    @classmethod
+    def prefix_has_no_spaces(cls, value: str) -> str:
+        if not value or any(character.isspace() for character in value):
+            raise ValueError("USERBOT_PREFIX must be a non-empty string without spaces")
+        return value
+
+    @field_validator(
+        "runtime_poll_seconds",
+        "runtime_health_seconds",
+        "runtime_backoff_initial_seconds",
+        "runtime_backoff_max_seconds",
+        "flood_min_interval_seconds",
+    )
+    @classmethod
+    def positive_duration(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("Runtime intervals must be greater than zero")
+        return value
+
+    @field_validator("flood_retry_threshold_seconds")
+    @classmethod
+    def non_negative_threshold(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("FLOOD_RETRY_THRESHOLD_SECONDS must be zero or greater")
+        return value
+
+    @model_validator(mode="after")
+    def shard_fits_count(self) -> Settings:
+        if self.worker_shard_count < 1:
+            raise ValueError("WORKER_SHARD_COUNT must be at least 1")
+        if not 0 <= self.worker_shard_id < self.worker_shard_count:
+            raise ValueError("WORKER_SHARD_ID must be >= 0 and < WORKER_SHARD_COUNT")
+        if self.runtime_backoff_initial_seconds > self.runtime_backoff_max_seconds:
+            raise ValueError("RUNTIME_BACKOFF_INITIAL_SECONDS cannot exceed the maximum")
+        return self
 
     @field_validator("redis_url", "payment_provider_token", "crypto_pay_api_token", mode="before")
     @classmethod

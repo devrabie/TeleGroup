@@ -9,6 +9,7 @@ from src.database import (
     add_plan, get_all_plans, get_all_users, get_user_details, grant_subscription,
     get_system_stats, get_plan_by_id, update_plan, get_info_page_content, update_info_page_content
 )
+from src.plugin_menu import show_plan_plugins, toggle_plan_plugin
 from src.translation import get_translation_func_for_user
 
 log = logging.getLogger(__name__)
@@ -269,6 +270,7 @@ async def edit_plan_menu_handler(update: Update, context: ContextTypes.DEFAULT_T
         [
             InlineKeyboardButton(_("Toggle Active/Inactive"), callback_data=f"edit_field_toggle_active"),
         ],
+        [InlineKeyboardButton(_("🧩 Plan Plugins"), callback_data=f"admin_planplugins_{plan['id']}")],
         [InlineKeyboardButton(_("🔙 Back to Plan List"), callback_data='admin_plan_edit_list')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -980,6 +982,11 @@ async def admin_callback_router(update: Update, context: ContextTypes.DEFAULT_TY
         await plans_list_handler(update, context)
     elif action == 'admin_plan_edit_list':
         await edit_plan_list_handler(update, context)
+    elif query.data.startswith('admin_planplugins_'):
+        await show_plan_plugins(update, context, int(query.data.split('_')[-1]))
+    elif query.data.startswith('admin_planplug_'):
+        _prefix, _kind, plan_id, plugin_name = query.data.split('_', 3)
+        await toggle_plan_plugin(update, context, int(plan_id), plugin_name)
     elif query.data.startswith('admin_plan_edit_'):
         await edit_plan_menu_handler(update, context)
     elif query.data == 'edit_field_toggle_active':

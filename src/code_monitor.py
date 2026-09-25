@@ -322,6 +322,29 @@ class CodeMonitorManager:
             log.error(f"Failed to start code monitor for account {account_id}: {last_error}")
             return False
 
+    def bind(self, client: Client, account_details: dict) -> list:
+        """Attach security-message handlers to a client owned by the runtime."""
+        account_id = account_details["account_id"]
+        handler = self._make_handler(account_details)
+        incoming_private = filters.incoming & filters.private
+        message_handler = MessageHandler(handler, incoming_private)
+        edited_handler = EditedMessageHandler(handler, incoming_private)
+        client.add_handler(message_handler)
+        client.add_handler(edited_handler)
+        self._meta[account_id] = {
+            "phone": account_details.get("phone"),
+            "telegram_id": account_details.get("telegram_id"),
+        }
+        return [message_handler, edited_handler]
+
+    def unbind(self, client: Client, handlers: list, account_id: int) -> None:
+        for handler in handlers:
+            try:
+                client.remove_handler(handler)
+            except Exception as exc:
+                log.debug("Could not remove code-monitor handler: %s", exc)
+        self._meta.pop(account_id, None)
+
     async def stop_account(self, account_id: int) -> None:
         async with self._start_lock_for(account_id):
             await self._stop_client_unlocked(account_id)
@@ -511,6 +534,15 @@ code_monitor_manager = CodeMonitorManager()
 
 
 def get_running_monitor_client(account_id: int) -> Optional[Client]:
+    """Prefer the runtime's client so interactive tools do not open a second session."""
+    try:
+        from src.runtime.supervisor import running_client
+
+        client = running_client(account_id)
+        if client is not None:
+            return client
+    except Exception as exc:
+        log.debug("Runtime client lookup failed for account %s: %s", account_id, exc)
     return code_monitor_manager.get_running_client(account_id)
 
 

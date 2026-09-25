@@ -111,6 +111,12 @@ def _schedule_jobs(application: Application) -> None:
     if job_queue is None:
         raise RuntimeError("Job queue is not available. Install python-telegram-bot[job-queue].")
     job_queue.run_repeating(update_proxies_from_url, interval=86400, first=10)
+    # Group creation and code monitoring run on the account runtime (embedded
+    # when RUNTIME_ROLE=all, or the worker service when RUNTIME_ROLE=bot).
+    role = config.get_settings().runtime_role
+    if role in {"all", "bot"}:
+        log.info("Account jobs are owned by the runtime (role=%s).", role)
+        return
     job_queue.run_repeating(run_group_creation_cycle, interval=300, first=20)
     job_queue.run_repeating(run_code_monitor_sync, interval=60, first=25)
 
@@ -118,6 +124,12 @@ def _schedule_jobs(application: Application) -> None:
 async def _shutdown(application: Application, runner: web.AppRunner | None) -> None:
     """Stop monitors, the bot, the webhook server, and the database engine."""
     log.info("Shutting down bot...")
+    try:
+        from src.runtime.supervisor import stop_embedded_supervisor
+
+        await stop_embedded_supervisor()
+    except Exception:
+        log.exception("Failed to stop the account runtime")
     try:
         await code_monitor_manager.stop_all()
     except Exception:
@@ -161,6 +173,10 @@ async def main() -> None:
 
     # --- Initialize the application ---
     await application.initialize()
+    if config.get_settings().runtime_role == "all":
+        from src.runtime.supervisor import start_embedded_supervisor
+
+        await start_embedded_supervisor(application.bot)
     runner: web.AppRunner | None = None
     try:
         runner = await _serve(application)
