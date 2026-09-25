@@ -21,6 +21,7 @@ from telegram.ext import (
 
 from src import config
 from src.database import get_all_plans, get_plan_by_id
+from src.sharing import bot_username, format_person
 from src.subscription_grants import (
     CODE_PAGE_SIZE,
     ERR_CHOOSE_MODE,
@@ -52,7 +53,6 @@ from src.subscription_grants import (
 from src.subscription_grants import (
     activation_link as build_activation_link,
 )
-from src.sharing import bot_username, format_person
 from src.translation import get_translation_func_for_user
 
 log = logging.getLogger(__name__)
