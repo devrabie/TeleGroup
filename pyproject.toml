@@ -1,0 +1,110 @@
+[project]
+name = "telegroup"
+version = "1.0.0"
+description = "Multi-account Telegram userbot control bot"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "python-telegram-bot[job-queue]==22.3",
+    "Kurigram==2.2.7",
+    "TgCrypto==1.2.5",
+    "PySocks==1.7.1",
+    "SQLAlchemy[asyncio]>=2.0.36,<3",
+    "asyncpg>=0.30",
+    "aiosqlite>=0.20",
+    "alembic>=1.14",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.6",
+    "cryptography>=44",
+    "Babel==2.17.0",
+    "httpx>=0.28",
+    "python-dotenv>=1.1",
+    "redis>=5.0",
+    "aiohttp>=3.8",
+    "requests>=2.32",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.25",
+    "ruff>=0.9",
+    "mypy>=1.14",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests", "alembic"]
+
+[tool.ruff.format]
+exclude = [
+    "src/account_explorer.py",
+    "src/account_views.py",
+    "src/admin_handlers.py",
+    "src/automation.py",
+    "src/cache_store.py",
+    "src/code_monitor.py",
+    "src/cryptopay.py",
+    "src/device_profiles.py",
+    "src/proxy_manager.py",
+    "src/security_messages.py",
+    "src/sharing.py",
+    "src/translation.py",
+    "src/two_step.py",
+    "src/user_handlers.py",
+    "tests/test_account_features.py",
+    "tests/test_account_login_flow.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Modules that already existed on the base branch keep their current style.
+"src/account_explorer.py" = ["E402", "E501", "F401", "F811", "I", "UP"]
+"src/account_views.py" = ["E501", "F401", "I", "UP"]
+"src/admin_handlers.py" = ["E501", "F401", "F541", "F841", "I", "UP"]
+"src/automation.py" = ["E501", "I", "UP"]
+"src/cache_store.py" = ["UP"]
+"src/code_monitor.py" = ["E501", "I", "UP"]
+"src/cryptopay.py" = ["E501", "I"]
+"src/device_profiles.py" = ["E501", "I"]
+"src/proxy_manager.py" = ["F541", "I", "UP"]
+"src/security_messages.py" = ["E501", "UP"]
+"src/sharing.py" = ["E501", "I", "UP"]
+"src/translation.py" = ["I", "UP"]
+"src/two_step.py" = ["E501", "I", "UP"]
+"src/user_handlers.py" = ["E402", "E501", "F401", "I", "UP"]
+"tests/test_account_features.py" = ["E402", "E501", "I", "UP"]
+"tests/test_account_login_flow.py" = ["E402", "E501", "F401", "I"]
+
+[tool.mypy]
+python_version = "3.12"
+packages = ["src"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = [
+    "src.account_explorer",
+    "src.account_views",
+    "src.admin_handlers",
+    "src.automation",
+    "src.cache_store",
+    "src.code_monitor",
+    "src.cryptopay",
+    "src.device_profiles",
+    "src.proxy_manager",
+    "src.security_messages",
+    "src.sharing",
+    "src.translation",
+    "src.two_step",
+    "src.user_handlers",
+]
+ignore_errors = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
