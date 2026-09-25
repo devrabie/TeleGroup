@@ -12,6 +12,10 @@ from src.runtime.plugins import AccountSession, Plugin
 log = logging.getLogger(__name__)
 
 CHECK_SECONDS = 2
+# Command handlers use group -1 (see ``supervisor.COMMAND_HANDLER_GROUP``).
+# Kurigram stops after the first match in a group, then continues with the
+# next group, so listeners stay here and still receive outgoing text.
+LISTENER_HANDLER_GROUP = 0
 
 
 async def watch(
@@ -27,7 +31,7 @@ async def watch(
             remove = getattr(session.client, "remove_handler", None)
             if enabled and handler is None and add is not None:
                 handler = _bind(session, callback)
-                add(handler)
+                add(handler, LISTENER_HANDLER_GROUP)
             elif not enabled and handler is not None and remove is not None:
                 _remove(remove, handler)
                 handler = None
@@ -51,11 +55,13 @@ def _bind(
         except Exception:
             log.exception("Listener failed for account %s", session.account_id)
 
+    # Kurigram only awaits coroutine-function callbacks. A sync function is
+    # run in a thread pool and a returned coroutine is discarded.
     return MessageHandler(_entry)
 
 
 def _remove(remove: Any, handler: Any) -> None:
     try:
-        remove(handler)
+        remove(handler, LISTENER_HANDLER_GROUP)
     except Exception:
         log.debug("Could not remove a plugin listener", exc_info=True)

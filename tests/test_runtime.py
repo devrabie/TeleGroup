@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
+import logging
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from src.plugins.groups import plugin as groups_plugin
+from src.plugins.listeners import LISTENER_HANDLER_GROUP, watch
 from src.plugins.ping import plugin as ping_plugin
 from src.runtime.connect import SessionInvalid
 from src.runtime.flood import AccountLimiter, ActionQueueFull, FloodDeferred
 from src.runtime.notifier import RecordingNotifier
 from src.runtime.plugins import (
+    AccountSession,
     BotCommand,
     CommandContext,
     Dispatcher,
@@ -25,9 +29,10 @@ from src.runtime.store import (
     account_is_running,
     ack_session_leases,
     lease_is_acked,
+    set_plan_plugin_allowed,
     set_plugin_setting,
 )
-from src.runtime.supervisor import Supervisor
+from src.runtime.supervisor import COMMAND_HANDLER_GROUP, Supervisor
 
 
 class Owner:
@@ -50,10 +55,10 @@ class FakeClient:
         self.is_connected = False
         self.stopped = True
 
-    def add_handler(self, handler: object) -> None:
+    def add_handler(self, handler: object, group: int = 0) -> None:
         self.handlers.append(handler)
 
-    def remove_handler(self, handler: object) -> None:
+    def remove_handler(self, handler: object, group: int = 0) -> None:
         if handler in self.handlers:
             self.handlers.remove(handler)
 
@@ -515,3 +520,249 @@ async def test_remote_lease_waits_until_the_worker_acks(tmp_path, monkeypatch):
     assert lease_is_acked(account_id)
     await resume_remote_runtime(account_id, paused=True)
     assert lease_is_acked(account_id) is False
+
+
+def _account_text(
+    text: str,
+    *,
+    outgoing: bool,
+    is_self: bool,
+    chat_id: int = 99,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        outgoing=outgoing,
+        text=text,
+        date=datetime.now(UTC),
+        id=7,
+        chat=SimpleNamespace(id=chat_id),
+        from_user=SimpleNamespace(id=5 if is_self else 8, is_self=is_self),
+    )
+
+
+async def test_dispatcher_logs_ignore_reasons_without_message_text(tmp_path, monkeypatch):
+    import src.database as database
+
+    _use_db(database, tmp_path, monkeypatch)
+    account_id, _plan_id = _prepare(database)
+    limiter = AccountLimiter(account_id, min_interval=0, retry_threshold=0)
+    sender = Sender()
+    dispatcher = Dispatcher()
+    secret = "hunter2-secret"
+    plugin_log = logging.getLogger("src.runtime.plugins")
+    # Alembic's fileConfig disables loggers that already exist. Re-enable this
+    # one for the test and put it back afterwards.
+    was_disabled = plugin_log.disabled
+    previous_level = plugin_log.level
+    plugin_log.disabled = False
+    plugin_log.setLevel(logging.DEBUG)
+    records: list[logging.LogRecord] = []
+
+    class _Capture(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            records.append(record)
+
+    handler = _Capture()
+    plugin_log.addHandler(handler)
+    try:
+        assert (
+            await dispatcher.handle_message(
+                account_id=account_id,
+                client=sender,
+                message=_account_text(".ping", outgoing=False, is_self=False),
+                limiter=limiter,
+            )
+            is False
+        )
+        assert (
+            await dispatcher.handle_message(
+                account_id=account_id,
+                client=sender,
+                message=_account_text(f"hello {secret}", outgoing=True, is_self=True),
+                limiter=limiter,
+            )
+            is False
+        )
+        assert (
+            await dispatcher.handle_message(
+                account_id=account_id,
+                client=sender,
+                message=_account_text(f".nope {secret}", outgoing=True, is_self=True),
+                limiter=limiter,
+            )
+            is False
+        )
+        from src.runtime.gating import set_account_plugin
+
+        assert set_account_plugin(account_id, 111, "ping") == "disabled"
+        assert (
+            await dispatcher.handle_message(
+                account_id=account_id,
+                client=sender,
+                message=_account_text(".ping", outgoing=True, is_self=True),
+                limiter=limiter,
+            )
+            is False
+        )
+        assert set_account_plugin(account_id, 111, "ping") == "enabled"
+        assert await dispatcher.handle_message(
+            account_id=account_id,
+            client=sender,
+            message=_account_text(".فحص", outgoing=False, is_self=True, chat_id=5),
+            limiter=limiter,
+            language="ar",
+        )
+        messages = [record.getMessage() for record in records]
+        assert any("not from this account" in message for message in messages)
+        assert any("not a command" in message for message in messages)
+        assert any("unknown command" in message for message in messages)
+        assert any("plugin ping disabled" in message for message in messages)
+        assert any("dispatched command فحص to plugin ping" in message for message in messages)
+        assert sender.sent[-1].endswith("مللي ثانية")
+        assert secret not in "\n".join(messages)
+    finally:
+        plugin_log.removeHandler(handler)
+        plugin_log.setLevel(previous_level)
+        plugin_log.disabled = was_disabled
+
+
+class _RawUpdate:
+    def __init__(self, message: object) -> None:
+        self.message = message
+
+
+class _BridgeClient:
+    """Kurigram handler registration on a real client, without a Telegram session."""
+
+    def __init__(self, inner: object) -> None:
+        self.inner = inner
+        self.is_connected = False
+        self.is_initialized = False
+        self.me = SimpleNamespace(id=5)
+        self.sent: list[str] = []
+
+    def add_handler(self, handler: object, group: int = 0) -> object:
+        return self.inner.add_handler(handler, group)
+
+    def remove_handler(self, handler: object, group: int = 0) -> None:
+        self.inner.remove_handler(handler, group)
+
+    async def get_me(self) -> SimpleNamespace:
+        return self.me
+
+    async def send_message(self, chat_id: object, text: str, **kwargs: object) -> str:
+        self.sent.append(text)
+        return text
+
+    async def stop(self) -> None:
+        self.is_connected = False
+
+
+async def test_kurigram_awaits_saved_message_commands_and_other_groups(tmp_path, monkeypatch):
+    import src.database as database
+    from pyrogram import Client
+    from pyrogram.handlers import MessageHandler
+
+    _use_db(database, tmp_path, monkeypatch)
+    account_id, plan_id = _prepare(database, "+15550001077")
+    assert set_plan_plugin_allowed(plan_id, "probe", True)
+    heard: list[str] = []
+
+    class Probe(Plugin):
+        meta = PluginMeta(
+            name="probe",
+            description_en="Records messages for tests.",
+            description_ar="يسجل الرسائل للاختبار.",
+            default_enabled=True,
+        )
+
+        def spawn(self, session: AccountSession):
+            async def record(_session: AccountSession, message: object) -> None:
+                heard.append(str(getattr(message, "text", "")))
+
+            return watch(session, self, record)
+
+    inner = Client(
+        "command-dispatch-test",
+        api_id=1,
+        api_hash="hash",
+        in_memory=True,
+        workers=1,
+        skip_updates=True,
+        loop=asyncio.get_running_loop(),
+    )
+    bridge = _BridgeClient(inner)
+    supervisor: Supervisor | None = None
+
+    async def _parse(update: _RawUpdate, _users: object, _chats: object):
+        return update.message, MessageHandler
+
+    inner.dispatcher.update_parsers[_RawUpdate] = _parse
+
+    async def deliver(message: object) -> None:
+        before = len(heard)
+        inner.dispatcher.updates_queue.put_nowait((_RawUpdate(message), {}, {}))
+        await _wait_for(lambda: len(heard) > before, timeout=5)
+
+    try:
+        await inner.dispatcher.start()
+        bridge.is_connected = True
+
+        async def connect(_details: dict) -> _BridgeClient:
+            return bridge
+
+        supervisor = Supervisor(
+            notifier=RecordingNotifier(),
+            connector=connect,
+            poll_seconds=30,
+            health_interval=30,
+            listen=False,
+            plugins=[ping_plugin, Probe()],
+        )
+        await supervisor.start()
+        await _wait_for(
+            lambda: (
+                bool(inner.dispatcher.groups.get(COMMAND_HANDLER_GROUP))
+                and bool(inner.dispatcher.groups.get(LISTENER_HANDLER_GROUP))
+            ),
+            timeout=5,
+        )
+
+        command_handlers = list(inner.dispatcher.groups[COMMAND_HANDLER_GROUP])
+        listener_handlers = list(inner.dispatcher.groups[LISTENER_HANDLER_GROUP])
+        assert COMMAND_HANDLER_GROUP != LISTENER_HANDLER_GROUP
+        assert len(command_handlers) == 1
+        assert inspect.iscoroutinefunction(command_handlers[0].callback)
+        assert all(inspect.iscoroutinefunction(handler.callback) for handler in listener_handlers)
+        assert command_handlers[0] not in listener_handlers
+
+        saved = _account_text(".فحص", outgoing=False, is_self=True, chat_id=5)
+        stranger = _account_text(".ping", outgoing=False, is_self=False)
+        assert await command_handlers[0].check(inner, saved)
+        assert not await command_handlers[0].check(inner, stranger)
+
+        await deliver(saved)
+        assert bridge.sent
+        assert bridge.sent[-1].endswith("ms")
+        assert heard[-1] == ".فحص"
+
+        replies = len(bridge.sent)
+        await deliver(stranger)
+        assert len(bridge.sent) == replies
+        assert heard[-1] == ".ping"
+
+        await deliver(_account_text(".ping", outgoing=True, is_self=True))
+        assert len(bridge.sent) == replies + 1
+        assert heard[-1] == ".ping"
+
+        await supervisor.stop()
+        supervisor = None
+        await _wait_for(
+            lambda: not inner.dispatcher.groups.get(COMMAND_HANDLER_GROUP),
+            timeout=5,
+        )
+    finally:
+        if supervisor is not None:
+            await supervisor.stop()
+        if inner.dispatcher.handler_worker_tasks:
+            await inner.dispatcher.stop()
+        inner.executor.shutdown(wait=False, cancel_futures=True)
