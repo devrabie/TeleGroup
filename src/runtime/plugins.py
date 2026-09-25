@@ -37,12 +37,36 @@ class BotCommand:
 
 
 @dataclass(frozen=True)
+class SettingField:
+    """One value the control bot can edit for this plugin.
+
+    ``kind`` is ``bool``, ``int``, or ``str``. Integers are clamped to
+    ``minimum`` and ``maximum`` when those are set. Secrets (passwords) are
+    never settings.
+    """
+
+    key: str
+    label_en: str
+    label_ar: str
+    kind: str
+    default: Any = None
+    minimum: int | None = None
+    maximum: int | None = None
+
+    def label(self, language: str) -> str:
+        if language == "ar":
+            return self.label_ar
+        return self.label_en
+
+
+@dataclass(frozen=True)
 class PluginMeta:
     name: str
     description_en: str
     description_ar: str
     commands: tuple[BotCommand, ...] = ()
     default_enabled: bool = True
+    settings: tuple[SettingField, ...] = ()
 
     def description(self, language: str) -> str:
         if language == "ar":
@@ -188,13 +212,41 @@ def load_plugins() -> None:
     global _LOADED
     if _LOADED:
         return
+    from src.plugins.admin import plugin as admin
+    from src.plugins.afk import plugin as afk
+    from src.plugins.autoreply import plugin as autoreply
+    from src.plugins.broadcast import plugin as broadcast
     from src.plugins.codewatch import plugin as codewatch
+    from src.plugins.createchat import plugin as createchat
+    from src.plugins.games import plugin as games
+    from src.plugins.gifts import plugin as gifts
     from src.plugins.groups import plugin as groups
     from src.plugins.help import plugin as help_plugin
     from src.plugins.identify import plugin as identify
+    from src.plugins.locks import plugin as locks
     from src.plugins.ping import plugin as ping
+    from src.plugins.pmpermit import plugin as pmpermit
+    from src.plugins.storage import plugin as storage
+    from src.plugins.tagall import plugin as tagall
 
-    for plugin in (groups, codewatch, ping, identify, help_plugin):
+    for plugin in (
+        groups,
+        codewatch,
+        ping,
+        identify,
+        help_plugin,
+        admin,
+        storage,
+        autoreply,
+        afk,
+        pmpermit,
+        locks,
+        tagall,
+        broadcast,
+        createchat,
+        gifts,
+        games,
+    ):
         register(plugin)
     _LOADED = True
 
@@ -224,6 +276,48 @@ def command_map(plugins: list[Plugin] | None = None) -> dict[str, tuple[Plugin, 
             found[command.name] = (plugin, command)
             found.setdefault(command.name.casefold(), (plugin, command))
     return found
+
+
+def _command_rows(
+    plugins: list[Plugin] | None = None,
+) -> list[tuple[Plugin, BotCommand]]:
+    source = all_plugins() if plugins is None else plugins
+    rows = [(plugin, command) for plugin in source for command in plugin.meta.commands]
+    rows.sort(key=lambda item: len(item[1].name), reverse=True)
+    return rows
+
+
+def _command_matches(body: str, name: str) -> str | None:
+    """Return the argument text when ``body`` starts with this command name."""
+    if name.isascii():
+        if body[: len(name)].casefold() != name.casefold():
+            return None
+        rest = body[len(name) :]
+    else:
+        if not body.startswith(name):
+            return None
+        rest = body[len(name) :]
+    if rest and not rest[0].isspace():
+        return None
+    return rest.strip()
+
+
+def resolve_command(
+    text: str,
+    prefix: str,
+    plugins: list[Plugin] | None = None,
+) -> tuple[Plugin, BotCommand, str] | None:
+    """Match the longest command name, including multi-word Arabic names."""
+    if not prefix or not text.startswith(prefix):
+        return None
+    body = text[len(prefix) :].strip()
+    if not body:
+        return None
+    for plugin, command in _command_rows(plugins):
+        args = _command_matches(body, command.name)
+        if args is not None:
+            return plugin, command, args
+    return None
 
 
 def _message_text(message: Any) -> str:
@@ -268,16 +362,11 @@ class Dispatcher:
     ) -> bool:
         if not is_self_outgoing(message):
             return False
-        parsed = parse_command(_message_text(message), command_prefix(account_id))
-        if parsed is None:
+        prefix = command_prefix(account_id)
+        matched = resolve_command(_message_text(message), prefix, self.plugins)
+        if matched is None:
             return False
-        name, args = parsed
-        match = command_map(self.plugins).get(name) or command_map(self.plugins).get(
-            name.casefold()
-        )
-        if match is None:
-            return False
-        plugin, _command = match
+        plugin, command, args = matched
         from src.runtime.gating import plugin_is_enabled
 
         if not plugin_is_enabled(account_id, plugin):
@@ -286,9 +375,9 @@ class Dispatcher:
             client=client,
             account_id=account_id,
             message=message,
-            command=name,
+            command=command.name,
             args=args,
-            prefix=command_prefix(account_id),
+            prefix=prefix,
             language=language,
             plugin_name=plugin.meta.name,
             limiter=limiter,
@@ -300,6 +389,6 @@ class Dispatcher:
                 "Plugin %s failed on account %s command %s",
                 plugin.meta.name,
                 account_id,
-                name,
+                command.name,
             )
         return True

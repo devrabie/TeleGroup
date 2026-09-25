@@ -1652,6 +1652,28 @@ msgstr "Blocked"
 msgid "Plugin access updated."
 msgstr "Plugin access updated."
 
+msgid "⚙️ Settings"
+msgstr "⚙️ Settings"
+
+msgid ""
+"<b>{name} settings</b>\n"
+"Booleans switch when tapped. Other fields ask for a new value."
+msgstr ""
+"<b>{name} settings</b>\n"
+"Booleans switch when tapped. Other fields ask for a new value."
+
+msgid "This plugin has no settings."
+msgstr "This plugin has no settings."
+
+msgid "Setting saved."
+msgstr "Setting saved."
+
+msgid "Send the new value for <b>{label}</b>. Send - to reset, or cancel to stop."
+msgstr "Send the new value for <b>{label}</b>. Send - to reset, or cancel to stop."
+
+msgid "That value is not valid."
+msgstr "That value is not valid."
+
 msgid "⚠️ The session for <code>{phone}</code> is invalid or revoked. The account was stopped. Delete it and add it again."
 msgstr "⚠️ The session for <code>{phone}</code> is invalid or revoked. The account was stopped. Delete it and add it again."
 

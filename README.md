@@ -15,6 +15,7 @@ Multi-account Telegram control bot. The interface uses `python-telegram-bot`. Ma
 - Session explorer, proxy rotation with per-proxy SOCKS5 credentials
 - Scheduled supergroup creation, flood-wait backoff, and proxy health checks
 - Account runtime: one Kurigram client per subscribed account, plugin commands, and plan gating
+- Userbot commands: group admin, logging, auto-reply, AFK, PM protection, locks, mentions, broadcast, chat creation, star gifts, and an opt-in game notice
 
 الخطط والاشتراك بنجوم تيليجرام وCrypto Pay، لوحة الإدارة، صفحات المعلومات، العربية والإنجليزية، إضافة الحساب مع ملفات الجهاز وإعادة محاولة تسجيل الدخول، مراقبة أكواد الدخول، التحقق بخطوتين، الحذف المنطقي، تصفح الملف والهدايا والمحادثات الخاصة، مديرو الفريق وروابط الدعوة ونقل الحساب، تدوير البروكسي، وإنشاء المجموعات المجدولة، ومحرك الحسابات مع أوامر الإضافات.
 
@@ -26,15 +27,19 @@ Kurigram clients are constructed only in `src/runtime/client_factory.py`.
 
 The worker supervises the Kurigram clients for accounts on its shard (`account_id % WORKER_SHARD_COUNT == WORKER_SHARD_ID`). It reconnects with backoff, stops on a revoked session, and messages the owner. The bot wakes it with a `runtime_signals` row and Postgres `NOTIFY telegroup_runtime`. A poll covers missed notifications and SQLite.
 
-Userbot commands use `USERBOT_PREFIX` (default `.`) and only outgoing messages from the account itself. Sample commands: `.ping` / `.فحص`, `.id` / `.ايدي`, `.help` / `.الاوامر`. Group creation and login-code monitoring are background plugins on the same client. See [docs/plugins.md](docs/plugins.md) for how to add a plugin.
+Userbot commands use `USERBOT_PREFIX` (default `.`) and only outgoing messages from the account itself. `.help` / `.الاوامر` lists what the current plan allows. Arabic names are the primary commands, with English aliases. The full list is in [docs/commands.md](docs/commands.md). See [docs/plugins.md](docs/plugins.md) for how to add a plugin.
 
 Each account menu has a Plugins screen. Admins choose which plugins a plan allows from the plan editor. New plans allow every plugin registered at creation time. A migration grants the built-in plugins to plans that already exist.
 
 Accounts with an active subscription start when at least one allowed plugin is enabled. `ping`, `id`, and `help` are on by default. Group creation and the code monitor stay off until their existing buttons (or the Plugins screen) turn them on.
 
-`python -m src.main` with `RUNTIME_ROLE=all` is the single-process setup. `python -m src.worker` is the worker. Apply schema changes with `alembic upgrade head` before starting either process. The new tables are `plan_plugins`, `account_plugins`, `plugin_settings`, `runtime_signals`, and `session_leases`.
+`python -m src.main` with `RUNTIME_ROLE=all` is the single-process setup. `python -m src.worker` is the worker. Apply schema changes with `alembic upgrade head` before starting either process.
 
-Phase 3 will add the rest of the userbot command set. Sharding is configured per process; there is no automatic assignment of accounts to workers yet. Plugin setting values are stored, and the control bot does not yet render a generic settings form.
+Phase 2 tables: `plan_plugins`, `account_plugins`, `plugin_settings`, `runtime_signals`, `session_leases`.
+
+Phase 3 tables: `auto_replies`, `pm_permits`, `chat_locks`. The migration does not grant the new plugins to plans that already exist. Open the plan editor and allow `admin`, `storage`, `autoreply`, `afk`, `pmpermit`, `locks`, `tagall`, `broadcast`, `create`, `gifts`, and `games`. New plans include every plugin registered when the plan is created. The Plugins screen can edit each plugin's settings (warning limit, log chat, mention cap, and so on).
+
+Sharding is configured per process; there is no automatic assignment of accounts to workers yet. Downloads, sticker tools, converters, and the remaining userbot commands are phase 4.
 
 ## Bug status on this branch / حالة الأخطاء
 

@@ -194,6 +194,49 @@ class RuntimeSignal(Base):
     created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
 
 
+class AutoReply(Base):
+    """Keyword reply owned by one account. ``chat_id`` 0 means every chat."""
+
+    __tablename__ = "auto_replies"
+    __table_args__ = (
+        UniqueConstraint("account_id", "chat_id", "keyword", name="uq_auto_replies_rule"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("managed_accounts.id", ondelete="CASCADE"), nullable=False
+    )
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    keyword: Mapped[str] = mapped_column(Text, nullable=False)
+    response: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class PmPermit(Base):
+    """Approval state for one private sender on one account."""
+
+    __tablename__ = "pm_permits"
+
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("managed_accounts.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    approved: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    warnings: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    blocked: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+
+
+class ChatLock(Base):
+    """One message-type lock in a group where the account is an admin."""
+
+    __tablename__ = "chat_locks"
+
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("managed_accounts.id", ondelete="CASCADE"), primary_key=True
+    )
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    lock_name: Mapped[str] = mapped_column(String(32), primary_key=True)
+
+
 class SessionLease(Base):
     """Pauses the worker client so the control bot can open the same session."""
 
