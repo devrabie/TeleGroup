@@ -34,6 +34,7 @@ from src.database import (
     mark_session_ok,
     rotate_account_proxy,
 )
+from src.runtime import build_user_client
 from src.security_messages import (
     KIND_LOGIN_CODE,
     KIND_NEW_LOGIN,
@@ -249,7 +250,7 @@ class CodeMonitorManager:
                     continue
 
                 client_name = f"monitor_{account_id}_{random.randint(1000, 9999)}"
-                client = Client(
+                client = build_user_client(
                     client_name,
                     session_string=session_string,
                     api_id=account_details.get("api_id") or config.API_ID,

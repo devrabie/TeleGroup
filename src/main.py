@@ -1,32 +1,31 @@
-import logging
 import asyncio
-import json
 import hashlib
 import hmac
+import json
+import logging
+import signal
 
+from aiohttp import web
 from telegram import Update
 from telegram.ext import Application
-from aiohttp import web
 
 from src import config
-from src.database import initialize_database, get_plan_by_id, grant_subscription, warn_if_no_working_proxies
 from src.admin_handlers import admin_handlers_list
-from src.user_handlers import user_handlers_list
-from src.proxy_manager import update_proxies_from_url
 from src.automation import run_group_creation_cycle
 from src.code_monitor import code_monitor_manager, run_code_monitor_sync
-from src.translation import compile_translations
-
-
-# --- Logging Setup ---
-logging.basicConfig(
-    level=config.LOG_LEVEL,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+from src.database import (
+    get_plan_by_id,
+    grant_subscription,
+    initialize_database,
+    warn_if_no_working_proxies,
 )
-# Silence noisy loggers
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
+from src.db.engine import dispose_engine
+from src.logging_setup import configure_logging
+from src.proxy_manager import update_proxies_from_url
+from src.translation import compile_translations
+from src.user_handlers import user_handlers_list
 
+configure_logging(config.LOG_LEVEL)
 log = logging.getLogger(__name__)
 
 
@@ -40,7 +39,10 @@ async def crypto_webhook_handler(request: web.Request):
         body = await request.text()
 
         # Verify the signature
-        secret = hashlib.sha256(config.CRYPTO_PAY_API_TOKEN.encode()).digest()
+        token = config.CRYPTO_PAY_API_TOKEN
+        if not token:
+            return web.Response(status=503, text="Crypto Pay is not configured.")
+        secret = hashlib.sha256(token.encode()).digest()
         computed_hmac = hmac.new(secret, body.encode(), hashlib.sha256).hexdigest()
 
         if not hmac.compare_digest(computed_hmac, signature):
@@ -71,15 +73,27 @@ async def crypto_webhook_handler(request: web.Request):
                     log.error(f"Webhook received for non-existent plan_id: {plan_id}")
                     return web.Response(status=400)
 
-                duration = plan['duration_days']
+                duration = plan["duration_days"]
                 success, msg = grant_subscription(user_id, plan_id, duration)
 
                 if success:
-                    log.info(f"Subscription granted via crypto webhook for user {user_id}, plan {plan_id}.")
-                    bot = request.app['ptb_app'].bot
-                    await bot.send_message(user_id, f"✅ Your payment was successful! Your '{plan['name']}' subscription is now active for {duration} days.")
+                    log.info(
+                        "Subscription granted via crypto webhook for user %s, plan %s.",
+                        user_id,
+                        plan_id,
+                    )
+                    bot = request.app["ptb_app"].bot
+                    await bot.send_message(
+                        user_id,
+                        (
+                            f"✅ Your payment was successful! Your '{plan['name']}' "
+                            f"subscription is now active for {duration} days."
+                        ),
+                    )
                 else:
-                    log.error(f"Failed to grant subscription via crypto webhook for user {user_id}: {msg}")
+                    log.error(
+                        f"Failed to grant subscription via crypto webhook for user {user_id}: {msg}"
+                    )
 
             except (IndexError, ValueError) as e:
                 log.error(f"Error parsing crypto webhook payload '{custom_payload}': {e}")
@@ -90,6 +104,40 @@ async def crypto_webhook_handler(request: web.Request):
     except Exception as e:
         log.error(f"Error processing crypto webhook: {e}", exc_info=True)
         return web.Response(status=500)
+
+
+def _schedule_jobs(application: Application) -> None:
+    job_queue = application.job_queue
+    if job_queue is None:
+        raise RuntimeError("Job queue is not available. Install python-telegram-bot[job-queue].")
+    job_queue.run_repeating(update_proxies_from_url, interval=86400, first=10)
+    job_queue.run_repeating(run_group_creation_cycle, interval=300, first=20)
+    job_queue.run_repeating(run_code_monitor_sync, interval=60, first=25)
+
+
+async def _shutdown(application: Application, runner: web.AppRunner | None) -> None:
+    """Stop monitors, the bot, the webhook server, and the database engine."""
+    log.info("Shutting down bot...")
+    try:
+        await code_monitor_manager.stop_all()
+    except Exception:
+        log.exception("Failed to stop code monitor clients")
+    updater = getattr(application, "updater", None)
+    try:
+        if updater is not None and getattr(updater, "running", False):
+            await updater.stop()
+    except Exception:
+        log.exception("Failed to stop the updater")
+    try:
+        if getattr(application, "running", False):
+            await application.stop()
+        await application.shutdown()
+    except Exception:
+        log.exception("Failed to stop the application")
+    if runner is not None:
+        await runner.cleanup()
+    dispose_engine()
+    log.info("Bot shut down gracefully.")
 
 
 async def main() -> None:
@@ -104,12 +152,7 @@ async def main() -> None:
     log.info(f"Translation catalogs compiled/updated: {compiled}")
 
     log.info("Building bot application with concurrent updates enabled...")
-    application = (
-        Application.builder()
-        .token(config.BOT_TOKEN)
-        .concurrent_updates(16)
-        .build()
-    )
+    application = Application.builder().token(config.BOT_TOKEN).concurrent_updates(16).build()
 
     # --- Handler Registration ---
     all_handlers = admin_handlers_list + user_handlers_list
@@ -118,24 +161,41 @@ async def main() -> None:
 
     # --- Initialize the application ---
     await application.initialize()
+    runner: web.AppRunner | None = None
+    try:
+        runner = await _serve(application)
+    finally:
+        await _shutdown(application, runner)
 
+
+async def _serve(application: Application) -> web.AppRunner | None:
     # --- Webhook or Polling ---
     if config.WEBHOOK_ENABLED:
-        if not all([config.WEBHOOK_URL, config.WEBHOOK_SECRET, config.CRYPTO_PAY_API_TOKEN]):
-            raise ValueError("WEBHOOK_URL, WEBHOOK_SECRET, and CRYPTO_PAY_API_TOKEN must be set when WEBHOOK_ENABLED is true.")
+        webhook_url = config.WEBHOOK_URL or ""
+        webhook_secret = config.WEBHOOK_SECRET or ""
+        crypto_token = config.CRYPTO_PAY_API_TOKEN or ""
+        if not all([webhook_url, webhook_secret, crypto_token]):
+            raise ValueError(
+                "WEBHOOK_URL, WEBHOOK_SECRET, and CRYPTO_PAY_API_TOKEN must be set "
+                "when WEBHOOK_ENABLED is true."
+            )
 
         # --- Configure webhooks and paths ---
         bot_webhook_path = f"/{config.BOT_TOKEN.split(':')[-1]}"
-        crypto_webhook_path = f"/webhooks/cryptopay/{config.CRYPTO_PAY_API_TOKEN[:10]}"
-        full_bot_webhook_url = f"{config.WEBHOOK_URL.rstrip('/')}{bot_webhook_path}"
+        crypto_webhook_path = f"/webhooks/cryptopay/{crypto_token[:10]}"
+        full_bot_webhook_url = f"{webhook_url.rstrip('/')}{bot_webhook_path}"
 
         await application.bot.set_webhook(
             url=full_bot_webhook_url,
-            secret_token=config.WEBHOOK_SECRET,
-            drop_pending_updates=True
+            secret_token=webhook_secret,
+            drop_pending_updates=True,
         )
-        log.info(f"Bot webhook set to: {full_bot_webhook_url}")
-        log.warning(f"Ensure your Crypto Pay app is configured to send webhooks to: {config.WEBHOOK_URL.rstrip('/')}{crypto_webhook_path}")
+        log.info("Bot webhook set to: %s", full_bot_webhook_url)
+        log.warning(
+            "Ensure your Crypto Pay app is configured to send webhooks to: %s%s",
+            webhook_url.rstrip("/"),
+            crypto_webhook_path,
+        )
 
         # --- Define aiohttp handlers ---
         async def telegram_handler(request: web.Request):
@@ -151,7 +211,7 @@ async def main() -> None:
 
         # --- Set up aiohttp server ---
         webapp = web.Application()
-        webapp['ptb_app'] = application # Make PTB app accessible in handlers
+        webapp["ptb_app"] = application  # Make PTB app accessible in handlers
         webapp.router.add_post(bot_webhook_path, telegram_handler)
         webapp.router.add_post(crypto_webhook_path, crypto_webhook_handler)
 
@@ -159,44 +219,44 @@ async def main() -> None:
         await runner.setup()
         site = web.TCPSite(runner, config.WEBHOOK_LISTEN_ADDRESS, config.WEBHOOK_PORT)
 
-        log.info(f"Starting aiohttp server on {config.WEBHOOK_LISTEN_ADDRESS}:{config.WEBHOOK_PORT}")
+        log.info(
+            f"Starting aiohttp server on {config.WEBHOOK_LISTEN_ADDRESS}:{config.WEBHOOK_PORT}"
+        )
         await site.start()
 
         # Start background jobs
-        application.job_queue.run_repeating(update_proxies_from_url, interval=86400, first=10)
-        application.job_queue.run_repeating(run_group_creation_cycle, interval=300, first=20)
-        application.job_queue.run_repeating(run_code_monitor_sync, interval=60, first=25)
+        _schedule_jobs(application)
         await application.start()
         log.info("Bot and job queue started in webhook mode.")
 
-        # Keep the script running
-        await asyncio.Event().wait()
+        stop_event = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, stop_event.set)
+        await stop_event.wait()
+        return runner
 
     else:
         # --- Start in Polling Mode ---
         log.info("Starting bot in polling mode...")
 
         # Add jobs to the queue. They will start when application.start() is called.
-        application.job_queue.run_repeating(update_proxies_from_url, interval=86400, first=10)
-        application.job_queue.run_repeating(run_group_creation_cycle, interval=300, first=20)
-        application.job_queue.run_repeating(run_code_monitor_sync, interval=60, first=25)
+        _schedule_jobs(application)
 
         # Start the job queue
         await application.start()
-        # Start the updater to begin polling for updates
-        await application.updater.start_polling(drop_pending_updates=True)
+        updater = application.updater
+        if updater is None:
+            raise RuntimeError("Polling updater is not available")
+        await updater.start_polling(drop_pending_updates=True)
         log.info("Bot started successfully in polling mode.")
 
         # Block the script until a signal is received
-        await application.updater.idle()
-
-        # Gracefully stop the bot
-        log.info("Shutting down bot...")
-        await code_monitor_manager.stop_all()
-        await application.updater.stop()
-        await application.stop()
-        await application.shutdown()
-        log.info("Bot shut down gracefully.")
+        idle = getattr(updater, "idle", None)
+        if idle is None:
+            raise RuntimeError("Polling updater cannot idle")
+        await idle()
+        return None
 
 
 if __name__ == "__main__":

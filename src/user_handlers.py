@@ -19,7 +19,6 @@ from telegram.ext import (
 )
 
 import pyrogram
-from pyrogram import Client
 from pyrogram.errors import (
     SessionPasswordNeeded,
     PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired,
@@ -36,9 +35,12 @@ from src.database import (
     set_user_language, get_random_proxy_id, get_proxy_string, get_account_session_string,
     update_user_details, mark_proxy_as_bad, get_account_details, get_info_page_content,
     get_user_language, get_random_device_profile, get_device_profile_by_account_id,
+    get_internal_user_id, get_group_log_details,
     session_is_invalid, user_owns_account, user_is_account_owner, get_accessible_accounts, add_account_manager,
     resolve_sharing_token, transfer_managed_account,
 )
+from src.payments import parse_invoice_payload, validate_stars_payment
+from src.runtime import build_user_client
 from src.translation import get_translation_func_for_user
 from src.code_monitor import build_proxy_dict, code_monitor_manager, is_socks_auth_error
 from src.account_explorer import display_name, format_session_health_text, get_cached_identity
@@ -502,22 +504,48 @@ async def pay_with_crypto_callback(update: Update, context: ContextTypes.DEFAULT
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
+    user_id = query.from_user.id
+    _ = get_translation_func_for_user(user_id)
+    parsed = parse_invoice_payload(query.invoice_payload)
+    plan = get_plan_by_id(parsed[0]) if parsed else None
+    result = validate_stars_payment(
+        payload=query.invoice_payload,
+        currency=query.currency,
+        total_amount=query.total_amount,
+        payer_telegram_id=user_id,
+        plan=plan,
+        user_exists=get_internal_user_id(user_id) is not None,
+    )
+    if not result.ok:
+        await query.answer(ok=False, error_message=_(result.message)[:255])
+        return
     await query.answer(ok=True)
 
 async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     _ = get_translation_func_for_user(user_id)
-    payload = update.message.successful_payment.invoice_payload
-    plan_id = int(payload.split("_")[1])
-    plan = get_plan_by_id(plan_id)
+    payment = update.message.successful_payment
+    parsed = parse_invoice_payload(payment.invoice_payload)
+    plan = get_plan_by_id(parsed[0]) if parsed else None
+    result = validate_stars_payment(
+        payload=payment.invoice_payload,
+        currency=payment.currency,
+        total_amount=payment.total_amount,
+        payer_telegram_id=user_id,
+        plan=plan,
+        user_exists=get_internal_user_id(user_id) is not None,
+    )
+    if not result.ok or plan is None:
+        await update.message.reply_text(_(result.message))
+        return
     duration_days = plan['duration_days']
-    success, msg = grant_subscription(user_id, plan_id, duration_days)
+    success, _msg = grant_subscription(user_id, plan['id'], duration_days)
     if success:
         reply_text = _("✅ Thank you! Your '{plan_name}' subscription is now active for {days} days.").format(
             plan_name=plan['name'], days=duration_days)
     else:
         reply_text = _("There was a database error activating your subscription. Please contact support with payload: `{payload}`").format(
-            payload=payload)
+            payload=payment.invoice_payload)
     await update.message.reply_text(reply_text)
 
 async def language_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -797,7 +825,7 @@ async def send_login_code(phone: str, context: ContextTypes.DEFAULT_TYPE, user_i
         # --- Attempt Connection and Send Code ---
         try:
             clean_digits = re.sub(r"\D", "", phone)
-            client = Client(
+            client = build_user_client(
                 f"user_session_{clean_digits}_{attempt}_{random.randint(1000, 9999)}",
                 api_id=config.API_ID or device_profile.get('api_id'),
                 api_hash=config.API_HASH or device_profile.get('api_hash'),
@@ -1923,9 +1951,9 @@ async def async_generate_group_report(update: Update, context: ContextTypes.DEFA
     device_profile = get_device_profile_by_account_id(account_id)
     if not device_profile:
         log.warning(f"No device profile found for account {account_id}. Using default client settings.")
-        client = Client(f"user_session_reporter_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+        client = build_user_client(f"user_session_reporter_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
     else:
-        client = Client(
+        client = build_user_client(
             f"user_session_reporter_{account_id}",
             session_string=session_string,
             api_id=config.API_ID or device_profile.get('api_id'),
@@ -2094,9 +2122,9 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             device_profile = get_device_profile_by_account_id(account_id)
             if not device_profile:
                 log.warning(f"No device profile found for account {account_id}. Using default client settings.")
-                client = Client(f"user_session_reader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+                client = build_user_client(f"user_session_reader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
             else:
-                client = Client(
+                client = build_user_client(
                     f"user_session_reader_{account_id}",
                     session_string=session_string,
                     api_id=config.API_ID or device_profile.get('api_id'),
@@ -2202,9 +2230,9 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
             device_profile = get_device_profile_by_account_id(account_id)
             if not device_profile:
                 log.warning(f"No device profile found for account {account_id}. Using default client settings.")
-                client = Client(f"user_session_upgrader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
+                client = build_user_client(f"user_session_upgrader_{account_id}", session_string=session_string, in_memory=True, api_id=config.API_ID, api_hash=config.API_HASH)
             else:
-                client = Client(
+                client = build_user_client(
                     f"user_session_upgrader_{account_id}",
                     session_string=session_string,
                     api_id=config.API_ID or device_profile.get('api_id'),

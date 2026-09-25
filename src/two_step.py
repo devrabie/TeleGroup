@@ -28,6 +28,7 @@ from src.database import (
     mark_session_ok,
     rotate_account_proxy,
 )
+from src.runtime import build_user_client
 
 log = logging.getLogger(__name__)
 
@@ -113,7 +114,7 @@ async def _start_temp_client(details: dict) -> Client:
             proxy_id = rotate_account_proxy(account_id, proxy_id)
             continue
 
-        client = Client(
+        client = build_user_client(
             f"twostep_{account_id}_{random.randint(1000, 9999)}",
             session_string=session_string,
             api_id=details.get("api_id") or config.API_ID,

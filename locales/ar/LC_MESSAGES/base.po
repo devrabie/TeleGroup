@@ -1868,3 +1868,27 @@ msgstr "تم إنهاء الجلسة بنجاح!"
 msgid "Could not terminate session."
 msgstr "تعذر إنهاء الجلسة."
 
+msgid "Invalid invoice payload"
+msgstr "حمولة الفاتورة غير صالحة"
+
+msgid "Invoice does not belong to this user"
+msgstr "هذه الفاتورة لا تخص هذا المستخدم"
+
+msgid "User is not registered. Send /start and try again"
+msgstr "المستخدم غير مسجل. أرسل /start ثم أعد المحاولة"
+
+msgid "Plan not found"
+msgstr "الخطة غير موجودة"
+
+msgid "Plan is not active"
+msgstr "الخطة غير مفعّلة"
+
+msgid "Invalid plan price"
+msgstr "سعر الخطة غير صالح"
+
+msgid "Unsupported currency"
+msgstr "عملة غير مدعومة"
+
+msgid "Amount does not match the plan price"
+msgstr "المبلغ لا يطابق سعر الخطة"
+

@@ -1520,6 +1520,30 @@ msgstr ""
 "Please send it in international format, e.g. <code>+1234567890</code> "
 "(starts with +, digits only, no letters)."
 
+msgid "Invalid invoice payload"
+msgstr "Invalid invoice payload"
+
+msgid "Invoice does not belong to this user"
+msgstr "Invoice does not belong to this user"
+
+msgid "User is not registered. Send /start and try again"
+msgstr "User is not registered. Send /start and try again"
+
+msgid "Plan not found"
+msgstr "Plan not found"
+
+msgid "Plan is not active"
+msgstr "Plan is not active"
+
+msgid "Invalid plan price"
+msgstr "Invalid plan price"
+
+msgid "Unsupported currency"
+msgstr "Unsupported currency"
+
+msgid "Amount does not match the plan price"
+msgstr "Amount does not match the plan price"
+
 #~ msgstr ""
 #~ "❌ Failed to convert group. The "
 #~ "account may not have the required "

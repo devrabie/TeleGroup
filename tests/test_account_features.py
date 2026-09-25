@@ -1,5 +1,4 @@
 import os
-import sqlite3
 import sys
 import tempfile
 import unittest
@@ -14,6 +13,10 @@ os.environ.setdefault("BOT_TOKEN", "1:test")
 os.environ.setdefault("API_ID", "1")
 os.environ.setdefault("API_HASH", "hash")
 os.environ.setdefault("ADMIN_IDS", "1")
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:////tmp/telegroup-pytest.db")
+os.environ.setdefault(
+    "SESSION_ENCRYPTION_KEY", "qoaGk05XJfuMlnrnND1-suk6JtqXR-Y04CWEJNH5KgU="
+)
 
 from src.security_messages import (
     KIND_LOGIN_CODE,
@@ -212,27 +215,21 @@ class ManagedAccountDefaultsTests(unittest.TestCase):
         self.assertEqual(monitored[0]["phone"], "+15550002222")
 
     def test_schema_migration_adds_code_monitor_column(self):
-        """Old databases without the column should gain it on initialize."""
-        raw_path = Path(self.tmp.name) / "legacy.db"
-        conn = sqlite3.connect(raw_path)
-        conn.execute("""
-            CREATE TABLE managed_accounts (
-                id INTEGER PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                phone TEXT NOT NULL UNIQUE,
-                session_string TEXT NOT NULL,
-                is_active BOOLEAN NOT NULL DEFAULT 1
-            )
-        """)
-        conn.commit()
-        conn.close()
-
-        with patch.object(self.database, "DB_FILE", raw_path):
-            self.database.initialize_database()
-            with self.database.get_db_connection() as conn:
-                columns = [row[1] for row in conn.execute("PRAGMA table_info(managed_accounts)")]
+        """Fresh databases include the columns Alembic creates; SQLite ALTER steps are gone."""
+        with self.database.get_db_connection() as conn:
+            columns = [row[1] for row in conn.execute("PRAGMA table_info(managed_accounts)")]
+            tables = {
+                row[0]
+                for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            }
         self.assertIn("code_monitor_enabled", columns)
         self.assertIn("session_status", columns)
+        self.assertIn("device_profile_id", columns)
+        self.assertIn("deleted_at", columns)
+        self.assertIn("info_pages", tables)
+        self.assertIn("device_profiles", tables)
+        self.assertIn("account_managers", tables)
+        self.assertIn("sharing_tokens", tables)
 
     def test_user_owns_account(self):
         self.database.add_managed_account(111, "+15550003333", "session-string", self.profile["id"])

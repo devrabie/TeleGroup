@@ -20,6 +20,7 @@ from src.database import (
     update_account_schedule,
     apply_error_backoff,
 )
+from src.runtime import build_user_client
 
 log = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ async def process_single_account(account_details: dict):
 
         try:
             client_name = f"auto_session_{account_id}_{random.randint(1000, 9999)}"
-            user_client = Client(
+            user_client = build_user_client(
                 client_name,
                 session_string=session_string,
                 api_id=account_details.get('api_id') or config.API_ID,
