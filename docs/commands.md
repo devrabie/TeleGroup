@@ -1,6 +1,40 @@
 # Userbot commands
 
-Outgoing messages from the managed account start with `USERBOT_PREFIX` (default `.`). Arabic is the primary name. English is an alias. Replies use one frame: a short header, the separator `⋆┄─┄─┄─┄┄─┄─┄─┄─┄┄⋆`, then the sentence. Arabic is used when the owner's control-bot language is Arabic. Any other language gets the English text.
+Commands start with `USERBOT_PREFIX` (default `.`). Arabic is the primary name. English is an alias. Replies use one frame: a short header, the separator `⋆┄─┄─┄─┄┄─┄─┄─┄─┄┄⋆`, then the sentence. Arabic is used when the owner's control-bot language is Arabic. Any other language gets the English text.
+
+The account itself can send every command, including from Saved Messages. The registered owner (the Telegram user who added the account) can send the same commands from their own account, in a private chat with the managed account or in a group where both are present. The owner can add other people. Everyone else is ignored and gets no reply. When the sender is not the account, the account answers with a new message. It does not edit the other person's message. A disabled or locked plugin stays silent, the same as when the account sends the command.
+
+Admins are limited to 6 commands per 30 seconds, and the owner sending from their own account is limited to 12. The account itself is not under this extra cap. The first command past the cap gets one notice. Further commands in that window are ignored.
+
+See [admins-ar.md](admins-ar.md) for the Arabic guide, the add/remove commands, and the owner-only list.
+
+## Who can send a command
+
+| Sender | What they can do |
+| --- | --- |
+| The managed account | Every enabled command, including Saved Messages |
+| The registered owner, from their own Telegram account | Every enabled command. The account replies with a new message |
+| An account admin | Enabled commands that are not in the owner-only list below |
+| Anyone else | Nothing. The account stays quiet |
+
+| Arabic | English | What it does |
+| --- | --- | --- |
+| رفع ادمن | addadmin | Add an admin by reply, numeric id, or `@username`. Owner only |
+| تنزيل ادمن | deladmin | Remove an admin the same way. Owner only |
+| الادمنية | admins | List admins. Owner, the account, and admins can read it |
+
+The control bot account screen has **مسؤولو الأوامر**. The inline panel has **المسؤولون**. Both list and remove admins. Adding from the bot asks for an id or `@username`. Adding from the panel explains the command, because a button cannot take a name. The limit is 20 admins per account.
+
+Owner-only commands (the account itself can still send them):
+
+- Admins: `رفع ادمن`, `تنزيل ادمن` (and `addadmin`, `deladmin`)
+- Profile: `وضع الاسم`, `وضع البايو`, `وضع الصورة`
+- Session and chats: `كلمة السر`, `نقل ملكية`, `نقل`, `انشاء كروب`, `انشاء مجموعة`, `انشاء قناة`, `مغادرة`
+- Logging and saved replies: `تخزين`, `وضع التخزين`, `حذف رد عام`, `حذف رد`
+- Broadcast: `اذاعة`, `اذاعة خاص`, `تأكيد الاذاعة`, `ايقاف الاذاعة`
+- Stars: `ارسل هدية`, `ارسل`, `تأكيد الهدية`, `الغاء الهدية`
+
+English aliases of those commands are owner-only too. Group moderation, downloads, and the other tools stay available to admins. An admin cannot add another admin.
 
 ## Sections and help
 

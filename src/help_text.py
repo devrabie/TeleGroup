@@ -32,6 +32,11 @@ def _status(language: str, view: dict) -> str:
     return "متوقفة" if is_ar(language) else "Off"
 
 
+def primary_commands(plugin: Plugin) -> list[BotCommand]:
+    """One command per action, preferring the Arabic name."""
+    return [command for _index, command in _primary(plugin)]
+
+
 def _primary(plugin: Plugin) -> list[tuple[int, BotCommand]]:
     """One command per description, preferring the Arabic name."""
     grouped: dict[str, tuple[int, BotCommand]] = {}
@@ -147,6 +152,8 @@ def _command_text(
     command: BotCommand,
     view: dict,
 ) -> str:
+    from src.runtime.actors import access_label
+
     names = _alias_line(plugin, command, prefix)
     status = _status(language, view) if view else ""
     return command_help_card(
@@ -158,6 +165,7 @@ def _command_text(
         example=apply_prefix(command.example(language), prefix),
         aliases=names,
         status=status,
+        access=access_label(language, command.name),
     )
 
 

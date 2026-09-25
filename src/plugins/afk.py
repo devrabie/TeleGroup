@@ -99,6 +99,10 @@ async def on_message(session: AccountSession, message: object) -> None:
         except Exception:
             log.debug("AFK clear notice failed", exc_info=True)
         return
+    from src.runtime.actors import is_trusted_sender
+
+    if is_trusted_sender(session.account_id, message):
+        return
     sender = getattr(message, "from_user", None)
     user_id = getattr(sender, "id", None)
     if user_id is None or getattr(sender, "is_bot", False):

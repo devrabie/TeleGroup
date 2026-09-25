@@ -142,6 +142,10 @@ def help_intro(language: str, prefix: str) -> str:
             f"{section('الأوامر')}\n"
             f"{SEP}\n"
             f"● البادئة: {prefix}\n"
+            "● يرسل الأوامر: هذا الحساب، أو صاحب الحساب من حسابه، أو مسؤول أضفته\n"
+            f"● إضافة مسؤول: {prefix}رفع ادمن بالرد أو المعرّف أو @username\n"
+            f"● قائمة المسؤولين: {prefix}الادمنية\n"
+            "● أوامر الحساب والإذاعة وحذف البيانات والمسؤولين تبقى لصاحب الحساب\n"
             f"● قسم أو إضافة أو أمر: {prefix}الاوامر الادارة\n"
             f"● لوحة الأزرار: {prefix}اللوحة"
         )
@@ -149,8 +153,36 @@ def help_intro(language: str, prefix: str) -> str:
         f"{section('Commands')}\n"
         f"{SEP}\n"
         f"● Prefix: {prefix}\n"
+        "● Who can send them: this account, its owner, or an admin you added\n"
+        f"● Add an admin: {prefix}addadmin by reply, id, or @username\n"
+        f"● Admin list: {prefix}admins\n"
+        "● Account, broadcast, deleting saved data, and admin changes stay with the owner\n"
         f"● Section, plugin, or command: {prefix}help admin\n"
         f"● Button panel: {prefix}panel"
+    )
+
+
+def owner_only_notice(language: str) -> str:
+    return tone_line(
+        language,
+        "err",
+        pick(
+            language,
+            "Only the account owner can use this command.",
+            "هذا الأمر لصاحب الحساب فقط. المسؤول لا يستخدمه.",
+        ),
+    )
+
+
+def rate_limit_notice(language: str) -> str:
+    return tone_line(
+        language,
+        "wait",
+        pick(
+            language,
+            "Too many commands in a short time. Wait a moment, then try again.",
+            "أُرسلت أوامر كثيرة خلال وقت قصير. انتظر قليلاً ثم أعد المحاولة.",
+        ),
     )
 
 
@@ -164,7 +196,9 @@ def command_help_card(
     example: str,
     aliases: str,
     status: str = "",
+    access: str = "",
 ) -> str:
+    del prefix
     if is_ar(language):
         rows = [
             field("الوصف", description),
@@ -175,6 +209,8 @@ def command_help_card(
             rows.append(field("الأسماء", aliases))
         if status:
             rows.append(field("الحالة", status))
+        if access:
+            rows.append(field("من يستخدمه", access))
         return card(language, title, "\n".join(rows))
     rows = [
         field("Description", description),
@@ -185,21 +221,27 @@ def command_help_card(
         rows.append(field("Names", aliases))
     if status:
         rows.append(field("Status", status))
+    if access:
+        rows.append(field("Who can use it", access))
     return card(language, title, "\n".join(rows))
 
 
 def panel_home(language: str, prefix: str) -> str:
     if is_ar(language):
         body = (
-            "اختر قسماً لعرض الأوامر، أو افتح إضافة لتشغيلها وإيقافها.\n"
-            f"● البادئة: {prefix}\n"
-            "الإضافات المقفلة 🔒 غير مشمولة في خطتك."
+            "من هنا تدير ميزات الحساب وتقرأ أوامرها.\n"
+            "اضغط قسماً، ثم اسم الميزة، لتشغيلها أو إيقافها أو رؤية مثال.\n"
+            f"● أوامر الحساب تبدأ بـ {prefix}\n"
+            "🟢 تعمل الآن · ⚪️ متوقفة · 🔒 غير متاحة في خطتك\n"
+            "زر «المسؤولون» يعرض من يستطيع إرسال الأوامر غيرك."
         )
         return card(language, "🎛 لوحة التحكم", body)
     body = (
-        "Choose a section to read its commands, or open a plugin to turn it on or off.\n"
-        f"● Prefix: {prefix}\n"
-        "Locked plugins 🔒 are not included in your plan."
+        "Manage this account's features and read their commands.\n"
+        "Tap a section, then a feature, to turn it on or off or see an example.\n"
+        f"● Commands start with {prefix}\n"
+        "🟢 On · ⚪️ Off · 🔒 Not in your plan\n"
+        "The admins button lists who else may send commands."
     )
     return card(language, "🎛 Control panel", body)
 

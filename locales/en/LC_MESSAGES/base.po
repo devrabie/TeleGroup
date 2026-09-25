@@ -2046,3 +2046,203 @@ msgstr "Could not activate this code. Please try again later."
 
 msgid "Your subscription was ended by an admin."
 msgstr "Your subscription was ended by an admin."
+
+msgid "🧩 Account features"
+msgstr "🧩 Account features"
+
+msgid "👥 Command admins"
+msgstr "👥 Command admins"
+
+msgid "Not available"
+msgstr "Not available"
+
+msgid "On now"
+msgstr "On now"
+
+msgid "Off now"
+msgstr "Off now"
+
+#, python-brace-format
+msgid ""
+"<b>🧩 Account features</b>\n"
+"Turn features on or off for this account.\n"
+"Tap a section, then tap a feature. You will see what it does before anything changes.\n"
+"🟢 On now · ⚪️ Off · 🔒 Not in your plan\n"
+"On: {on} · Off: {off} · Locked: {locked}"
+msgstr ""
+"<b>🧩 Account features</b>\n"
+"Turn features on or off for this account.\n"
+"Tap a section, then tap a feature. You will see what it does before anything changes.\n"
+"🟢 On now · ⚪️ Off · 🔒 Not in your plan\n"
+"On: {on} · Off: {off} · Locked: {locked}"
+
+#, python-brace-format
+msgid ""
+"<b>{emoji} {title}</b>\n"
+"Tap a feature. The button shows its name and whether it is on.\n"
+"The next screen explains it and lets you turn it on or off."
+msgstr ""
+"<b>{emoji} {title}</b>\n"
+"Tap a feature. The button shows its name and whether it is on.\n"
+"The next screen explains it and lets you turn it on or off."
+
+msgid "This section has no features."
+msgstr "This section has no features."
+
+msgid "↩ Back to features"
+msgstr "↩ Back to features"
+
+msgid "🔙 Back to this account"
+msgstr "🔙 Back to this account"
+
+msgid "This feature is not in your plan, so it cannot be turned on here."
+msgstr "This feature is not in your plan, so it cannot be turned on here."
+
+msgid "This feature is on. Use the button below to turn it off."
+msgstr "This feature is on. Use the button below to turn it off."
+
+msgid "This feature is off. Use the button below to turn it on."
+msgstr "This feature is off. Use the button below to turn it on."
+
+#, python-brace-format
+msgid "Status: {state}"
+msgstr "Status: {state}"
+
+msgid "<b>Commands</b>"
+msgstr "<b>Commands</b>"
+
+#, python-brace-format
+msgid "Send these from the account, or from your own account if you are the owner or an admin. They start with {prefix}."
+msgstr "Send these from the account, or from your own account if you are the owner or an admin. They start with {prefix}."
+
+#, python-brace-format
+msgid "⏸ Turn off {name}"
+msgstr "⏸ Turn off {name}"
+
+#, python-brace-format
+msgid "▶️ Turn on {name}"
+msgstr "▶️ Turn on {name}"
+
+#, python-brace-format
+msgid "⚙️ Settings for {name}"
+msgstr "⚙️ Settings for {name}"
+
+#, python-brace-format
+msgid "↩ Back to {section}"
+msgstr "↩ Back to {section}"
+
+msgid "🏠 Features home"
+msgstr "🏠 Features home"
+
+#, python-brace-format
+msgid ""
+"<b>⚙️ Settings for {name}</b>\n"
+"Tap a button to change that setting.\n"
+"An on/off button switches immediately.\n"
+"Other settings ask you to send the new value.\n"
+"Send - to restore the original value, or الغاء to stop."
+msgstr ""
+"<b>⚙️ Settings for {name}</b>\n"
+"Tap a button to change that setting.\n"
+"An on/off button switches immediately.\n"
+"Other settings ask you to send the new value.\n"
+"Send - to restore the original value, or الغاء to stop."
+
+#, python-brace-format
+msgid "⏸ Turn off: {label}"
+msgstr "⏸ Turn off: {label}"
+
+#, python-brace-format
+msgid "▶️ Turn on: {label}"
+msgstr "▶️ Turn on: {label}"
+
+#, python-brace-format
+msgid "✏️ Change {label} — now: {value}"
+msgstr "✏️ Change {label} — now: {value}"
+
+#, python-brace-format
+msgid "↩ Back to {name}"
+msgstr "↩ Back to {name}"
+
+msgid ""
+"<b>Plan features</b>\n"
+"Tap a feature to allow it or block it on this plan. The name is what people see, not an internal id."
+msgstr ""
+"<b>Plan features</b>\n"
+"Tap a feature to allow it or block it on this plan. The name is what people see, not an internal id."
+
+msgid "Only the account owner can manage command admins."
+msgstr "Only the account owner can manage command admins."
+
+msgid "No admins yet. Add someone you trust with the button below."
+msgstr "No admins yet. Add someone you trust with the button below."
+
+#, python-brace-format
+msgid ""
+"<b>👥 Command admins</b>\n"
+"These people can send this account's commands from their own Telegram account, in a private chat with the account or in a group you are both in.\n"
+"You and the account itself can always send commands. An admin cannot add another admin.\n"
+"Sensitive commands stay with you: profile, password, creating chats, broadcast, deleting saved replies, and managing admins.\n"
+"From the account you can also send <code>{prefix}رفع ادمن</code> and <code>{prefix}الادمنية</code>.\n"
+"\n"
+"{listing}"
+msgstr ""
+"<b>👥 Command admins</b>\n"
+"These people can send this account's commands from their own Telegram account, in a private chat with the account or in a group you are both in.\n"
+"You and the account itself can always send commands. An admin cannot add another admin.\n"
+"Sensitive commands stay with you: profile, password, creating chats, broadcast, deleting saved replies, and managing admins.\n"
+"From the account you can also send <code>{prefix}رفع ادمن</code> and <code>{prefix}الادمنية</code>.\n"
+"\n"
+"{listing}"
+
+msgid "➕ Add an admin"
+msgstr "➕ Add an admin"
+
+#, python-brace-format
+msgid "🗑 Remove {name}"
+msgstr "🗑 Remove {name}"
+
+#, python-brace-format
+msgid ""
+"<b>➕ Add an admin</b>\n"
+"Send their numeric Telegram id, or their @username.\n"
+"If the username cannot be found, send the numeric id, or add them from the account by replying to their message with <code>{prefix}رفع ادمن</code>.\n"
+"Send الغاء to stop.\n"
+"The limit is {limit} admins."
+msgstr ""
+"<b>➕ Add an admin</b>\n"
+"Send their numeric Telegram id, or their @username.\n"
+"If the username cannot be found, send the numeric id, or add them from the account by replying to their message with <code>{prefix}رفع ادمن</code>.\n"
+"Send الغاء to stop.\n"
+"The limit is {limit} admins."
+
+msgid "✖ Cancel"
+msgstr "✖ Cancel"
+
+msgid "Could not add that admin."
+msgstr "Could not add that admin."
+
+msgid "That user was not found. Send a numeric Telegram id, or add them from the account by reply."
+msgstr "That user was not found. Send a numeric Telegram id, or add them from the account by reply."
+
+msgid "Admin added. They can send commands from their own account."
+msgstr "Admin added. They can send commands from their own account."
+
+msgid "That person is already an admin."
+msgstr "That person is already an admin."
+
+msgid "The account owner can already send commands."
+msgstr "The account owner can already send commands."
+
+#, python-brace-format
+msgid "This account already has {limit} admins."
+msgstr "This account already has {limit} admins."
+
+msgid "That id is not valid."
+msgstr "That id is not valid."
+
+msgid "Admin removed."
+msgstr "Admin removed."
+
+msgid "That person is not an admin."
+msgstr "That person is not an admin."

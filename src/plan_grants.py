@@ -19,6 +19,9 @@ PLAN_PLUGIN_EXISTS_SQL = (
     "SELECT 1 FROM plan_plugins WHERE plan_id = :plan_id AND plugin_name = :name"
 )
 
+# Granted by revision 0006 so existing plans can use account-admin commands.
+DELEGATES_PLUGIN_NAMES: tuple[str, ...] = ("delegates",)
+
 PHASE4_PLUGIN_NAMES: tuple[str, ...] = (
     "download",
     "stickers",

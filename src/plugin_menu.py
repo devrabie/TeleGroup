@@ -9,9 +9,16 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
+from src.command_catalog import plugin_label
 from src.database import get_user_language, user_owns_account
-from src.runtime.gating import list_plan_plugin_views, list_plugin_views, set_account_plugin
-from src.runtime.plugins import command_prefix, get_plugin
+from src.plugin_screens import (
+    build_plugin_category,
+    build_plugin_detail,
+    build_plugin_settings,
+    build_plugins_home,
+)
+from src.runtime.gating import list_plan_plugin_views, set_account_plugin
+from src.runtime.plugins import get_plugin
 from src.runtime.settings_form import coerce_setting, current_setting, save_setting
 from src.runtime.store import set_plan_plugin_allowed
 from src.translation import get_translation_func_for_user
@@ -19,8 +26,18 @@ from src.translation import get_translation_func_for_user
 log = logging.getLogger(__name__)
 
 
-def _mark(enabled: bool) -> str:
-    return "🟢" if enabled else "⚪️"
+def _markup(rows: list[list[tuple[str, str]]]) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton(label, callback_data=data) for label, data in row] for row in rows]
+    )
+
+
+async def _show(query: object, text: str, rows: list[list[tuple[str, str]]]) -> None:
+    message = getattr(query, "message", None)
+    edit = getattr(query, "edit_message_text", None)
+    if message is None or edit is None:
+        return
+    await edit(text, reply_markup=_markup(rows), parse_mode=ParseMode.HTML)
 
 
 def _user_id(update: Update) -> int | None:
@@ -48,62 +65,67 @@ async def show_plugins_menu(
         )
         return
     language = get_user_language(user_id)
-    views = list_plugin_views(account_id, language)
-    if views is None:
+    built = build_plugins_home(account_id, language, _)
+    if built is None:
         await query.answer(
             _("Error: Account not found or you don't have permission."), show_alert=True
         )
         return
-    prefix = command_prefix(account_id)
-    lines = [
-        _(
-            "<b>Plugins</b>\n"
-            "Choose which features this account runs. "
-            "Locked plugins are not included in the current plan."
+    text, rows = built
+    await _show(query, text, rows)
+
+
+async def show_plugin_category(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    account_id: int,
+    category_id: str,
+) -> None:
+    del context
+    query = update.callback_query
+    user_id = _user_id(update)
+    if user_id is None or query is None:
+        return
+    _ = get_translation_func_for_user(user_id)
+    if not user_owns_account(account_id, user_id):
+        await query.answer(
+            _("Error: Account not found or you don't have permission."), show_alert=True
         )
-    ]
-    buttons: list[list[InlineKeyboardButton]] = []
-    for view in views:
-        if not view["allowed"]:
-            state = _("Not in your plan")
-            mark = "🔒"
-        elif view["enabled"]:
-            state = _("🟢 On")
-            mark = _mark(True)
-        else:
-            state = _("⚪️ Off")
-            mark = _mark(False)
-        lines.append(f"\n{mark} <b>{view['name']}</b> — {state}\n{view['description']}")
-        if view["commands"] and sum(len(line) for line in lines) < 2800:
-            shown = view["commands"][:6]
-            extra = len(view["commands"]) - len(shown)
-            line = " ".join(f"<code>{prefix}{name}</code>" for name in shown)
-            if extra:
-                line += f" +{extra}"
-            lines.append(line)
-        row = [
-            InlineKeyboardButton(
-                f"{mark} {view['name']}",
-                callback_data=f"mng_plugtog_{account_id}_{view['name']}",
-            )
-        ]
-        plugin = get_plugin(view["name"])
-        if plugin is not None and plugin.meta.settings and view["allowed"]:
-            row.append(
-                InlineKeyboardButton(
-                    _("⚙️ Settings"),
-                    callback_data=f"mng_plugcfg_{account_id}_{view['name']}",
-                )
-            )
-        buttons.append(row)
-    buttons.append(
-        [InlineKeyboardButton(_("🔙 Back to Account"), callback_data=f"mng_select_{account_id}")]
-    )
-    await query.edit_message_text(
-        "\n".join(lines),
-        reply_markup=InlineKeyboardMarkup(buttons),
-        parse_mode=ParseMode.HTML,
-    )
+        return
+    language = get_user_language(user_id)
+    built = build_plugin_category(account_id, language, category_id, _)
+    if built is None:
+        await query.answer(
+            _("Error: Account not found or you don't have permission."), show_alert=True
+        )
+        return
+    text, rows = built
+    await _show(query, text, rows)
+
+
+async def show_plugin_detail(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    account_id: int,
+    plugin_name: str,
+) -> None:
+    query = update.callback_query
+    user_id = _user_id(update)
+    if user_id is None or query is None:
+        return
+    _ = get_translation_func_for_user(user_id)
+    if not user_owns_account(account_id, user_id):
+        await query.answer(
+            _("Error: Account not found or you don't have permission."), show_alert=True
+        )
+        return
+    language = get_user_language(user_id)
+    built = build_plugin_detail(account_id, language, plugin_name, _)
+    if built is None:
+        await show_plugins_menu(update, context, account_id)
+        return
+    text, rows = built
+    await _show(query, text, rows)
 
 
 async def toggle_account_plugin(
@@ -129,7 +151,7 @@ async def toggle_account_plugin(
     }
     await query.answer(messages.get(result, _("Could not change this plugin.")), show_alert=True)
     if result in {"enabled", "disabled"}:
-        await show_plugins_menu(update, context, account_id)
+        await show_plugin_detail(update, context, account_id, plugin_name)
 
 
 async def show_plan_plugins(
@@ -153,20 +175,27 @@ async def show_plan_plugins(
     if views is None:
         await query.edit_message_text(_("Error: Plan not found. It might have been deleted."))
         return
-    lines = [_("<b>Plan plugins</b>\nChoose which plugins this plan allows.")]
+    lines = [
+        _(
+            "<b>Plan features</b>\n"
+            "Tap a feature to allow it or block it on this plan. "
+            "The name is what people see, not an internal id."
+        )
+    ]
     buttons: list[list[InlineKeyboardButton]] = []
     for view in views:
+        label = plugin_label(view["name"], language)
         if view["allowed"]:
             mark = "✅"
             state = _("Allowed")
         else:
             mark = "🚫"
             state = _("Blocked")
-        lines.append(f"\n{mark} <b>{view['name']}</b> — {state}\n{view['description']}")
+        lines.append(f"\n{mark} <b>{escape(label)}</b> — {state}\n{escape(view['description'])}")
         buttons.append(
             [
                 InlineKeyboardButton(
-                    f"{mark} {view['name']}",
+                    f"{mark} {label} — {state}",
                     callback_data=f"admin_planplug_{plan_id}_{view['name']}",
                 )
             ]
@@ -212,19 +241,6 @@ async def toggle_plan_plugin(
     await show_plan_plugins(update, context, plan_id, answer=False)
 
 
-def _field_value_label(value: object, language: str) -> str:
-    if isinstance(value, bool):
-        if language == "ar":
-            return "تشغيل" if value else "ايقاف"
-        return "on" if value else "off"
-    if value is None or value == "":
-        return "—"
-    text = str(value)
-    if len(text) > 40:
-        return text[:37] + "..."
-    return text
-
-
 async def show_plugin_settings(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -246,31 +262,12 @@ async def show_plugin_settings(
         await query.answer(_("This plugin has no settings."), show_alert=True)
         return
     language = get_user_language(user_id)
-    lines = [
-        _(
-            "<b>{name} settings</b>\nBooleans switch when tapped. Other fields ask for a new value."
-        ).format(name=plugin.meta.name)
-    ]
-    buttons: list[list[InlineKeyboardButton]] = []
-    for field in plugin.meta.settings:
-        value = current_setting(account_id, plugin.meta.name, field)
-        label = field.label(language)
-        shown = _field_value_label(value, language)
-        lines.append(f"\n<b>{escape(label)}</b>: <code>{escape(shown)}</code>")
-        buttons.append(
-            [
-                InlineKeyboardButton(
-                    f"{label}: {shown}",
-                    callback_data=f"mng_pf_{account_id}_{plugin.meta.name}_{field.key}",
-                )
-            ]
-        )
-    buttons.append([InlineKeyboardButton(_("🔙 Back"), callback_data=f"mng_plugins_{account_id}")])
-    await query.edit_message_text(
-        "\n".join(lines),
-        reply_markup=InlineKeyboardMarkup(buttons),
-        parse_mode=ParseMode.HTML,
-    )
+    built = build_plugin_settings(account_id, language, plugin_name, _)
+    if built is None:
+        await query.answer(_("This plugin has no settings."), show_alert=True)
+        return
+    text, rows = built
+    await _show(query, text, rows)
 
 
 async def edit_plugin_setting(

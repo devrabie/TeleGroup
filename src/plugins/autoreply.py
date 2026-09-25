@@ -182,6 +182,10 @@ async def on_message(session: AccountSession, message: object) -> None:
         chosen = next((row for row in global_rows if _matches(text, row["keyword"])), None)
     if chosen is None:
         return
+    from src.runtime.actors import is_trusted_sender
+
+    if is_trusted_sender(session.account_id, message):
+        return
     try:
         await session.limiter.run(session.client.send_message, chat_id, chosen["response"])
     except Exception:
