@@ -102,6 +102,10 @@ async def on_message(session: AccountSession, message: object) -> None:
     locks = set(list_locks(session.account_id, chat_id))
     if not lock_matches(message, locks):
         return
+    from src.runtime.actors import is_trusted_sender
+
+    if is_trusted_sender(session.account_id, message):
+        return
     try:
         await session.limiter.run(session.client.delete_messages, chat_id, [message_id])
     except Exception:

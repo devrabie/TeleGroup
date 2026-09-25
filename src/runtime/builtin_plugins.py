@@ -8,7 +8,7 @@ still skips plans that already have any allowlist row. Alembic 0004 inserts
 the phase 4 names into plans that already exist and does not delete rows.
 """
 
-from src.plan_grants import PHASE4_PLUGIN_NAMES
+from src.plan_grants import DELEGATES_PLUGIN_NAMES, PHASE4_PLUGIN_NAMES
 
 DEFAULT_PLAN_PLUGINS: tuple[str, ...] = (
     "ping",
@@ -28,4 +28,5 @@ DEFAULT_PLAN_PLUGINS: tuple[str, ...] = (
     "gifts",
     "games",
     *PHASE4_PLUGIN_NAMES,
+    *DELEGATES_PLUGIN_NAMES,
 )

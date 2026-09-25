@@ -170,6 +170,26 @@ class AccountPlugin(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
 
 
+class AccountAdmin(Base):
+    """Telegram user who may send commands to one managed account.
+
+    The registered owner and the account itself are not rows here. They can
+    always command the account. Only the owner can insert or delete rows.
+    """
+
+    __tablename__ = "account_admins"
+    __table_args__ = (UniqueConstraint("account_id", "telegram_id", name="uq_account_admins_pair"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("managed_accounts.id", ondelete="CASCADE"), nullable=False
+    )
+    telegram_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    username: Mapped[str | None] = mapped_column(String(64))
+    added_by_telegram_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+
+
 class PluginSetting(Base):
     """JSON values scoped to one account and plugin."""
 

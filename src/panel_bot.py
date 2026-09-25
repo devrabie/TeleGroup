@@ -18,6 +18,7 @@ from src.panel import (
     actor_allowed,
     adjust_setting,
     alert_text,
+    remove_panel_admin,
     render,
     toggle_plugin,
     unpack_callback,
@@ -112,6 +113,17 @@ async def on_panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 ),
             )
         op, arg = "s", plugin_name
+    elif op == "r":
+        notice = alert_text(
+            language,
+            remove_panel_admin(
+                parsed.account_id,
+                query.from_user.id,
+                parsed.account_user_id,
+                arg,
+            ),
+        )
+        op, arg = "a", ""
     try:
         text, rows = render(parsed.account_id, parsed.account_user_id, op, arg)
         if query.message is not None:

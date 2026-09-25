@@ -17,7 +17,7 @@ from src.command_catalog import CATEGORIES, category_of, plugin_label
 from src.config import get_settings
 from src.templates import apply_prefix, field, is_ar, panel_closed, panel_home, pick
 
-_OPS = frozenset({"h", "c", "g", "d", "t", "s", "k", "x"})
+_OPS = frozenset({"h", "c", "g", "d", "t", "s", "k", "x", "a", "r"})
 _ARG = re.compile(r"^[a-z0-9:+-]*$")
 _ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -254,18 +254,50 @@ def render(
         return _command(account_id, account_user_id, language, arg)
     if op == "s" and arg:
         return _settings(account_id, account_user_id, language, arg)
+    if op == "a":
+        if arg == "add":
+            return _admins_add(account_id, account_user_id, language)
+        return _admins(account_id, account_user_id, language)
     return _home(account_id, account_user_id, language)
 
 
 def _home(account_id: int, account_user_id: int, language: str) -> tuple[str, ButtonRows]:
     prefix = escape(_prefix(account_id))
     pairs = [
-        _button(account_id, account_user_id, item.label(language), "c", item.id)
+        _button(
+            account_id,
+            account_user_id,
+            f"{item.emoji} {item.title(language)}",
+            "c",
+            item.id,
+        )
         for item in CATEGORIES
     ]
-    return panel_home(language, prefix), _rows_of(pairs, 2) + _nav(
-        account_id, account_user_id, language
-    )
+    admins = "👥 المسؤولون" if is_ar(language) else "👥 Admins"
+    rows = _rows_of(pairs, 2)
+    rows.append([_button(account_id, account_user_id, admins, "a")])
+    return panel_home(language, prefix), rows + _nav(account_id, account_user_id, language)
+
+
+def _view_state(language: str, view: dict) -> tuple[str, str]:
+    if not view.get("allowed"):
+        if is_ar(language):
+            return "🔒", "غير متاحة"
+        return "🔒", "Not in plan"
+    if view.get("enabled"):
+        if is_ar(language):
+            return "🟢", "تعمل الآن"
+        return "🟢", "On"
+    if is_ar(language):
+        return "⚪️", "متوقفة"
+    return "⚪️", "Off"
+
+
+def _short(text: str, limit: int = 26) -> str:
+    cleaned = " ".join(text.split())
+    if len(cleaned) <= limit:
+        return cleaned
+    return cleaned[: limit - 1] + "…"
 
 
 def _category(
@@ -276,40 +308,38 @@ def _category(
     category = CATEGORY_BY_ID.get(category_id)
     if category is None:
         return _home(account_id, account_user_id, language)
-    plugins = _plugins()
     lines = []
     pairs: list[tuple[str, str]] = []
     for view in _views(account_id, language):
         if category_of(view["name"]).id != category_id:
             continue
-        plugin = plugins.get(view["name"])
         label = plugin_label(view["name"], language)
-        if not view["allowed"]:
-            mark = "🔒"
-            state = "غير مشمولة" if is_ar(language) else "Locked"
-        elif view["enabled"]:
-            mark = "🟢"
-            state = "تعمل" if is_ar(language) else "On"
-        else:
-            mark = "⚪️"
-            state = "متوقفة" if is_ar(language) else "Off"
+        mark, state = _view_state(language, view)
         description = escape(str(view["description"]))
         lines.append(f"{mark} <b>{escape(label)}</b> — {escape(state)}\n{description}")
-        if plugin is not None and plugin.meta.commands:
-            shown = plugin.meta.commands[:4]
-            extra = len(plugin.meta.commands) - len(shown)
-            names = " ".join(escape(f"{_prefix(account_id)}{item.name}") for item in shown)
-            if extra:
-                names += f" +{extra}"
-            lines.append(names)
-        pairs.append(_button(account_id, account_user_id, f"{mark} {label}", "g", view["name"]))
+        pairs.append(
+            _button(account_id, account_user_id, f"{mark} {label} — {state}", "g", view["name"])
+        )
     if not lines:
         lines.append(
-            "لا توجد إضافات في هذا القسم." if is_ar(language) else "This section is empty."
+            "لا توجد ميزات في هذا القسم." if is_ar(language) else "This section has no features."
         )
-    title = escape(category.label(language))
-    text = f"<b>{title}</b>\n⋆┄─┄─┄─┄┄─┄─┄─┄─┄┄⋆\n" + "\n".join(lines)
-    back = ("↩ رجوع" if is_ar(language) else "↩ Back", ("h", ""))
+    title = escape(f"{category.emoji} {category.title(language)}")
+    if is_ar(language):
+        intro = (
+            "اضغط اسم الميزة لفتحها.\n"
+            "من الشاشة التالية تشغّلها أو توقفها وتقرأ أوامرها.\n"
+            "🟢 تعمل الآن · ⚪️ متوقفة · 🔒 غير متاحة في خطتك"
+        )
+    else:
+        intro = (
+            "Tap a feature to open it.\n"
+            "The next screen turns it on or off and shows its commands.\n"
+            "🟢 On · ⚪️ Off · 🔒 Not in your plan"
+        )
+    text = f"<b>{title}</b>\n⋆┄─┄─┄─┄┄─┄─┄─┄─┄┄⋆\n{intro}\n\n" + "\n".join(lines)
+    back_label = "↩ رجوع للأقسام" if is_ar(language) else "↩ Back to sections"
+    back = (back_label, ("h", ""))
     return text, _rows_of(pairs, 1) + _nav(account_id, account_user_id, language, back=back)
 
 
@@ -326,17 +356,37 @@ def _plugin(
         return _home(account_id, account_user_id, language)
     label = plugin_label(plugin_name, language)
     prefix = _prefix(account_id)
+    mark, state = _view_state(language, view)
     if not view["allowed"]:
-        state = "🔒 " + ("غير مشمولة في الخطة" if is_ar(language) else "Not in your plan")
+        lead = (
+            "هذه الميزة غير متاحة في خطتك، لذلك لا يمكن تشغيلها من هنا."
+            if is_ar(language)
+            else "This feature is not in your plan, so it cannot be turned on here."
+        )
     elif view["enabled"]:
-        state = "🟢 " + ("تعمل" if is_ar(language) else "On")
+        lead = (
+            "هذه الميزة تعمل الآن. اضغط الزر لإيقافها، أو اضغط أمراً لترى مثالاً."
+            if is_ar(language)
+            else (
+                "This feature is on. Tap the button to turn it off, "
+                "or tap a command for an example."
+            )
+        )
     else:
-        state = "⚪️ " + ("متوقفة" if is_ar(language) else "Off")
+        lead = (
+            "هذه الميزة متوقفة. اضغط الزر لتشغيلها، أو اضغط أمراً لتعرف ماذا تفعل."
+            if is_ar(language)
+            else (
+                "This feature is off. Tap the button to turn it on, "
+                "or tap a command to see what it does."
+            )
+        )
     lines = [
-        f"<b>{escape(label)}</b>",
+        f"<b>{mark} {escape(label)}</b>",
         "⋆┄─┄─┄─┄┄─┄─┄─┄─┄┄⋆",
+        escape(lead),
         escape(plugin.meta.description(language)),
-        escape(field("الحالة" if is_ar(language) else "Status", state)),
+        escape(field("الحالة" if is_ar(language) else "Status", f"{mark} {state}")),
     ]
     pairs: list[tuple[str, str]] = []
     seen: set[str] = set()
@@ -364,22 +414,23 @@ def _plugin(
             _button(
                 account_id,
                 account_user_id,
-                command.name,
+                f"📖 {command.name}: {_short(command.description(language))}",
                 "d",
                 f"{plugin_name}:{index}",
             )
         )
-    buttons = _rows_of(pairs, 2)
+    buttons = _rows_of(pairs, 1)
     if view["allowed"]:
         if view["enabled"]:
-            toggle_label = "⏸ إيقاف" if is_ar(language) else "⏸ Disable"
+            toggle_label = f"⏸ إيقاف {label}" if is_ar(language) else f"⏸ Turn off {label}"
         else:
-            toggle_label = "▶️ تشغيل" if is_ar(language) else "▶️ Enable"
+            toggle_label = f"▶️ تشغيل {label}" if is_ar(language) else f"▶️ Turn on {label}"
         buttons.append([_button(account_id, account_user_id, toggle_label, "t", plugin_name)])
     if plugin.meta.settings and view["allowed"]:
-        settings_label = "⚙️ الإعدادات" if is_ar(language) else "⚙️ Settings"
+        settings_label = f"⚙️ إعدادات {label}" if is_ar(language) else f"⚙️ Settings for {label}"
         buttons.append([_button(account_id, account_user_id, settings_label, "s", plugin_name)])
-    back_label = "↩ القسم" if is_ar(language) else "↩ Section"
+    section = category_of(plugin_name).title(language)
+    back_label = f"↩ رجوع إلى {section}" if is_ar(language) else f"↩ Back to {section}"
     back = (back_label, ("c", category_of(plugin_name).id))
     return "\n".join(lines), buttons + _nav(account_id, account_user_id, language, back=back)
 
@@ -402,28 +453,39 @@ def _command(
         for item in plugin.meta.commands
         if item.description_en == command.description_en
     )
+    from src.runtime.actors import access_label
+
     usage = escape(apply_prefix(command.usage(language), prefix))
     example = escape(apply_prefix(command.example(language), prefix))
+    access = escape(access_label(language, command.name))
+    feature = plugin_label(plugin_name, language)
     if is_ar(language):
+        lead = "هذا مثال جاهز. أرسله كما هو، أو غيّر الاسم والمعرّف."
         body = "\n".join(
             [
+                escape(lead),
                 escape(field("الوصف", command.description(language))),
                 f"● الاستخدام: {usage}",
                 f"● مثال: {example}",
                 f"● الأسماء: {names}",
+                f"● من يستخدمه: {access}",
             ]
         )
     else:
+        lead = "This is a ready example. Send it as written, or change the name and id."
         body = "\n".join(
             [
+                escape(lead),
                 escape(field("Description", command.description(language))),
                 f"● Usage: {usage}",
                 f"● Example: {example}",
                 f"● Names: {names}",
+                f"● Who can use it: {access}",
             ]
         )
     text = f"<b>{escape(prefix + command.name)}</b>\n⋆┄─┄─┄─┄┄─┄─┄─┄─┄┄⋆\n{body}"
-    back = ("↩ الإضافة" if is_ar(language) else "↩ Plugin", ("g", plugin_name))
+    back_label = f"↩ رجوع إلى {feature}" if is_ar(language) else f"↩ Back to {feature}"
+    back = (back_label, ("g", plugin_name))
     return text, _nav(account_id, account_user_id, language, back=back)
 
 
@@ -436,48 +498,50 @@ def _settings(
     plugin = plugins.get(plugin_name)
     if plugin is None or not plugin.meta.settings:
         return _plugin(account_id, account_user_id, language, plugin_name)
+    feature = plugin_label(plugin_name, language)
+    if is_ar(language):
+        intro = (
+            "اضغط الزر لتغيير الإعداد. التغيير يسري مباشرة.\n"
+            "زر التشغيل يبدّل بين يعمل ومتوقف.\n"
+            "زر الزيادة والنقصان يغيّر الرقم.\n"
+            "النص الطويل يُعدّل من أمر الميزة نفسه."
+        )
+    else:
+        intro = (
+            "Tap a button to change that setting. It applies immediately.\n"
+            "The on/off button switches the setting.\n"
+            "The plus and minus buttons change a number.\n"
+            "Long text is changed with the feature's own command."
+        )
     lines = [
-        f"<b>{escape(plugin_label(plugin_name, language))}</b>",
+        f"<b>⚙️ {escape(feature)}</b>",
         "⋆┄─┄─┄─┄┄─┄─┄─┄─┄┄⋆",
-        "الإعدادات" if is_ar(language) else "Settings",
+        escape(intro),
     ]
     buttons: ButtonRows = []
     for index, spec in enumerate(plugin.meta.settings):
         current = current_setting(account_id, plugin_name, spec)
         label = spec.label(language)
         if spec.kind == "bool":
-            mark = "🟢" if current else "⚪️"
-            state = (
-                ("تشغيل" if current else "إيقاف")
-                if is_ar(language)
-                else ("On" if current else "Off")
-            )
-            lines.append(escape(field(label, f"{mark} {state}")))
+            if current:
+                action = f"⏸ إيقاف {label}" if is_ar(language) else f"⏸ Turn off {label}"
+                state = "🟢 تعمل" if is_ar(language) else "🟢 On"
+            else:
+                action = f"▶️ تشغيل {label}" if is_ar(language) else f"▶️ Turn on {label}"
+                state = "⚪️ متوقفة" if is_ar(language) else "⚪️ Off"
+            lines.append(escape(field(label, state)))
             buttons.append(
-                [
-                    _button(
-                        account_id,
-                        account_user_id,
-                        f"{mark} {label}",
-                        "k",
-                        f"{plugin_name}:{index}:t",
-                    )
-                ]
+                [_button(account_id, account_user_id, action, "k", f"{plugin_name}:{index}:t")]
             )
         elif spec.kind == "int":
             lines.append(escape(field(label, current)))
+            decrease = f"➖ تقليل {label}" if is_ar(language) else f"➖ Decrease {label}"
+            increase = f"➕ زيادة {label}" if is_ar(language) else f"➕ Increase {label}"
             buttons.append(
-                [
-                    _button(account_id, account_user_id, "−", "k", f"{plugin_name}:{index}:m"),
-                    _button(
-                        account_id,
-                        account_user_id,
-                        str(current),
-                        "s",
-                        plugin_name,
-                    ),
-                    _button(account_id, account_user_id, "+", "k", f"{plugin_name}:{index}:p"),
-                ]
+                [_button(account_id, account_user_id, decrease, "k", f"{plugin_name}:{index}:m")]
+            )
+            buttons.append(
+                [_button(account_id, account_user_id, increase, "k", f"{plugin_name}:{index}:p")]
             )
         else:
             shown = str(current if current is not None else "")
@@ -485,13 +549,116 @@ def _settings(
                 shown = shown[:77] + "…"
             lines.append(escape(field(label, shown or "—")))
             note = (
-                "النص يُعدّل من أمر الإضافة."
+                "هذا النص يُعدّل من أمر الميزة، وليس من زر."
                 if is_ar(language)
-                else "Change this text with the plugin command."
+                else "Change this text with the feature's command, not a button."
             )
             lines.append(escape(note))
-    back = ("↩ الإضافة" if is_ar(language) else "↩ Plugin", ("g", plugin_name))
+    back_label = f"↩ رجوع إلى {feature}" if is_ar(language) else f"↩ Back to {feature}"
+    back = (back_label, ("g", plugin_name))
     return "\n".join(lines), buttons + _nav(account_id, account_user_id, language, back=back)
+
+
+def _admin_name(row: dict) -> str:
+    username = row.get("username")
+    if username:
+        return f"@{username}"
+    return str(row.get("telegram_id"))
+
+
+def _admins(account_id: int, account_user_id: int, language: str) -> tuple[str, ButtonRows]:
+    from src.runtime.store import list_account_admins
+
+    rows = list_account_admins(account_id)
+    prefix = escape(_prefix(account_id))
+    if is_ar(language):
+        intro = (
+            "هؤلاء يستطيعون إرسال أوامر الحساب من حساباتهم، في الخاص أو في مجموعة أنتم فيها معاً.\n"
+            "أنت والحساب نفسه تستطيعان دائماً. المسؤول لا يضيف مسؤولاً آخر.\n"
+            f"للإضافة أرسل {prefix}رفع ادمن بالرد أو المعرّف أو @username، "
+            "أو من بوت التحكم في شاشة مسؤولو الأوامر."
+        )
+        empty = "لا يوجد مسؤولون بعد."
+        title = "👥 المسؤولون"
+        add_label = "➕ كيف أضيف مسؤولاً"
+    else:
+        intro = (
+            "These people can send this account's commands from their own accounts, "
+            "in private or in a group you share.\n"
+            "You and the account itself always can. An admin cannot add another admin.\n"
+            f"To add one, send {prefix}addadmin by reply, id, or @username, "
+            "or use the control bot's admins screen."
+        )
+        empty = "No admins yet."
+        title = "👥 Admins"
+        add_label = "➕ How to add an admin"
+    lines = [f"<b>{title}</b>", "⋆┄─┄─┄─┄┄─┄─┄─┄─┄┄⋆", escape(intro)]
+    if not rows:
+        lines.append(escape(empty))
+    else:
+        for row in rows:
+            lines.append(escape(field(str(row["telegram_id"]), _admin_name(row))))
+    buttons: ButtonRows = [[_button(account_id, account_user_id, add_label, "a", "add")]]
+    for row in rows:
+        name = _admin_name(row)
+        remove = f"🗑 إزالة {name}" if is_ar(language) else f"🗑 Remove {name}"
+        buttons.append(
+            [
+                _button(
+                    account_id,
+                    account_user_id,
+                    remove,
+                    "r",
+                    _b36(int(row["telegram_id"])),
+                )
+            ]
+        )
+    back = ("↩ رجوع للأقسام" if is_ar(language) else "↩ Back to sections", ("h", ""))
+    return "\n".join(lines), buttons + _nav(account_id, account_user_id, language, back=back)
+
+
+def _admins_add(account_id: int, account_user_id: int, language: str) -> tuple[str, ButtonRows]:
+    prefix = escape(_prefix(account_id))
+    if is_ar(language):
+        body = (
+            "الإضافة تتم برسالة، لأن هذا الزر لا يستقبل أسماء.\n"
+            f"من الحساب، أو من حسابك في الخاص أو في مجموعة مع الحساب:\n"
+            f"● {prefix}رفع ادمن بالرد على رسالته\n"
+            f"● {prefix}رفع ادمن 123456789\n"
+            f"● {prefix}رفع ادمن @username\n"
+            "أو افتح بوت التحكم، ثم الحساب، ثم «مسؤولو الأوامر»، ثم «إضافة مسؤول».\n"
+            "فقط صاحب الحساب يستطيع الإضافة والإزالة."
+        )
+        title = "➕ إضافة مسؤول"
+        back_label = "↩ رجوع للمسؤولين"
+    else:
+        body = (
+            "Adding someone needs a message, because this button cannot take a name.\n"
+            "From the account, or from your account in private or in a shared group:\n"
+            f"● {prefix}addadmin by reply\n"
+            f"● {prefix}addadmin 123456789\n"
+            f"● {prefix}addadmin @username\n"
+            "Or open the control bot, the account, Command admins, then Add an admin.\n"
+            "Only the account owner can add or remove admins."
+        )
+        title = "➕ Add an admin"
+        back_label = "↩ Back to admins"
+    text = f"<b>{title}</b>\n⋆┄─┄─┄─┄┄─┄─┄─┄─┄┄⋆\n{escape(body)}"
+    back = (back_label, ("a", ""))
+    return text, _nav(account_id, account_user_id, language, back=back)
+
+
+def remove_panel_admin(account_id: int, actor_id: int, account_user_id: int, arg: str) -> str:
+    if not actor_allowed(account_id, actor_id, account_user_id):
+        return "denied"
+    admin_id = _b36_dec(arg)
+    if admin_id is None:
+        return "admin-missing"
+    from src.runtime.store import remove_account_admin
+
+    if remove_account_admin(account_id, admin_id):
+        return "admin-removed"
+    return "admin-missing"
 
 
 def alert_text(language: str, code: str) -> str:
@@ -503,9 +670,11 @@ def alert_text(language: str, code: str) -> str:
         "missing": ("That plugin was not found.", "تعذر العثور على الإضافة."),
         "saved": ("Saved. It applies without a restart.", "تم الحفظ. يسري بدون إعادة تشغيل."),
         "readonly": (
-            "Change this text with the plugin command.",
-            "عدّل هذا النص من أمر الإضافة.",
+            "Change this text with the feature's command.",
+            "عدّل هذا النص من أمر الميزة.",
         ),
+        "admin-removed": ("Admin removed.", "تمت إزالة المسؤول."),
+        "admin-missing": ("That admin was not found.", "هذا المسؤول غير موجود."),
     }
     en, ar = table.get(code, ("Could not update that.", "تعذر التعديل."))
     return pick(language, en, ar)

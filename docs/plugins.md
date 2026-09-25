@@ -39,7 +39,7 @@ plugin = PingPlugin()
 
 ## Commands
 
-The dispatcher accepts an outgoing message from the account itself (saved messages or any chat the account sends in). The default prefix is `.` (`USERBOT_PREFIX`). An account can override it with a core setting:
+The dispatcher accepts a command from the account itself (saved messages or any chat the account sends in), from the registered owner, and from people in `account_admins`. Anyone else is ignored with no reply. When the sender is not the account, the reply is a new message in that chat; the account does not edit the other person's message. The same plan and per-account enablement checks apply. Owner-only commands are listed in [admins-ar.md](admins-ar.md). Incoming commands from an admin are rate-limited. The default prefix is `.` (`USERBOT_PREFIX`). An account can override it with a core setting:
 
 ```python
 from src.runtime.plugins import CORE_PLUGIN, PluginSettings

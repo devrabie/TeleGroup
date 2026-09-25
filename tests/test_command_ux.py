@@ -141,7 +141,7 @@ def test_callback_data_stays_within_64_bytes(tmp_path, monkeypatch):
                 assert parsed.account_id == account_id
                 assert parsed.account_user_id == account_user_id
                 seen.append(data)
-                if parsed.op in {"c", "g", "d", "s"} and (parsed.op, parsed.arg) not in walked:
+                if parsed.op in {"c", "g", "d", "s", "a"} and (parsed.op, parsed.arg) not in walked:
                     walked.add((parsed.op, parsed.arg))
                     _walk(parsed.op, parsed.arg)
 

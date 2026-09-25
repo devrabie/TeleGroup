@@ -2385,3 +2385,203 @@ msgstr "تعذر تفعيل هذا الرمز. حاول مرة أخرى لاحق
 
 msgid "Your subscription was ended by an admin."
 msgstr "أنهى المشرف اشتراكك."
+
+msgid "🧩 Account features"
+msgstr "🧩 ميزات الحساب"
+
+msgid "👥 Command admins"
+msgstr "👥 مسؤولو الأوامر"
+
+msgid "Not available"
+msgstr "غير متاحة"
+
+msgid "On now"
+msgstr "تعمل الآن"
+
+msgid "Off now"
+msgstr "متوقفة"
+
+#, python-brace-format
+msgid ""
+"<b>🧩 Account features</b>\n"
+"Turn features on or off for this account.\n"
+"Tap a section, then tap a feature. You will see what it does before anything changes.\n"
+"🟢 On now · ⚪️ Off · 🔒 Not in your plan\n"
+"On: {on} · Off: {off} · Locked: {locked}"
+msgstr ""
+"<b>🧩 ميزات الحساب</b>\n"
+"من هنا تشغّل ميزات هذا الحساب أو توقفها.\n"
+"اضغط القسم، ثم اضغط اسم الميزة. ستقرأ شرحها قبل أن يتغير شيء.\n"
+"🟢 تعمل الآن · ⚪️ متوقفة · 🔒 غير متاحة في خطتك\n"
+"تعمل: {on} · متوقفة: {off} · غير متاحة: {locked}"
+
+#, python-brace-format
+msgid ""
+"<b>{emoji} {title}</b>\n"
+"Tap a feature. The button shows its name and whether it is on.\n"
+"The next screen explains it and lets you turn it on or off."
+msgstr ""
+"<b>{emoji} {title}</b>\n"
+"اضغط اسم الميزة. الزر يعرض اسمها وهل تعمل الآن.\n"
+"الشاشة التالية تشرحها وتتيح لك تشغيلها أو إيقافها."
+
+msgid "This section has no features."
+msgstr "لا توجد ميزات في هذا القسم."
+
+msgid "↩ Back to features"
+msgstr "↩ رجوع للميزات"
+
+msgid "🔙 Back to this account"
+msgstr "🔙 رجوع لهذا الحساب"
+
+msgid "This feature is not in your plan, so it cannot be turned on here."
+msgstr "هذه الميزة غير متاحة في خطتك، لذلك لا يمكن تشغيلها من هنا."
+
+msgid "This feature is on. Use the button below to turn it off."
+msgstr "هذه الميزة تعمل الآن. اضغط الزر بالأسفل لإيقافها."
+
+msgid "This feature is off. Use the button below to turn it on."
+msgstr "هذه الميزة متوقفة. اضغط الزر بالأسفل لتشغيلها."
+
+#, python-brace-format
+msgid "Status: {state}"
+msgstr "الحالة: {state}"
+
+msgid "<b>Commands</b>"
+msgstr "<b>الأوامر</b>"
+
+#, python-brace-format
+msgid "Send these from the account, or from your own account if you are the owner or an admin. They start with {prefix}."
+msgstr "أرسلها من الحساب، أو من حسابك إذا كنت صاحب الحساب أو مسؤولاً. تبدأ بـ {prefix}."
+
+#, python-brace-format
+msgid "⏸ Turn off {name}"
+msgstr "⏸ إيقاف {name}"
+
+#, python-brace-format
+msgid "▶️ Turn on {name}"
+msgstr "▶️ تشغيل {name}"
+
+#, python-brace-format
+msgid "⚙️ Settings for {name}"
+msgstr "⚙️ إعدادات {name}"
+
+#, python-brace-format
+msgid "↩ Back to {section}"
+msgstr "↩ رجوع إلى {section}"
+
+msgid "🏠 Features home"
+msgstr "🏠 ميزات الحساب"
+
+#, python-brace-format
+msgid ""
+"<b>⚙️ Settings for {name}</b>\n"
+"Tap a button to change that setting.\n"
+"An on/off button switches immediately.\n"
+"Other settings ask you to send the new value.\n"
+"Send - to restore the original value, or الغاء to stop."
+msgstr ""
+"<b>⚙️ إعدادات {name}</b>\n"
+"اضغط الزر لتغيير الإعداد.\n"
+"زر التشغيل يبدّل بين يعمل ومتوقف مباشرة.\n"
+"باقي الإعدادات تطلب منك إرسال القيمة الجديدة.\n"
+"أرسل - للرجوع للقيمة الأولى، أو الغاء للتوقف."
+
+#, python-brace-format
+msgid "⏸ Turn off: {label}"
+msgstr "⏸ إيقاف: {label}"
+
+#, python-brace-format
+msgid "▶️ Turn on: {label}"
+msgstr "▶️ تشغيل: {label}"
+
+#, python-brace-format
+msgid "✏️ Change {label} — now: {value}"
+msgstr "✏️ تغيير {label} — الآن: {value}"
+
+#, python-brace-format
+msgid "↩ Back to {name}"
+msgstr "↩ رجوع إلى {name}"
+
+msgid ""
+"<b>Plan features</b>\n"
+"Tap a feature to allow it or block it on this plan. The name is what people see, not an internal id."
+msgstr ""
+"<b>ميزات الخطة</b>\n"
+"اضغط الميزة للسماح بها أو منعها في هذه الخطة. الاسم هو ما يراه الناس، وليس رقماً داخلياً."
+
+msgid "Only the account owner can manage command admins."
+msgstr "إدارة مسؤولي الأوامر لصاحب الحساب فقط."
+
+msgid "No admins yet. Add someone you trust with the button below."
+msgstr "لا يوجد مسؤولون بعد. أضف شخصاً تثق به من الزر بالأسفل."
+
+#, python-brace-format
+msgid ""
+"<b>👥 Command admins</b>\n"
+"These people can send this account's commands from their own Telegram account, in a private chat with the account or in a group you are both in.\n"
+"You and the account itself can always send commands. An admin cannot add another admin.\n"
+"Sensitive commands stay with you: profile, password, creating chats, broadcast, deleting saved replies, and managing admins.\n"
+"From the account you can also send <code>{prefix}رفع ادمن</code> and <code>{prefix}الادمنية</code>.\n"
+"\n"
+"{listing}"
+msgstr ""
+"<b>👥 مسؤولو الأوامر</b>\n"
+"هؤلاء يستطيعون إرسال أوامر الحساب من حساباتهم، في الخاص مع الحساب أو في مجموعة أنتم فيها معاً.\n"
+"أنت والحساب نفسه تستطيعان دائماً. المسؤول لا يضيف مسؤولاً آخر.\n"
+"الأوامر الحساسة تبقى لك: الملف، كلمة السر، إنشاء المحادثات، الإذاعة، حذف الردود المحفوظة، وإدارة المسؤولين.\n"
+"من الحساب يمكنك أيضاً إرسال <code>{prefix}رفع ادمن</code> و<code>{prefix}الادمنية</code>.\n"
+"\n"
+"{listing}"
+
+msgid "➕ Add an admin"
+msgstr "➕ إضافة مسؤول"
+
+#, python-brace-format
+msgid "🗑 Remove {name}"
+msgstr "🗑 إزالة {name}"
+
+#, python-brace-format
+msgid ""
+"<b>➕ Add an admin</b>\n"
+"Send their numeric Telegram id, or their @username.\n"
+"If the username cannot be found, send the numeric id, or add them from the account by replying to their message with <code>{prefix}رفع ادمن</code>.\n"
+"Send الغاء to stop.\n"
+"The limit is {limit} admins."
+msgstr ""
+"<b>➕ إضافة مسؤول</b>\n"
+"أرسل معرّفه الرقمي في تيليجرام، أو @username.\n"
+"إذا لم يُعثر على اسم المستخدم، أرسل المعرّف الرقمي، أو أضفه من الحساب بالرد على رسالته بهذا الأمر <code>{prefix}رفع ادمن</code>.\n"
+"أرسل الغاء للتوقف.\n"
+"الحد {limit} مسؤولاً."
+
+msgid "✖ Cancel"
+msgstr "✖ إلغاء"
+
+msgid "Could not add that admin."
+msgstr "تعذرت إضافة المسؤول."
+
+msgid "That user was not found. Send a numeric Telegram id, or add them from the account by reply."
+msgstr "لم يُعثر على هذا المستخدم. أرسل معرّفه الرقمي، أو أضفه من الحساب بالرد عليه."
+
+msgid "Admin added. They can send commands from their own account."
+msgstr "تمت إضافة المسؤول. يستطيع الآن إرسال الأوامر من حسابه."
+
+msgid "That person is already an admin."
+msgstr "هذا المستخدم مسؤول بالفعل."
+
+msgid "The account owner can already send commands."
+msgstr "صاحب الحساب يستطيع إرسال الأوامر دون إضافته."
+
+#, python-brace-format
+msgid "This account already has {limit} admins."
+msgstr "اكتمل العدد. الحد {limit} مسؤولاً."
+
+msgid "That id is not valid."
+msgstr "هذا المعرّف غير صالح."
+
+msgid "Admin removed."
+msgstr "تمت إزالة المسؤول."
+
+msgid "That person is not an admin."
+msgstr "هذا المستخدم ليس مسؤولاً."

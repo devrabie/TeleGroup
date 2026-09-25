@@ -44,9 +44,18 @@ from src.database import (
     resolve_sharing_token, transfer_managed_account,
 )
 from src.payments import parse_invoice_payload, validate_stars_payment
+from src.account_admin_menu import (
+    cancel_add_account_admin,
+    receive_account_admin_text,
+    remove_listed_admin,
+    show_account_admins,
+    start_add_account_admin,
+)
 from src.plugin_menu import (
     edit_plugin_setting,
     receive_plugin_setting,
+    show_plugin_category,
+    show_plugin_detail,
     show_plugin_settings,
     show_plugins_menu,
     toggle_account_plugin,
@@ -2180,7 +2189,8 @@ async def account_detail_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         [
             InlineKeyboardButton(_("📢 Channels & Groups"), callback_data=f"mng_channels_{acc['id']}")
         ],
-        [InlineKeyboardButton(_("🧩 Plugins"), callback_data=f"mng_plugins_{acc['id']}")],
+        [InlineKeyboardButton(_("🧩 Account features"), callback_data=f"mng_plugins_{acc['id']}")],
+        [InlineKeyboardButton(_("👥 Command admins"), callback_data=f"mng_admins_{acc['id']}")],
         [InlineKeyboardButton(_("❌ Delete"), callback_data=f"mng_delete_{acc['id']}")],
         [InlineKeyboardButton(_("🔙 Back to Account List"), callback_data="mng_back_list")]
     ]
@@ -2282,7 +2292,7 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
         from datetime import timedelta
         action_parts = query.data.split("_")
         action = action_parts[1] if len(action_parts) > 1 else ""
-        if action not in {"proxy", "toggle", "monitor", "deleteconfirm", "plugtog", "pf"}:
+        if action not in {"proxy", "toggle", "monitor", "deleteconfirm", "plugtog", "pf", "admrm"}:
             await _safe_answer_query(query)
 
         if action == "cancel":
@@ -2302,6 +2312,32 @@ async def manage_account_callback(update: Update, context: ContextTypes.DEFAULT_
 
         if action == "plugins":
             await show_plugins_menu(update, context, int(action_parts[2]))
+            return
+
+        if action == "pcat":
+            await show_plugin_category(update, context, int(action_parts[2]), action_parts[3])
+            return
+
+        if action == "pview":
+            await show_plugin_detail(update, context, int(action_parts[2]), action_parts[3])
+            return
+
+        if action == "admins":
+            await show_account_admins(update, context, int(action_parts[2]))
+            return
+
+        if action == "admadd":
+            await start_add_account_admin(update, context, int(action_parts[2]))
+            return
+
+        if action == "admstop":
+            await cancel_add_account_admin(update, context, int(action_parts[2]))
+            return
+
+        if action == "admrm":
+            await remove_listed_admin(
+                update, context, int(action_parts[2]), int(action_parts[3])
+            )
             return
 
         if action == "plugtog":
@@ -2648,6 +2684,7 @@ user_handlers_list = [
     two_step_conv_handler,
     team_add_conv_handler,
     CallbackQueryHandler(manage_account_callback, pattern="^mng_"),
+    MessageHandler(filters.TEXT & ~filters.COMMAND, receive_account_admin_text),
     MessageHandler(filters.TEXT & ~filters.COMMAND, receive_plugin_setting),
     CallbackQueryHandler(team_callback, pattern="^team_"),
     CallbackQueryHandler(invite_callback, pattern="^invite_"),

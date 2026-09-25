@@ -1,7 +1,8 @@
 """Plugin types, registry, and command dispatch.
 
 A plugin is a small object with metadata and optional ``handle`` / ``spawn``
-methods. Command plugins answer outgoing messages from the account itself.
+methods. Command plugins answer the account itself, its registered owner,
+and account admins. Other senders are ignored.
 Background plugins return a long-running coroutine from ``spawn``. One plugin
 raising does not cancel the others.
 """
@@ -162,7 +163,13 @@ class AccountSession:
 
 
 class CommandContext:
-    """One outgoing command invocation."""
+    """One command invocation.
+
+    ``actor_role`` is ``self`` when the managed account sent the command,
+    ``owner`` for the registered owner, or ``admin`` for an account admin.
+    ``reply`` always sends a new message. It does not edit the command,
+    because an owner or admin message cannot be edited by this account.
+    """
 
     def __init__(
         self,
@@ -176,6 +183,8 @@ class CommandContext:
         language: str,
         plugin_name: str,
         limiter: AccountLimiter,
+        actor_role: str = "self",
+        actor_id: int | None = None,
     ) -> None:
         self.client = client
         self.account_id = account_id
@@ -186,9 +195,16 @@ class CommandContext:
         self.language = language
         self.plugin_name = plugin_name
         self.limiter = limiter
+        self.actor_role = actor_role
+        self.actor_id = actor_id
         self.settings = PluginSettings(account_id, plugin_name)
 
+    @property
+    def from_self(self) -> bool:
+        return self.actor_role == "self"
+
     async def reply(self, text: str) -> Any:
+        """Send a new message in the same chat. Never edits the command."""
         chat = getattr(self.message, "chat", None)
         chat_id = getattr(chat, "id", None)
         if chat_id is None:
@@ -241,6 +257,7 @@ def load_plugins() -> None:
     from src.plugins.codewatch import plugin as codewatch
     from src.plugins.convert import plugin as convert
     from src.plugins.createchat import plugin as createchat
+    from src.plugins.delegates import plugin as delegates
     from src.plugins.download import plugin as download
     from src.plugins.games import plugin as games
     from src.plugins.gifts import plugin as gifts
@@ -268,6 +285,7 @@ def load_plugins() -> None:
         ping,
         identify,
         help_plugin,
+        delegates,
         admin,
         storage,
         autoreply,
@@ -396,7 +414,11 @@ def parse_command(text: str, prefix: str) -> tuple[str, str] | None:
 
 
 class Dispatcher:
-    """Route one message from the account itself to at most one plugin."""
+    """Route one command to at most one plugin.
+
+    Accepted senders are the account itself, the registered owner, and
+    account admins. Anyone else is ignored with no reply.
+    """
 
     def __init__(self, plugins: list[Plugin] | None = None) -> None:
         self.plugins = plugins
@@ -410,21 +432,36 @@ class Dispatcher:
         limiter: AccountLimiter,
         language: str = "en",
     ) -> bool:
-        if not is_self_outgoing(message):
-            log.debug("Account %s ignored message: not from this account", account_id)
-            return False
+        from src.runtime.actors import (
+            classify_actor,
+            incoming_limit,
+            is_owner_only,
+            message_sender_id,
+        )
+        from src.runtime.gating import plugin_is_enabled
+        from src.templates import owner_only_notice, rate_limit_notice
+
         text = _message_text(message)
         prefix = command_prefix(account_id)
+        from_self = is_self_outgoing(message)
         matched = resolve_command(text, prefix, self.plugins)
-        if matched is None:
-            if prefix and text.startswith(prefix) and text[len(prefix) :].strip():
-                log.debug("Account %s ignored command: unknown command", account_id)
-            else:
-                log.debug("Account %s ignored message: not a command", account_id)
-            return False
+        if from_self:
+            if matched is None:
+                if prefix and text.startswith(prefix) and text[len(prefix) :].strip():
+                    log.debug("Account %s ignored command: unknown command", account_id)
+                else:
+                    log.debug("Account %s ignored message: not a command", account_id)
+                return False
+            role = "self"
+        else:
+            if matched is None:
+                return False
+            classified = classify_actor(account_id, message)
+            if classified is None:
+                log.debug("Account %s ignored message: not from this account", account_id)
+                return False
+            role = classified
         plugin, command, args = matched
-        from src.runtime.gating import plugin_is_enabled
-
         if not plugin_is_enabled(account_id, plugin):
             log.debug(
                 "Account %s ignored command %s: plugin %s disabled",
@@ -433,6 +470,36 @@ class Dispatcher:
                 plugin.meta.name,
             )
             return False
+        actor_id = message_sender_id(message)
+        if role != "self":
+            decision = incoming_limit().decide(account_id, actor_id or 0, role)
+            if decision == "limited":
+                log.debug("Account %s dropped command %s: rate limit", account_id, command.name)
+                return False
+            if decision == "notice":
+                await self._notice(
+                    account_id=account_id,
+                    client=client,
+                    message=message,
+                    limiter=limiter,
+                    language=language,
+                    text=rate_limit_notice(language),
+                    actor_role=role,
+                    actor_id=actor_id,
+                )
+                return True
+            if role == "admin" and is_owner_only(command.name):
+                await self._notice(
+                    account_id=account_id,
+                    client=client,
+                    message=message,
+                    limiter=limiter,
+                    language=language,
+                    text=owner_only_notice(language),
+                    actor_role=role,
+                    actor_id=actor_id,
+                )
+                return True
         log.debug(
             "Account %s dispatched command %s to plugin %s",
             account_id,
@@ -449,6 +516,8 @@ class Dispatcher:
             language=language,
             plugin_name=plugin.meta.name,
             limiter=limiter,
+            actor_role=role,
+            actor_id=actor_id,
         )
         try:
             await plugin.handle(ctx)
@@ -460,3 +529,33 @@ class Dispatcher:
                 command.name,
             )
         return True
+
+    async def _notice(
+        self,
+        *,
+        account_id: int,
+        client: Any,
+        message: Any,
+        limiter: AccountLimiter,
+        language: str,
+        text: str,
+        actor_role: str,
+        actor_id: int | None,
+    ) -> None:
+        ctx = CommandContext(
+            client=client,
+            account_id=account_id,
+            message=message,
+            command="",
+            args="",
+            prefix="",
+            language=language,
+            plugin_name="",
+            limiter=limiter,
+            actor_role=actor_role,
+            actor_id=actor_id,
+        )
+        try:
+            await ctx.reply(text)
+        except Exception:
+            log.debug("Could not send a command notice for account %s", account_id, exc_info=True)

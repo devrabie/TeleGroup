@@ -30,6 +30,16 @@ sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-ara
 
 No package install is required for this. If inline mode is off, the account replies with the same steps.
 
+## Account admins
+
+After pulling the command-admin change, apply the schema and restart both processes:
+
+```bash
+alembic upgrade head
+```
+
+Revision `0006_account_admins` creates `account_admins` if it is missing and grants the `delegates` plugin to existing plans. Restart the control bot and the worker. The worker has to start again so it hears commands from the owner and from admins, not only messages the account sends itself. Downgrade drops that table and removes only the `delegates` allowlist rows.
+
 ## Not required
 
 Downloads use the `yt-dlp` Python package. Stickers use `Pillow`. Speech uses `gTTS`. Translation uses `httpx` against MyMemory, or LibreTranslate when `TRANSLATE_URL` is set. None of those need an extra apt package.

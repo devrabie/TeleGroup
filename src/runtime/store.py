@@ -7,10 +7,11 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 
 from src.db.engine import session_scope
 from src.db.models import (
+    AccountAdmin,
     AccountPlugin,
     DeviceProfile,
     ManagedAccount,
@@ -476,6 +477,143 @@ def lease_is_acked(account_id: int) -> bool:
         return bool(_run(_go()))
     except Exception:
         log.exception("Failed to read session lease for account %s", account_id)
+        return False
+
+
+MAX_ACCOUNT_ADMINS = 20
+
+
+def _clean_username(username: str | None) -> str | None:
+    if username is None:
+        return None
+    text = username.strip().lstrip("@")
+    if not text:
+        return None
+    return text[:64]
+
+
+def list_account_admins(account_id: int) -> list[dict[str, Any]]:
+    """Admins who may command this account, oldest first."""
+
+    async def _go() -> list[dict[str, Any]]:
+        async with session_scope() as session:
+            rows = (
+                await session.scalars(
+                    select(AccountAdmin)
+                    .where(AccountAdmin.account_id == account_id)
+                    .order_by(AccountAdmin.id.asc())
+                )
+            ).all()
+            return [
+                {
+                    "telegram_id": int(row.telegram_id),
+                    "username": row.username,
+                    "added_by_telegram_id": (
+                        int(row.added_by_telegram_id)
+                        if row.added_by_telegram_id is not None
+                        else None
+                    ),
+                }
+                for row in rows
+            ]
+
+    try:
+        return list(_run(_go()))
+    except Exception:
+        log.exception("Failed to list admins for account %s", account_id)
+        return []
+
+
+def is_account_admin(account_id: int, telegram_id: int) -> bool:
+    async def _go() -> bool:
+        async with session_scope() as session:
+            row = await session.scalar(
+                select(AccountAdmin.id).where(
+                    AccountAdmin.account_id == account_id,
+                    AccountAdmin.telegram_id == int(telegram_id),
+                )
+            )
+            return row is not None
+
+    try:
+        return bool(_run(_go()))
+    except Exception:
+        log.exception("Failed to check admin %s for account %s", telegram_id, account_id)
+        return False
+
+
+def add_account_admin(
+    account_id: int,
+    telegram_id: int,
+    *,
+    username: str | None = None,
+    added_by_telegram_id: int | None = None,
+) -> str:
+    """Insert one admin. Returns added, exists, owner, full, invalid, or missing."""
+    if int(telegram_id) <= 0:
+        return "invalid"
+    cleaned = _clean_username(username)
+
+    async def _go() -> str:
+        async with session_scope() as session:
+            account = await session.get(ManagedAccount, account_id)
+            if account is None or account.deleted_at is not None:
+                return "missing"
+            owner = await session.scalar(select(User.telegram_id).where(User.id == account.user_id))
+            if owner is not None and int(owner) == int(telegram_id):
+                return "owner"
+            existing = await session.scalar(
+                select(AccountAdmin).where(
+                    AccountAdmin.account_id == account_id,
+                    AccountAdmin.telegram_id == int(telegram_id),
+                )
+            )
+            if existing is not None:
+                if cleaned and not existing.username:
+                    existing.username = cleaned
+                return "exists"
+            count = await session.scalar(
+                select(func.count())
+                .select_from(AccountAdmin)
+                .where(AccountAdmin.account_id == account_id)
+            )
+            if int(count or 0) >= MAX_ACCOUNT_ADMINS:
+                return "full"
+            session.add(
+                AccountAdmin(
+                    account_id=account_id,
+                    telegram_id=int(telegram_id),
+                    username=cleaned,
+                    added_by_telegram_id=added_by_telegram_id,
+                )
+            )
+            return "added"
+
+    try:
+        return str(_run(_go()))
+    except Exception:
+        log.exception("Failed to add admin %s on account %s", telegram_id, account_id)
+        return "missing"
+
+
+def remove_account_admin(account_id: int, telegram_id: int) -> bool:
+    async def _go() -> bool:
+        async with session_scope() as session:
+            row = await session.scalar(
+                select(AccountAdmin).where(
+                    AccountAdmin.account_id == account_id,
+                    AccountAdmin.telegram_id == int(telegram_id),
+                )
+            )
+            if row is None:
+                return False
+            await session.delete(row)
+            return True
+
+    try:
+        return bool(_run(_go()))
+    except Exception:
+        log.exception("Failed to remove admin %s from account %s", telegram_id, account_id)
         return False
 
 

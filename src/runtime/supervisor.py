@@ -43,10 +43,11 @@ _CURRENT: Supervisor | None = None
 
 # Kurigram runs the first matching handler in a group and then moves on to the
 # next group. Commands sit alone in this group so listeners in other groups
-# still see the same outgoing text. Saved Messages are not ``outgoing``;
-# ``filters.me`` includes those (``from_user.is_self``) and ordinary sends.
+# still see the same text. Incoming text is included so the owner and account
+# admins can command from their own accounts. The dispatcher ignores everyone
+# else and still accepts the account's own outgoing messages and Saved Messages.
 COMMAND_HANDLER_GROUP = -1
-_COMMAND_FILTER = (filters.outgoing | filters.me) & filters.text
+_COMMAND_FILTER = filters.text
 
 
 def request_reconcile() -> None:

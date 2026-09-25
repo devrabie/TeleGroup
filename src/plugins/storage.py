@@ -110,6 +110,10 @@ async def on_message(session: AccountSession, message: object) -> None:
         return
     if is_self_outgoing(message):
         return
+    from src.runtime.actors import is_trusted_sender
+
+    if is_trusted_sender(session.account_id, message):
+        return
     settings = session.settings_for(plugin.meta.name)
     if not settings.get("enabled", False):
         return

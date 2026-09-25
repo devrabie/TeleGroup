@@ -69,6 +69,7 @@ PLUGIN_CATEGORY: dict[str, str] = {
     "games": "fun",
     "gifts": "fun",
     "help": "system",
+    "delegates": "system",
 }
 
 PLUGIN_LABEL: dict[str, tuple[str, str]] = {
@@ -101,6 +102,7 @@ PLUGIN_LABEL: dict[str, tuple[str, str]] = {
     "games": ("Games", "الألعاب"),
     "gifts": ("Gifts", "الهدايا"),
     "help": ("Help", "الأوامر"),
+    "delegates": ("Command admins", "مسؤولو الأوامر"),
 }
 
 # name -> (usage_en, usage_ar, example_en, example_ar)
@@ -127,6 +129,23 @@ _row(
     "الأوامر",
 )
 _row("{p}panel", "{p}اللوحة", "{p}panel", "{p}اللوحة", "panel", "اللوحة")
+_row(
+    "{p}addadmin by reply, id, or @username",
+    "{p}رفع ادمن بالرد أو المعرّف أو @username",
+    "{p}addadmin 123456",
+    "{p}رفع ادمن 123456",
+    "رفع ادمن",
+    "addadmin",
+)
+_row(
+    "{p}deladmin by reply, id, or @username",
+    "{p}تنزيل ادمن بالرد أو المعرّف أو @username",
+    "{p}deladmin 123456",
+    "{p}تنزيل ادمن 123456",
+    "تنزيل ادمن",
+    "deladmin",
+)
+_row("{p}admins", "{p}الادمنية", "{p}admins", "{p}الادمنية", "الادمنية", "admins")
 
 _row(
     "{p}ban by reply, or {p}ban @user",
