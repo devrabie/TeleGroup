@@ -75,18 +75,15 @@ def upgrade() -> None:
 
 
 def _grant_builtin_plugins(bind: sa.Connection) -> None:
-    """Existing plans keep today's features until an admin edits the allowlist."""
-    if "plans" not in _tables(bind) or "plan_plugins" not in _tables(bind):
-        return
-    plan_ids = [row[0] for row in bind.execute(sa.text("SELECT id FROM plans")).fetchall()]
-    insert = sa.text(
-        "INSERT INTO plan_plugins (plan_id, plugin_name) "
-        "SELECT :plan_id, :name WHERE NOT EXISTS ("
-        "SELECT 1 FROM plan_plugins WHERE plan_id = :plan_id AND plugin_name = :name)"
-    )
-    for plan_id in plan_ids:
-        for name in _BUILTIN_PLUGINS:
-            bind.execute(insert, {"plan_id": plan_id, "name": name})
+    """Existing plans keep today's features until an admin edits the allowlist.
+
+    Uses ``grant_named_plugins`` so ``:name`` is bound once per statement.
+    The previous ``INSERT ... SELECT ... WHERE NOT EXISTS`` reused ``:name``
+    and PostgreSQL raised ``inconsistent types deduced for parameter``.
+    """
+    from src.plan_grants import grant_named_plugins
+
+    grant_named_plugins(bind, _BUILTIN_PLUGINS)
 
 
 def downgrade() -> None:
