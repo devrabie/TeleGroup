@@ -1,4 +1,6 @@
 # Example unit for a non-Docker install. Start it with the bot unit.
+# Host packages: ffmpeg (gif, voice, mp3). Optional: tesseract-ocr for OCR.
+# See deploy/README.md.
 # The bot unit runs alembic upgrade head before the control bot; this unit
 # does not migrate. Environment= overrides RUNTIME_ROLE from the env file.
 

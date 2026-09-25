@@ -216,18 +216,31 @@ def load_plugins() -> None:
     from src.plugins.afk import plugin as afk
     from src.plugins.autoreply import plugin as autoreply
     from src.plugins.broadcast import plugin as broadcast
+    from src.plugins.calc import plugin as calc
+    from src.plugins.clock import plugin as clock
     from src.plugins.codewatch import plugin as codewatch
+    from src.plugins.convert import plugin as convert
     from src.plugins.createchat import plugin as createchat
+    from src.plugins.download import plugin as download
     from src.plugins.games import plugin as games
     from src.plugins.gifts import plugin as gifts
     from src.plugins.groups import plugin as groups
     from src.plugins.help import plugin as help_plugin
     from src.plugins.identify import plugin as identify
+    from src.plugins.info import plugin as info
+    from src.plugins.leave import plugin as leave
     from src.plugins.locks import plugin as locks
+    from src.plugins.ocr import plugin as ocr
     from src.plugins.ping import plugin as ping
     from src.plugins.pmpermit import plugin as pmpermit
+    from src.plugins.profile import plugin as profile
+    from src.plugins.repeat import plugin as repeat
+    from src.plugins.stickers import plugin as stickers
     from src.plugins.storage import plugin as storage
     from src.plugins.tagall import plugin as tagall
+    from src.plugins.telegraph import plugin as telegraph
+    from src.plugins.translate import plugin as translate
+    from src.plugins.tts import plugin as tts
 
     for plugin in (
         groups,
@@ -246,6 +259,19 @@ def load_plugins() -> None:
         createchat,
         gifts,
         games,
+        download,
+        stickers,
+        translate,
+        tts,
+        ocr,
+        convert,
+        telegraph,
+        info,
+        leave,
+        repeat,
+        profile,
+        clock,
+        calc,
     ):
         register(plugin)
     _LOADED = True

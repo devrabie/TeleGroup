@@ -28,3 +28,6 @@ alembic>=1.14
 pydantic>=2.10
 pydantic-settings>=2.6
 cryptography>=44
+yt-dlp>=2024.8.6
+Pillow>=10
+gTTS>=2.5

@@ -33,7 +33,7 @@ plugin = PingPlugin()
 - `commands` are matched without the prefix. Latin names are case-insensitive. Arabic names are matched as written.
 - The longest command name wins, so `.رد عام` is not handled as `.رد`. A name must end at a space or the end of the message.
 - `default_enabled` applies when the account has no row in `account_plugins`. `groups` and `codemon` are special: they follow `managed_accounts.is_active` and `code_monitor_enabled`.
-- New plugins are not added to existing plans. `add_plan` grants whatever is registered at creation time. Admins change the allowlist from the plan editor. The SQLite importer grants the default plugins only to plans that have no allowlist rows.
+- New plugins are not added to existing plans unless a migration says so. Alembic 0004 grants the phase 4 names and does not remove rows. `add_plan` grants whatever is registered at creation time. Admins change the allowlist from the plan editor. The SQLite importer grants the default plugins only to plans that have no allowlist rows.
 
 ## Commands
 
@@ -87,6 +87,8 @@ Construct Kurigram clients only with `build_user_client` (the runtime already di
 
 `settings` on `PluginMeta` is a tuple of `SettingField` (`bool`, `int`, or `str`). The account's Plugins screen shows a Settings button for plugins that declare fields. Values still live in `plugin_settings`. Passwords are not settings.
 
-Phase 3 command plugins live in `src/plugins/` (`admin`, `storage`, `autoreply`, `afk`, `pmpermit`, `locks`, `tagall`, `broadcast`, `create`, `gifts`, `games`). The command list is in [commands.md](commands.md). Listeners attach from `spawn` and call Telegram through `session.limiter`. Long jobs (`tagall`, `broadcast`) are cancellable. New plugins are not added to plans that already exist; an admin turns them on from the plan editor. `add_plan` grants whatever is registered at creation time.
+Phase 3 command plugins live in `src/plugins/` (`admin`, `storage`, `autoreply`, `afk`, `pmpermit`, `locks`, `tagall`, `broadcast`, `create`, `gifts`, `games`). Phase 4 adds `download`, `stickers`, `translate`, `tts`, `ocr`, `convert`, `telegraph`, `info`, `leave`, `repeat`, `profile`, `clock`, and `calc`. The command list is in [commands.md](commands.md). Listeners attach from `spawn` and call Telegram through `session.limiter`. Long jobs (`tagall`, `broadcast`, downloads) are cancellable.
 
-Keep each command family in its own plugin module rather than growing a single handler file. Downloads, stickers, converters, and the rest of the old userbot command set are left for phase 4.
+`add_plan` grants whatever is registered at creation time. Alembic 0002 grants the original five plugins. Alembic 0004 grants the phase 4 names to plans that already exist and does not delete allowlist rows. The SQLite importer still fills only empty allowlists, using `DEFAULT_PLAN_PLUGINS`.
+
+Keep each command family in its own plugin module rather than growing a single handler file. Downloads and ffmpeg conversions run in a short-lived child process (`src/runtime/work_pool.py`, `src/media_jobs.py`). Heavy libraries are imported inside that process. If ffmpeg, tesseract, yt-dlp, Pillow, or gTTS is missing, the command replies with that fact and the account stays up.

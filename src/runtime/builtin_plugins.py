@@ -3,9 +3,12 @@
 Alembic revision 0002 grants the first five names to plans that already exist
 when that revision runs. The SQLite importer copies plans afterwards, so those
 copies have an empty ``plan_plugins`` set and no account would start. This
-tuple is those five plus the phase 3 defaults. Plans that already have any
-allowlist row are left unchanged.
+tuple is those five, the phase 3 defaults, and the phase 4 names. The importer
+still skips plans that already have any allowlist row. Alembic 0004 inserts
+the phase 4 names into plans that already exist and does not delete rows.
 """
+
+from src.plan_grants import PHASE4_PLUGIN_NAMES
 
 DEFAULT_PLAN_PLUGINS: tuple[str, ...] = (
     "ping",
@@ -24,4 +27,5 @@ DEFAULT_PLAN_PLUGINS: tuple[str, ...] = (
     "create",
     "gifts",
     "games",
+    *PHASE4_PLUGIN_NAMES,
 )

@@ -2,6 +2,7 @@
 # PostgreSQL unit name to match the host. Environment= overrides
 # EnvironmentFile, so RUNTIME_ROLE stays bot even when .env says otherwise.
 # ExecStartPre applies migrations before the control bot starts.
+# Media packages (ffmpeg, optional tesseract) are documented in deploy/README.md.
 
 [Unit]
 Description=TeleGroup control bot

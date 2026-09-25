@@ -17,6 +17,37 @@ def tr(ctx: CommandContext, en: str, ar: str) -> str:
     return en
 
 
+def missing_dependency(ctx: CommandContext, name: str) -> str:
+    """Message when a Python package or system program is not installed."""
+    labels = {
+        "yt-dlp": (
+            "yt-dlp is not installed on this server.",
+            "حزمة yt-dlp غير مثبتة على الخادم.",
+        ),
+        "ffmpeg": (
+            "ffmpeg is not installed on this server.",
+            "ffmpeg غير مثبت على الخادم.",
+        ),
+        "Pillow": (
+            "Pillow is not installed on this server.",
+            "حزمة Pillow غير مثبتة على الخادم.",
+        ),
+        "gTTS": (
+            "gTTS is not installed on this server.",
+            "حزمة gTTS غير مثبتة على الخادم.",
+        ),
+        "tesseract": (
+            "OCR needs the tesseract program, which is not installed.",
+            "التعرف على النص يحتاج برنامج tesseract وهو غير مثبت.",
+        ),
+    }
+    en, ar = labels.get(
+        name,
+        (f"{name} is not available on this server.", f"{name} غير متاح على الخادم."),
+    )
+    return tr(ctx, en, ar)
+
+
 def aliases(description_en: str, description_ar: str, *names: str) -> tuple[BotCommand, ...]:
     return tuple(BotCommand(name, description_en, description_ar) for name in names)
 
