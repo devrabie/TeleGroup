@@ -1,116 +1,93 @@
-# Telegram Group Creation Bot
+# Telegram Group Creation Bot / بوت إنشاء مجموعات تيليجرام
 
-This is a comprehensive Telegram bot designed to manage multiple Telegram user accounts for the purpose of automated group creation. The bot is multi-user, subscription-based (using Telegram Stars), and includes a full admin panel for management.
+Multi-account Telegram control bot. The interface uses `python-telegram-bot`. Managed accounts use Kurigram (imported as `pyrogram`). PostgreSQL is the application database.
 
-It uses a dual-library architecture:
-- **`python-telegram-bot`**: For the user-facing bot interface (commands, buttons, conversations).
-- **`Pyrogram`**: For the backend automation involving user accounts (logging in, creating groups).
+بوت تحكم متعدد الحسابات. الواجهة عبر `python-telegram-bot`، والحسابات المُدارة عبر Kurigram. قاعدة التشغيل هي PostgreSQL.
 
-## Features
+## Features / الميزات
 
-- **Multi-User & Subscriptions**: Regular users can subscribe to plans to use the bot's features.
-- **Admin Panel**: A full-featured admin dashboard inside the bot for managing users, plans, and subscriptions.
-- **Telegram Account Management**: Users can interactively add their own Telegram accounts to the bot for automation.
-- **Automated Group Creation**: Managed accounts automatically create new private supergroups based on user-defined limits.
-- **Proxy Management**: Automatically downloads and rotates proxies to avoid rate-limiting and bans.
-- **User Dashboard**: Users can manage their added accounts, view stats, and control automation.
-- **Multi-Language Support**: Interface is available in English and Arabic, with easy extension to other languages.
+- Plans, Telegram Stars, and Crypto Pay subscriptions
+- Admin panel, info pages, and English/Arabic UI
+- Add account with device profiles, CAPTCHA/login retry handling, and login timeouts
+- My Accounts: group creation (off by default), code monitor, 2FA, soft-delete, session status
+- Profile, gifts, and private-chat browsing
+- Team managers, invite links, and account transfer
+- Session explorer, proxy rotation with per-proxy SOCKS5 credentials
+- Scheduled supergroup creation, flood-wait backoff, and proxy health checks
 
-## Project Structure
+الخطط والاشتراك بنجوم تيليجرام وCrypto Pay، لوحة الإدارة، صفحات المعلومات، العربية والإنجليزية، إضافة الحساب مع ملفات الجهاز وإعادة محاولة تسجيل الدخول، مراقبة أكواد الدخول، التحقق بخطوتين، الحذف المنطقي، تصفح الملف والهدايا والمحادثات الخاصة، مديرو الفريق وروابط الدعوة ونقل الحساب، تدوير البروكسي، وإنشاء المجموعات المجدولة.
 
-```
-.
-├── data/                  # Holds the SQLite database and session files (ignored by git)
-├── src/                   # Main source code
-│   ├── admin_handlers.py    # Command handlers for the admin panel
-│   ├── automation.py        # Core background automation logic
-│   ├── config.py            # Configuration loader
-│   ├── database.py          # Database schema and interaction logic
-│   ├── main.py              # Main entry point of the bot
-│   ├── proxy_manager.py     # Logic for downloading and managing proxies
-│   ├── translation.py       # Internationalization (i18n) setup
-│   └── user_handlers.py     # Command handlers for regular users
-├── .env.example           # Example environment variables file
-├── .gitignore             # Git ignore rules
-├── babel.cfg              # Babel configuration for i18n
-├── locales/               # Translation files
-├── requirements.txt       # Python dependencies
-└── README.md              # This file
-```
+Phase 2 (not in this change) can add a per-account plugin runtime. Kurigram clients are constructed only in `src/runtime/client_factory.py`.
 
-## Setup and Installation
+## Bug status on this branch / حالة الأخطاء
 
-Follow these steps to get the bot running.
+| Report | Status |
+| --- | --- |
+| Arabic catalogs never load because `.mo` files are gitignored | Already fixed on the base branch. `compile_translations()` runs at startup, and the Docker image compiles catalogs during build. |
+| Add-account advances to the code step even when sending the login code fails | Already fixed. `receive_phone_number` waits for `send_login_code` and stays on the phone step when sending fails. |
+| Stars `precheckout_callback` approves every payment | Fixed here. Payload, payer, plan, currency (`XTR`), and star amount are checked again before a subscription is granted. |
+| Webshare proxy URL with an API token hardcoded as the default | Fixed here. The URL is empty unless `WEBSHARE_PROXY_API_URL` is set. A revoked embedded token is rejected. |
 
-### 1. Clone the Repository
-
-```bash
-git clone <repository_url>
-cd <repository_directory>
-```
-
-### 2. Create a Virtual Environment
-
-It is highly recommended to use a virtual environment to manage dependencies.
+## Setup / الإعداد
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-```
-
-### 3. Install Dependencies
-
-Install all the required Python packages using pip.
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configure Environment Variables
-
-The bot is configured using environment variables. Create a `.env` file in the root directory by copying the example file.
-
-```bash
+pip install -e ".[dev]"
 cp .env.example .env
 ```
 
-Now, open the `.env` file and fill in the required values:
+Required environment variables:
 
-- `BOT_TOKEN`: Your main bot's token from @BotFather.
-- `API_ID` and `API_HASH`: Your Telegram API credentials from [my.telegram.org](https://my.telegram.org).
-- `ADMIN_IDS`: Your numeric Telegram user ID. This will give you admin access to the bot.
-- `PAYMENT_PROVIDER_TOKEN`: The payment token for Telegram Stars, obtained from @BotFather.
-
-### 5. Initialize the Database
-
-The database is created automatically when you first run the bot. Alternatively, you can initialize it manually:
+- `BOT_TOKEN`, `API_ID`, `API_HASH`, `ADMIN_IDS`
+- `DATABASE_URL` — `postgresql+asyncpg://user:pass@host:5432/telegroup`
+- `SESSION_ENCRYPTION_KEY` — Fernet key:
 
 ```bash
-python3 src/database.py
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-## Running the Bot
+Optional: `WEBSHARE_PROXY_API_URL`, `PROXY_USERNAME`, `PROXY_PASSWORD`, `CRYPTO_PAY_API_TOKEN`, `REDIS_URL`, webhook settings, `DISPLAY_TIMEZONE`, `LOG_LEVEL`.
 
-Once the setup is complete, you can run the bot with the following command from the root directory of the project:
+Create the schema, then start the bot:
 
 ```bash
-python3 -m src.main
+alembic upgrade head
+python -m src.main
 ```
 
-The bot will start, connect to Telegram, and the automation engine will begin its cycles. You can interact with the bot from the Telegram account you designated as the admin.
+Startup also creates any missing tables, seeds device profiles and default info pages, compiles translations, and encrypts leftover plaintext session strings.
 
-### Key Commands
+### Existing SQLite data / نقل قاعدة SQLite
 
-- `/start`: Initialize the bot.
-- `/subscribe`: View and subscribe to a plan.
-- `/add_account`: Start the process to add a new Telegram account to manage.
-- `/my_accounts`: View and manage your added accounts.
-- `/language`: Change the interface language.
+```bash
+python -m src.tools.migrate_sqlite --sqlite data/bot.db
+```
 
-### Admin Commands
+The script copies the current tables into `DATABASE_URL`, keeps ids, and encrypts session strings. Re-running it does not overwrite existing rows.
 
-- `/create_plan <name> <price> <days> <accounts> <limit>`: Create a new subscription plan.
-- `/list_plans`: View all created plans.
-- `/list_users`: See all users of the bot.
-- `/view_user <user_id>`: Get details for a specific user.
-- `/grant_subscription <user_id> <plan_id> <days>`: Manually give a subscription to a user.
+### Docker
+
+```bash
+cp .env.example .env
+# fill BOT_TOKEN, API_ID, API_HASH, ADMIN_IDS, SESSION_ENCRYPTION_KEY
+docker compose up --build
+```
+
+Compose starts Postgres 16 and overrides `DATABASE_URL` to the `db` service. The container runs `alembic upgrade head` before the bot.
+
+## Development / التطوير
+
+```bash
+ruff check src tests alembic
+ruff format --check src tests alembic
+mypy src
+pytest
+```
+
+Logs are JSON, one object per line. Shutdown stops the code monitor, the bot, the webhook server when it is running, and disposes the database engine.
+
+## Commands / الأوامر
+
+- `/start`, `/subscribe`, `/add_account`, `/my_accounts`, `/language`
+- Admin: `/create_plan`, `/list_plans`, `/list_users`, `/view_user`, `/grant_subscription`

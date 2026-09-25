@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import requests
 from telegram.ext import ContextTypes
@@ -19,7 +20,7 @@ async def update_proxies_from_url(context: ContextTypes.DEFAULT_TYPE):
     log.info(f"Attempting to download proxies from the configured URL...")
 
     try:
-        response = requests.get(url, timeout=20)
+        response = await asyncio.to_thread(requests.get, url, timeout=20)
         response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
 
         # The response text is expected to be a list of proxies, one per line.

@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: telegroup
+      POSTGRES_PASSWORD: telegroup
+      POSTGRES_DB: telegroup
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telegroup -d telegroup"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  bot:
+    build: .
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://telegroup:telegroup@db:5432/telegroup
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - botdata:/app/data
+
+volumes:
+  pgdata:
+  botdata:

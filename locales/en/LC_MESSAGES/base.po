@@ -7,9 +7,9 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-08-23 18:25+0000\n"
-"PO-Revision-Date: 2025-08-23 18:25+0000\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"POT-Creation-Date: 2025-09-04 20:42+0000\n"
+"PO-Revision-Date: 2025-09-04 13:40+0000\n"
+"Last-Translator: Jules <jules@example.com>\n"
 "Language: en\n"
 "Language-Team: en <LL@li.org>\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
@@ -18,130 +18,223 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.17.0\n"
 
-#: src/admin_handlers.py:35
-msgid ""
-"<b>Usage:</b> <code>/create_plan &lt;name&gt; &lt;price&gt; &lt;days&gt; "
-"&lt;accounts&gt; &lt;limit&gt;</code>\n"
-"\n"
-"<b>Example:</b> <code>/create_plan Basic 100 30 2 10</code>"
-msgstr ""
-"<b>Usage:</b> <code>/create_plan &lt;name&gt; &lt;price&gt; &lt;days&gt; "
-"&lt;accounts&gt; &lt;limit&gt;</code>\n"
-"\n"
-"<b>Example:</b> <code>/create_plan Basic 100 30 2 10</code>"
+#: src/admin_handlers.py:27
+msgid "Welcome to the Admin Panel. Please choose a category to manage."
+msgstr "Welcome to the Admin Panel. Please choose a category to manage."
 
-#: src/admin_handlers.py:47
-msgid "❌ Invalid number format in arguments."
-msgstr "❌ Invalid number format in arguments."
+#: src/admin_handlers.py:29
+msgid "📊 Statistics"
+msgstr "📊 Statistics"
 
-#: src/admin_handlers.py:51
-#, python-brace-format
-msgid "✅ Plan '<b>{plan_name}</b>' created successfully."
-msgstr "✅ Plan '<b>{plan_name}</b>' created successfully."
+#: src/admin_handlers.py:30
+msgid "👥 Manage Users"
+msgstr "👥 Manage Users"
+
+#: src/admin_handlers.py:31
+msgid "📋 Manage Plans"
+msgstr "📋 Manage Plans"
 
 #: src/admin_handlers.py:53
 #, python-brace-format
 msgid ""
-"❌ Failed to create plan '<b>{plan_name}</b>'. It might already exist or a"
-" database error occurred."
-msgstr ""
-"❌ Failed to create plan '<b>{plan_name}</b>'. It might already exist or a"
-" database error occurred."
-
-#: src/admin_handlers.py:65
-msgid "No subscription plans found."
-msgstr "No subscription plans found."
-
-#: src/admin_handlers.py:68
-msgid ""
-"<b>Subscription Plans:</b>\n"
+"<b>📊 System Statistics</b>\n"
 "\n"
+"<b>Total Users:</b> {total_users}\n"
+"<b>Active Subscriptions:</b> {active_subscriptions}\n"
+"<b>Managed Accounts:</b> {total_managed_accounts}\n"
+"<b>Groups Created (Today):</b> {groups_created_today}\n"
+"<b>Groups Created (Total):</b> {groups_created_total}\n"
 msgstr ""
-"<b>Subscription Plans:</b>\n"
+"<b>📊 System Statistics</b>\n"
 "\n"
+"<b>Total Users:</b> {total_users}\n"
+"<b>Active Subscriptions:</b> {active_subscriptions}\n"
+"<b>Managed Accounts:</b> {total_managed_accounts}\n"
+"<b>Groups Created (Today):</b> {groups_created_today}\n"
+"<b>Groups Created (Total):</b> {groups_created_total}\n"
 
-#: src/admin_handlers.py:70 src/admin_handlers.py:157
+#: src/admin_handlers.py:61
+msgid "Could not retrieve statistics."
+msgstr "Could not retrieve statistics."
+
+#: src/admin_handlers.py:63 src/admin_handlers.py:319 src/admin_handlers.py:343
+#: src/admin_handlers.py:371 src/admin_handlers.py:388
+#: src/admin_handlers.py:572 src/admin_handlers.py:610
+#: src/admin_handlers.py:624 src/admin_handlers.py:635 src/user_handlers.py:143
+#: src/user_handlers.py:177 src/user_handlers.py:268 src/user_handlers.py:275
+#: src/user_handlers.py:305 src/user_handlers.py:585 src/user_handlers.py:800
+msgid "🔙 Back"
+msgstr "🔙 Back"
+
+#: src/admin_handlers.py:87
+msgid "Could not determine which plan to edit. Please start over."
+msgstr "Could not determine which plan to edit. Please start over."
+
+#: src/admin_handlers.py:98
+msgid "Error: Plan not found. It might have been deleted."
+msgstr "Error: Plan not found. It might have been deleted."
+
+#: src/admin_handlers.py:106 src/admin_handlers.py:426
+#: src/admin_handlers.py:595
 msgid "Active"
 msgstr "Active"
 
-#: src/admin_handlers.py:70 src/admin_handlers.py:157
+#: src/admin_handlers.py:106 src/admin_handlers.py:426
+#: src/admin_handlers.py:595
 msgid "Inactive"
 msgstr "Inactive"
 
-#: src/admin_handlers.py:72
+#: src/admin_handlers.py:109
 #, python-brace-format
 msgid ""
-"<b>ID:</b> <code>{id}</code>\n"
+"<b>Editing Plan:</b> {name} (ID: <code>{id}</code>)\n"
+"\n"
+"Select a field to modify:\n"
+"\n"
 "<b>Name:</b> {name}\n"
-"<b>Price:</b> {price} Stars\n"
-"<b>Duration:</b> {days} days\n"
-"<b>Accounts:</b> {accounts}\n"
+"<b>Price (Stars):</b> {price_stars}\n"
+"<b>Price (USD):</b> {price_usd}\n"
+"<b>Duration:</b> {duration} days\n"
+"<b>Max Accounts:</b> {max_accounts}\n"
 "<b>Daily Limit:</b> {limit} groups/day\n"
-"<b>Status:</b> {status}\n"
-"--------------------\n"
+"<b>Status:</b> {status}"
 msgstr ""
-"<b>ID:</b> <code>{id}</code>\n"
+"<b>Editing Plan:</b> {name} (ID: <code>{id}</code>)\n"
+"\n"
+"Select a field to modify:\n"
+"\n"
 "<b>Name:</b> {name}\n"
-"<b>Price:</b> {price} Stars\n"
-"<b>Duration:</b> {days} days\n"
-"<b>Accounts:</b> {accounts}\n"
+"<b>Price (Stars):</b> {price_stars}\n"
+"<b>Price (USD):</b> {price_usd}\n"
+"<b>Duration:</b> {duration} days\n"
+"<b>Max Accounts:</b> {max_accounts}\n"
 "<b>Daily Limit:</b> {limit} groups/day\n"
-"<b>Status:</b> {status}\n"
-"--------------------\n"
+"<b>Status:</b> {status}"
 
-#: src/admin_handlers.py:99
+#: src/admin_handlers.py:125
+msgid "✏️ Name"
+msgstr "✏️ Name"
+
+#: src/admin_handlers.py:126
+msgid "✨ Price (Stars)"
+msgstr "✨ Price (Stars)"
+
+#: src/admin_handlers.py:129
+msgid "💵 Price (USD)"
+msgstr "💵 Price (USD)"
+
+#: src/admin_handlers.py:130
+msgid "📅 Duration"
+msgstr "📅 Duration"
+
+#: src/admin_handlers.py:133
+msgid "👤 Max Accounts"
+msgstr "👤 Max Accounts"
+
+#: src/admin_handlers.py:134
+msgid "📈 Daily Limit"
+msgstr "📈 Daily Limit"
+
+#: src/admin_handlers.py:137
+msgid "Toggle Active/Inactive"
+msgstr "Toggle Active/Inactive"
+
+#: src/admin_handlers.py:139
+msgid "🔙 Back to Plan List"
+msgstr "🔙 Back to Plan List"
+
+#: src/admin_handlers.py:191
+#, python-brace-format
+msgid ""
+"Please send the new value for <b>{field_name}</b>.\n"
+"\n"
+"Send /cancel to abort."
+msgstr ""
+"Please send the new value for <b>{field_name}</b>.\n"
+"\n"
+"Send /cancel to abort."
+
+#: src/admin_handlers.py:206 src/admin_handlers.py:262
+msgid "An error occurred (missing context). Please start over."
+msgstr "An error occurred (missing context). Please start over."
+
+#: src/admin_handlers.py:218
+msgid "Invalid value type. Please enter a valid number."
+msgstr "Invalid value type. Please enter a valid number."
+
+#: src/admin_handlers.py:267
+msgid "Error: Plan not found."
+msgstr "Error: Plan not found."
+
+#: src/admin_handlers.py:274
+msgid "Status toggled successfully."
+msgstr "Status toggled successfully."
+
+#: src/admin_handlers.py:290
+msgid "Edit operation cancelled. Returning to the main admin panel."
+msgstr "Edit operation cancelled. Returning to the main admin panel."
+
+#: src/admin_handlers.py:315
+msgid ""
+"<b>Manage Users</b>\n"
+"\n"
+"Select an option from below."
+msgstr ""
+"<b>Manage Users</b>\n"
+"\n"
+"Select an option from below."
+
+#: src/admin_handlers.py:317
+msgid "📜 List All Users"
+msgstr "📜 List All Users"
+
+#: src/admin_handlers.py:342
 msgid "No users found."
 msgstr "No users found."
 
-#: src/admin_handlers.py:102
+#: src/admin_handlers.py:349
+#, python-brace-format
 msgid ""
-"<b>Bot Users:</b>\n"
+"<b>Bot Users (Page {page_num}):</b>\n"
 "\n"
 msgstr ""
-"<b>Bot Users:</b>\n"
+"<b>Bot Users (Page {page_num}):</b>\n"
 "\n"
 
-#: src/admin_handlers.py:104
-msgid " (Admin)"
-msgstr " (Admin)"
-
-#: src/admin_handlers.py:119
-msgid "<b>Usage:</b> <code>/view_user &lt;telegram_id&gt;</code>"
-msgstr "<b>Usage:</b> <code>/view_user &lt;telegram_id&gt;</code>"
-
-#: src/admin_handlers.py:125
-msgid "Invalid Telegram ID."
-msgstr "Invalid Telegram ID."
-
-#: src/admin_handlers.py:130
+#: src/admin_handlers.py:387
 #, python-brace-format
-msgid "No user found with ID <code>{user_id}</code>."
-msgstr "No user found with ID <code>{user_id}</code>."
+msgid "User with ID <code>{user_id}</code> not found."
+msgstr "User with ID <code>{user_id}</code> not found."
 
-#: src/admin_handlers.py:137
+#: src/admin_handlers.py:403
 #, python-brace-format
-msgid "<b>User Details for:</b> <code>{user_id}</code>\n"
-msgstr "<b>User Details for:</b> <code>{user_id}</code>\n"
+msgid "<b>User Details for:</b> {user_mention} (<code>{user_id}</code>)\n"
+msgstr "<b>User Details for:</b> {user_mention} (<code>{user_id}</code>)\n"
 
-#: src/admin_handlers.py:138
+#: src/admin_handlers.py:406
 msgid "Yes"
 msgstr "Yes"
 
-#: src/admin_handlers.py:138
+#: src/admin_handlers.py:406
 msgid "No"
 msgstr "No"
 
-#: src/admin_handlers.py:139
+#: src/admin_handlers.py:407
 #, python-brace-format
 msgid "<b>Admin:</b> {is_admin}\n"
 msgstr "<b>Admin:</b> {is_admin}\n"
 
-#: src/admin_handlers.py:140
+#: src/admin_handlers.py:408
+#, python-brace-format
+msgid "<b>Language:</b> {lang}\n"
+msgstr "<b>Language:</b> {lang}\n"
+
+#: src/admin_handlers.py:409
 #, python-brace-format
 msgid "<b>Joined:</b> {join_date}\n"
 msgstr "<b>Joined:</b> {join_date}\n"
 
-#: src/admin_handlers.py:145
+#: src/admin_handlers.py:414
 #, python-brace-format
 msgid ""
 "<b>Subscription:</b> {plan_name} (Plan ID: {plan_id})\n"
@@ -150,37 +243,331 @@ msgstr ""
 "<b>Subscription:</b> {plan_name} (Plan ID: {plan_id})\n"
 "<b>Expires:</b> {end_date}\n"
 
-#: src/admin_handlers.py:151
+#: src/admin_handlers.py:420
 msgid "<b>Subscription:</b> None\n"
 msgstr "<b>Subscription:</b> None\n"
 
-#: src/admin_handlers.py:154
+#: src/admin_handlers.py:423
 #, python-brace-format
 msgid "<b>Managed Accounts ({count}):</b>\n"
 msgstr "<b>Managed Accounts ({count}):</b>\n"
 
-#: src/admin_handlers.py:158
+#: src/admin_handlers.py:427
 #, python-brace-format
 msgid "  - <code>{phone}</code> ({status})\n"
 msgstr "  - <code>{phone}</code> ({status})\n"
 
-#: src/admin_handlers.py:160
+#: src/admin_handlers.py:429
 msgid "  None\n"
 msgstr "  None\n"
 
-#: src/admin_handlers.py:173
+#: src/admin_handlers.py:432
+msgid "🎁 Grant Subscription"
+msgstr "🎁 Grant Subscription"
+
+#: src/admin_handlers.py:433
+msgid "🔙 Back to User List"
+msgstr "🔙 Back to User List"
+
+#: src/admin_handlers.py:448 src/user_handlers.py:531
+msgid "Operation cancelled."
+msgstr "Operation cancelled."
+
+#: src/admin_handlers.py:471
+msgid "There are no active plans to grant. Please create one first."
+msgstr "There are no active plans to grant. Please create one first."
+
+#: src/admin_handlers.py:478
+#, python-brace-format
+msgid "{name} - {price} Stars"
+msgstr "{name} - {price} Stars"
+
+#: src/admin_handlers.py:482 src/admin_handlers.py:748 src/user_handlers.py:362
+msgid "❌ Cancel"
+msgstr "❌ Cancel"
+
+#: src/admin_handlers.py:484
+#, python-brace-format
+msgid "Please choose a plan to grant to user <code>{user_id}</code>:"
+msgstr "Please choose a plan to grant to user <code>{user_id}</code>:"
+
+#: src/admin_handlers.py:499
 msgid ""
-"<b>Usage:</b> <code>/grant_subscription &lt;telegram_id&gt; "
-"&lt;plan_id&gt; &lt;duration_days&gt;</code>"
+"Please enter the duration for this subscription in days (e.g., 30).\n"
+"\n"
+"Or send /cancel to abort."
 msgstr ""
-"<b>Usage:</b> <code>/grant_subscription &lt;telegram_id&gt; "
-"&lt;plan_id&gt; &lt;duration_days&gt;</code>"
+"Please enter the duration for this subscription in days (e.g., 30).\n"
+"\n"
+"Or send /cancel to abort."
 
-#: src/admin_handlers.py:181
-msgid "Invalid number format in arguments."
-msgstr "Invalid number format in arguments."
+#: src/admin_handlers.py:521
+msgid "An error occurred. Please try again."
+msgstr "An error occurred. Please try again."
 
-#: src/user_handlers.py:24
+#: src/admin_handlers.py:539
+msgid "Grant subscription cancelled."
+msgstr "Grant subscription cancelled."
+
+#: src/admin_handlers.py:567
+msgid ""
+"<b>Manage Subscription Plans</b>\n"
+"\n"
+"Select an option from below."
+msgstr ""
+"<b>Manage Subscription Plans</b>\n"
+"\n"
+"Select an option from below."
+
+#: src/admin_handlers.py:569
+msgid "📜 List All Plans"
+msgstr "📜 List All Plans"
+
+#: src/admin_handlers.py:570
+msgid "➕ Create New Plan"
+msgstr "➕ Create New Plan"
+
+#: src/admin_handlers.py:571
+msgid "✏️ Edit a Plan"
+msgstr "✏️ Edit a Plan"
+
+#: src/admin_handlers.py:591
+msgid "No subscription plans found."
+msgstr "No subscription plans found."
+
+#: src/admin_handlers.py:593
+msgid ""
+"<b>Existing Subscription Plans:</b>\n"
+"\n"
+msgstr ""
+"<b>Existing Subscription Plans:</b>\n"
+"\n"
+
+#: src/admin_handlers.py:598
+#, python-brace-format
+msgid ""
+"<b>ID:</b> <code>{id}</code>, <b>Name:</b> {name}\n"
+"<b>Price (Stars):</b> {price}{price_usd_text}, <b>Duration:</b> {days} "
+"days\n"
+"<b>Accounts:</b> {accounts}, <b>Limit:</b> {limit} groups/day\n"
+"<b>Status:</b> {status}\n"
+"--------------------\n"
+msgstr ""
+"<b>ID:</b> <code>{id}</code>, <b>Name:</b> {name}\n"
+"<b>Price (Stars):</b> {price}{price_usd_text}, <b>Duration:</b> {days} "
+"days\n"
+"<b>Accounts:</b> {accounts}, <b>Limit:</b> {limit} groups/day\n"
+"<b>Status:</b> {status}\n"
+"--------------------\n"
+
+#: src/admin_handlers.py:623
+msgid "No subscription plans found to edit."
+msgstr "No subscription plans found to edit."
+
+#: src/admin_handlers.py:626
+msgid "Please select a plan to edit:"
+msgstr "Please select a plan to edit:"
+
+#: src/admin_handlers.py:654
+msgid ""
+"Let's create a new plan.\n"
+"\n"
+"First, what is the name of the plan? (e.g., 'Premium')\n"
+"\n"
+"You can send /cancel at any time to stop."
+msgstr ""
+"Let's create a new plan.\n"
+"\n"
+"First, what is the name of the plan? (e.g., 'Premium')\n"
+"\n"
+"You can send /cancel at any time to stop."
+
+#: src/admin_handlers.py:665
+msgid "Great. Now, what is the price in Telegram Stars? (e.g., 100)"
+msgstr "Great. Now, what is the price in Telegram Stars? (e.g., 100)"
+
+#: src/admin_handlers.py:675
+msgid "Next, what is the price in USD for crypto payments? (e.g., 5.99)"
+msgstr "Next, what is the price in USD for crypto payments? (e.g., 5.99)"
+
+#: src/admin_handlers.py:678
+msgid "That's not a valid number. Please enter the price in Stars again."
+msgstr "That's not a valid number. Please enter the price in Stars again."
+
+#: src/admin_handlers.py:688
+msgid "Perfect. How many days will the subscription last? (e.g., 30)"
+msgstr "Perfect. How many days will the subscription last? (e.g., 30)"
+
+#: src/admin_handlers.py:691
+msgid "That's not a valid number. Please enter the price in USD again."
+msgstr "That's not a valid number. Please enter the price in USD again."
+
+#: src/admin_handlers.py:701
+msgid "Got it. How many accounts can a user on this plan add? (e.g., 5)"
+msgstr "Got it. How many accounts can a user on this plan add? (e.g., 5)"
+
+#: src/admin_handlers.py:704
+msgid "That's not a valid number. Please enter the duration in days again."
+msgstr "That's not a valid number. Please enter the duration in days again."
+
+#: src/admin_handlers.py:714
+msgid ""
+"Almost done. What is the daily group creation limit for each account? "
+"(e.g., 20)"
+msgstr ""
+"Almost done. What is the daily group creation limit for each account? "
+"(e.g., 20)"
+
+#: src/admin_handlers.py:717
+msgid "That's not a valid number. Please enter the max accounts again."
+msgstr "That's not a valid number. Please enter the max accounts again."
+
+#: src/admin_handlers.py:730
+#, python-brace-format
+msgid ""
+"<b>Please confirm the new plan details:</b>\n"
+"\n"
+"<b>Name:</b> {name}\n"
+"<b>Price (Stars):</b> {price}\n"
+"<b>Price (USD):</b> {price_usd:.2f}\n"
+"<b>Duration:</b> {duration} days\n"
+"<b>Max Accounts:</b> {accounts}\n"
+"<b>Daily Limit:</b> {limit} groups/day"
+msgstr ""
+"<b>Please confirm the new plan details:</b>\n"
+"\n"
+"<b>Name:</b> {name}\n"
+"<b>Price (Stars):</b> {price}\n"
+"<b>Price (USD):</b> {price_usd:.2f}\n"
+"<b>Duration:</b> {duration} days\n"
+"<b>Max Accounts:</b> {accounts}\n"
+"<b>Daily Limit:</b> {limit} groups/day"
+
+#: src/admin_handlers.py:747
+msgid "✅ Save Plan"
+msgstr "✅ Save Plan"
+
+#: src/admin_handlers.py:755
+msgid "That's not a valid number. Please enter the daily group limit again."
+msgstr "That's not a valid number. Please enter the daily group limit again."
+
+#: src/admin_handlers.py:777
+#, python-brace-format
+msgid "✅ Plan '<b>{name}</b>' created successfully."
+msgstr "✅ Plan '<b>{name}</b>' created successfully."
+
+#: src/admin_handlers.py:779
+#, python-brace-format
+msgid "❌ Failed to create plan '<b>{name}</b>'. It might already exist."
+msgstr "❌ Failed to create plan '<b>{name}</b>'. It might already exist."
+
+#: src/admin_handlers.py:795
+msgid "Plan creation cancelled."
+msgstr "Plan creation cancelled."
+
+#: src/user_handlers.py:66
+msgid "🚀 Subscribe"
+msgstr "🚀 Subscribe"
+
+#: src/user_handlers.py:67
+msgid "👤 My Accounts"
+msgstr "👤 My Accounts"
+
+#: src/user_handlers.py:68
+msgid "➕ Add Account"
+msgstr "➕ Add Account"
+
+msgid "👥 Team"
+msgstr "👥 Team"
+
+msgid "🔗 Invite to add numbers"
+msgstr "🔗 Invite to add numbers"
+
+#: src/user_handlers.py:69
+msgid "🌐 Language"
+msgstr "🌐 Language"
+
+#: src/user_handlers.py:70
+msgid "❓ Help"
+msgstr "❓ Help"
+
+#: src/user_handlers.py:74
+msgid "Welcome to the main menu. Please choose an option:"
+msgstr "Welcome to the main menu. Please choose an option:"
+
+#: src/user_handlers.py:108
+msgid "An error occurred. Please try again later."
+msgstr "An error occurred. Please try again later."
+
+#: src/user_handlers.py:119
+msgid ""
+"<b>Bot Help & Commands</b>\n"
+"\n"
+"Here is a list of commands you can use:\n"
+"\n"
+"<b>/start</b> - Shows the welcome message.\n"
+"<b>/help</b> - Shows this help message.\n"
+"<b>/subscribe</b> - Browse and purchase a subscription plan to use the "
+"bot's features.\n"
+"<b>/my_accounts</b> - View and manage your connected Telegram accounts.\n"
+"<b>/add_account</b> - Start the process of adding a new Telegram account "
+"for the bot to manage.\n"
+"<b>/language</b> - Change the display language of the bot "
+"(English/العربية).\n"
+"\n"
+"After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation, login-code monitoring, or two-step verification for each account separately.\n"
+"\n"
+"From the main menu you can add a <b>manager</b> who can view and manage your accounts, and share an <b>add-number invite</b>. Anyone who opens that link can sign in a phone number; it is added to your list (not theirs) and you get a notification.\n"
+"\n"
+"For most features, you need an active subscription. You can get one via "
+"the /subscribe command."
+msgstr ""
+"<b>Bot Help & Commands</b>\n"
+"\n"
+"Here is a list of commands you can use:\n"
+"\n"
+"<b>/start</b> - Shows the welcome message.\n"
+"<b>/help</b> - Shows this help message.\n"
+"<b>/subscribe</b> - Browse and purchase a subscription plan to use the "
+"bot's features.\n"
+"<b>/my_accounts</b> - View and manage your connected Telegram accounts.\n"
+"<b>/add_account</b> - Start the process of adding a new Telegram account "
+"for the bot to manage.\n"
+"<b>/language</b> - Change the display language of the bot "
+"(English/العربية).\n"
+"\n"
+"After adding an account, group creation is <b>off</b> by default. Open /my_accounts to enable group creation, login-code monitoring, or two-step verification for each account separately.\n"
+"\n"
+"From the main menu you can add a <b>manager</b> who can view and manage your accounts, and share an <b>add-number invite</b>. Anyone who opens that link can sign in a phone number; it is added to your list (not theirs) and you get a notification.\n"
+"\n"
+"For most features, you need an active subscription. You can get one via "
+"the /subscribe command."
+
+#: src/user_handlers.py:133
+msgid ""
+"\n"
+"\n"
+"<b>--- Admin Commands ---</b>\n"
+"<b>/create_plan</b> - Create a new subscription plan.\n"
+"<b>/list_plans</b> - List all plans.\n"
+"<b>/list_users</b> - List all bot users.\n"
+"<b>/view_user</b> - View details for a specific user.\n"
+"<b>/grant_subscription</b> - Manually grant a subscription."
+msgstr ""
+"\n"
+"\n"
+"<b>--- Admin Commands ---</b>\n"
+"<b>/create_plan</b> - Create a new subscription plan.\n"
+"<b>/list_plans</b> - List all plans.\n"
+"<b>/list_users</b> - List all bot users.\n"
+"<b>/view_user</b> - View details for a specific user.\n"
+"<b>/grant_subscription</b> - Manually grant a subscription."
+
+#: src/user_handlers.py:158
+msgid "Please select a subscription plan from the list below:"
+msgstr "Please select a subscription plan from the list below:"
+
+#: src/user_handlers.py:161
 msgid ""
 "There are currently no subscription plans available. Please check back "
 "later."
@@ -188,158 +575,182 @@ msgstr ""
 "There are currently no subscription plans available. Please check back "
 "later."
 
-#: src/user_handlers.py:29
+#: src/user_handlers.py:168
+#, python-brace-format
+msgid "{plan_name} - {price} Stars / ${price_usd:.2f}"
+msgstr "{plan_name} - {price} Stars / ${price_usd:.2f}"
+
+#: src/user_handlers.py:172
 #, python-brace-format
 msgid "{plan_name} - {price} Stars"
 msgstr "{plan_name} - {price} Stars"
 
-#: src/user_handlers.py:34
-msgid "No active plans to display."
-msgstr "No active plans to display."
+#: src/user_handlers.py:199
+msgid "This plan is no longer available. Please choose another one."
+msgstr "This plan is no longer available. Please choose another one."
 
-#: src/user_handlers.py:39
-msgid "Please select a subscription plan from the list below:"
-msgstr "Please select a subscription plan from the list below:"
+#: src/user_handlers.py:202
+#, python-brace-format
+msgid ""
+"You have selected the '<b>{plan_name}</b>' plan.\n"
+"\n"
+"Please choose your payment method:"
+msgstr ""
+"You have selected the '<b>{plan_name}</b>' plan.\n"
+"\n"
+"Please choose your payment method:"
 
-#: src/user_handlers.py:73
-msgid "This plan is no longer available."
-msgstr "This plan is no longer available."
+#: src/user_handlers.py:204
+msgid "Pay with Stars ✨"
+msgstr "Pay with Stars ✨"
 
-#: src/user_handlers.py:77
+#: src/user_handlers.py:208
+msgid "Pay with Crypto 💳"
+msgstr "Pay with Crypto 💳"
+
+#: src/user_handlers.py:210
+#, fuzzy
+msgid "🔙 Back to Plans"
+msgstr "🔙 Back to Plan List"
+
+#: src/user_handlers.py:224
 #, python-brace-format
 msgid "Subscription: {plan_name}"
 msgstr "Subscription: {plan_name}"
 
-#: src/user_handlers.py:78
+#: src/user_handlers.py:225
 #, python-brace-format
 msgid "Access to {accounts} accounts and {limit} groups/day."
 msgstr "Access to {accounts} accounts and {limit} groups/day."
 
-#: src/user_handlers.py:82
+#: src/user_handlers.py:229
 msgid "Subscription"
 msgstr "Subscription"
 
-#: src/user_handlers.py:98
-msgid "Could not process your request. Please try again."
-msgstr "Could not process your request. Please try again."
-
-#: src/user_handlers.py:122
-msgid "There was an issue processing your subscription. Please contact support."
-msgstr "There was an issue processing your subscription. Please contact support."
-
-#: src/user_handlers.py:128
-msgid "There was an issue finding your selected plan. Please contact support."
-msgstr "There was an issue finding your selected plan. Please contact support."
-
-#: src/user_handlers.py:135
-#, python-brace-format
-msgid ""
-"✅ Thank you! Your '{plan_name}' subscription is now active for {days} "
-"days."
-msgstr ""
-"✅ Thank you! Your '{plan_name}' subscription is now active for {days} "
-"days."
-
-#: src/user_handlers.py:141
-#, python-brace-format
-msgid ""
-"There was a database error activating your subscription. Please contact "
-"support with payload: `{payload}`"
-msgstr ""
-"There was a database error activating your subscription. Please contact "
-"support with payload: `{payload}`"
-
-#: src/user_handlers.py:158
-msgid ""
-"You need an active subscription to add accounts. Use /subscribe to get "
-"one."
-msgstr ""
-"You need an active subscription to add accounts. Use /subscribe to get "
-"one."
-
-#: src/user_handlers.py:166
-msgid "Your subscription plan could not be found. Please contact support."
-msgstr "Your subscription plan could not be found. Please contact support."
-
-#: src/user_handlers.py:170
-#, python-brace-format
-msgid ""
-"You have reached the maximum of {max_accounts} accounts for your "
-"'{plan_name}' plan."
-msgstr ""
-"You have reached the maximum of {max_accounts} accounts for your "
-"'{plan_name}' plan."
-
-#: src/user_handlers.py:186
-msgid ""
-"Please send the phone number of the account you want to add.\n"
-"<i>(Must be in international format, e.g., +1234567890)</i>"
-msgstr ""
-"Please send the phone number of the account you want to add.\n"
-"<i>(Must be in international format, e.g., +1234567890)</i>"
-
-#: src/user_handlers.py:201
-msgid "Operation cancelled."
-msgstr "Operation cancelled."
-
-#: src/user_handlers.py:203
-msgid "Nothing to cancel."
-msgstr "Nothing to cancel."
-
-#: src/user_handlers.py:231
-#, python-brace-format
-msgid "Trying to log in with <code>{phone_number}</code>. Please wait..."
-msgstr "Trying to log in with <code>{phone_number}</code>. Please wait..."
-
 #: src/user_handlers.py:248
+msgid "Crypto payments are not configured by the admin yet."
+msgstr "Crypto payments are not configured by the admin yet."
+
+#: src/user_handlers.py:254
+msgid "Creating your crypto invoice, please wait..."
+msgstr "Creating your crypto invoice, please wait..."
+
+#: src/user_handlers.py:265
+msgid "Your invoice has been created. Please use the button below to pay."
+msgstr "Your invoice has been created. Please use the button below to pay."
+
+#: src/user_handlers.py:267
+msgid "Pay Invoice"
+msgstr "Pay Invoice"
+
+#: src/user_handlers.py:274
 msgid ""
-"A login code has been sent to your Telegram account. Please send it here."
-"\n"
-"Use /cancel to stop this process."
+"Sorry, we could not create a crypto invoice at this moment. Please try "
+"again later or contact support."
 msgstr ""
-"A login code has been sent to your Telegram account. Please send it here."
-"\n"
-"Use /cancel to stop this process."
+"Sorry, we could not create a crypto invoice at this moment. Please try "
+"again later or contact support."
 
-#: src/user_handlers.py:252
+#: src/user_handlers.py:292
+#, python-brace-format
 msgid ""
-"The phone number is invalid. Please try again with a valid number in "
-"international format."
+"✅ Thank you! Your '{plan_name}' subscription is now active for {days} "
+"days."
 msgstr ""
-"The phone number is invalid. Please try again with a valid number in "
-"international format."
+"✅ Thank you! Your '{plan_name}' subscription is now active for {days} "
+"days."
 
-#: src/user_handlers.py:255 src/user_handlers.py:286
-msgid "An unexpected error occurred. Please try again or use /cancel."
-msgstr "An unexpected error occurred. Please try again or use /cancel."
+#: src/user_handlers.py:295
+#, python-brace-format
+msgid ""
+"There was a database error activating your subscription. Please contact "
+"support with payload: `{payload}`"
+msgstr ""
+"There was a database error activating your subscription. Please contact "
+"support with payload: `{payload}`"
 
-#: src/user_handlers.py:266 src/user_handlers.py:297
-msgid "Your session has expired. Please start over with /add_account."
-msgstr "Your session has expired. Please start over with /add_account."
+#: src/user_handlers.py:308
+msgid "Please choose your language:"
+msgstr "Please choose your language:"
 
-#: src/user_handlers.py:281
+#: src/user_handlers.py:350
+msgid ""
+"You need an active subscription to add accounts. Use /subscribe to get "
+"one."
+msgstr ""
+"You need an active subscription to add accounts. Use /subscribe to get "
+"one."
+
+#: src/user_handlers.py:355
+#, python-brace-format
+msgid ""
+"You have reached the maximum of {max_accounts} accounts for your "
+"'{plan_name}' plan."
+msgstr ""
+"You have reached the maximum of {max_accounts} accounts for your "
+"'{plan_name}' plan."
+
+#: src/user_handlers.py:359
+msgid ""
+"Please send the phone number of the account you want to add.\n"
+"<i>(Must be in international format, e.g., +1234567890)</i>"
+msgstr ""
+"Please send the phone number of the account you want to add.\n"
+"<i>(Must be in international format, e.g., +1234567890)</i>"
+
+#: src/user_handlers.py:424
+msgid "A login code has been sent. Please send it here."
+msgstr "A login code has been sent. Please send it here."
+
+#: src/user_handlers.py:436
+msgid ""
+"Failed to connect to Telegram after multiple attempts. Please check proxy"
+" settings and try again later."
+msgstr ""
+"Failed to connect to Telegram after multiple attempts. Please check proxy"
+" settings and try again later."
+
+#: src/user_handlers.py:439
+msgid "The phone number is invalid. Please try again."
+msgstr "The phone number is invalid. Please try again."
+
+#: src/user_handlers.py:446
+msgid "An unexpected error occurred. Please try again."
+msgstr "An unexpected error occurred. Please try again."
+
+#: src/user_handlers.py:456
+msgid "Processing... Please wait."
+msgstr "Processing... Please wait."
+
+#: src/user_handlers.py:469
 msgid ""
 "This account has Two-Factor Authentication enabled. Please send your "
-"password.\n"
-"Use /cancel to stop."
+"password."
 msgstr ""
 "This account has Two-Factor Authentication enabled. Please send your "
-"password.\n"
-"Use /cancel to stop."
+"password."
 
-#: src/user_handlers.py:283
+#: src/user_handlers.py:472
 msgid "Invalid or expired code. Please send the correct code again."
 msgstr "Invalid or expired code. Please send the correct code again."
 
-#: src/user_handlers.py:307
+#: src/user_handlers.py:476
+msgid "An unexpected error occurred."
+msgstr "An unexpected error occurred."
+
+#: src/user_handlers.py:484
+msgid "Processing..."
+msgstr "Processing..."
+
+#: src/user_handlers.py:495
 msgid "Incorrect password or an error occurred. Please try again or use /cancel."
 msgstr "Incorrect password or an error occurred. Please try again or use /cancel."
 
-#: src/user_handlers.py:321
+#: src/user_handlers.py:510
 msgid "✅ Account added successfully!"
 msgstr "✅ Account added successfully!"
 
-#: src/user_handlers.py:323
+#: src/user_handlers.py:512
 msgid ""
 "❌ Could not save your account to the database. It might already be "
 "registered."
@@ -347,23 +758,19 @@ msgstr ""
 "❌ Could not save your account to the database. It might already be "
 "registered."
 
-#: src/user_handlers.py:339
+#: src/user_handlers.py:561 src/user_handlers.py:791
+msgid "Please select an account to manage:"
+msgstr "Please select an account to manage:"
+
+#: src/user_handlers.py:565 src/user_handlers.py:794
 msgid "You have not added any accounts yet. Use /add_account to get started."
 msgstr "You have not added any accounts yet. Use /add_account to get started."
 
-#: src/user_handlers.py:342
-msgid "Your managed accounts:"
-msgstr "Your managed accounts:"
+#: src/user_handlers.py:611
+msgid "Error: Account not found or you don't have permission."
+msgstr "Error: Account not found or you don't have permission."
 
-#: src/user_handlers.py:345
-msgid "🟢 Active"
-msgstr "🟢 Active"
-
-#: src/user_handlers.py:345
-msgid "🔴 Inactive"
-msgstr "🔴 Inactive"
-
-#: src/user_handlers.py:346
+#: src/user_handlers.py:631
 #, python-brace-format
 msgid ""
 "<b>Account:</b> <code>{phone}</code>\n"
@@ -372,76 +779,828 @@ msgstr ""
 "<b>Account:</b> <code>{phone}</code>\n"
 "<b>Status:</b> {status}"
 
-#: src/user_handlers.py:350
-msgid "📊 Stats"
-msgstr "📊 Stats"
+#: src/user_handlers.py:633
+#, python-brace-format
+msgid ""
+"\n"
+"<b>Last Group:</b> {time}"
+msgstr ""
+"\n"
+"<b>Last Group:</b> {time}"
 
-#: src/user_handlers.py:351
+#: src/user_handlers.py:634
+#, python-brace-format
+msgid ""
+"\n"
+"<b>Next Group:</b> {time}"
+msgstr ""
+"\n"
+"<b>Next Group:</b> {time}"
+
+#: src/user_handlers.py:637
+#, python-brace-format
+msgid ""
+"\n"
+"<b>Last Error:</b> <pre>{error}</pre>"
+msgstr ""
+"\n"
+"<b>Last Error:</b> <pre>{error}</pre>"
+
+#: src/user_handlers.py:639
+#, python-brace-format
+msgid ""
+"\n"
+"\n"
+"📊 <b>Total Groups Created:</b> {count}"
+msgstr ""
+"\n"
+"\n"
+"📊 <b>Total Groups Created:</b> {count}"
+
+#: src/user_handlers.py:643
 msgid "Toggle On"
 msgstr "Toggle On"
 
-#: src/user_handlers.py:351
+#: src/user_handlers.py:643
 msgid "Toggle Off"
 msgstr "Toggle Off"
 
-#: src/user_handlers.py:354
+#: src/user_handlers.py:644
 msgid "🔄 Change Proxy"
 msgstr "🔄 Change Proxy"
 
-#: src/user_handlers.py:355
+#: src/user_handlers.py:647
+msgid "📂 View Groups"
+msgstr "📂 View Groups"
+
+#: src/user_handlers.py:648
 msgid "❌ Delete"
 msgstr "❌ Delete"
 
-#: src/user_handlers.py:376
-#, python-brace-format
-msgid "This account has created {count} groups."
-msgstr "This account has created {count} groups."
+#: src/user_handlers.py:650
+#, fuzzy
+msgid "🔙 Back to Account List"
+msgstr "🔙 Back to Plan List"
 
-#: src/user_handlers.py:383
+#: src/user_handlers.py:671
+msgid "Cancelled."
+msgstr "Cancelled."
+
+#: src/user_handlers.py:688
+msgid "Fetching groups... Please wait."
+msgstr "Fetching groups... Please wait."
+
+#: src/user_handlers.py:692
+msgid "Error: Could not retrieve session for this account."
+msgstr "Error: Could not retrieve session for this account."
+
+#: src/user_handlers.py:708
+msgid "This account is not a member of any groups."
+msgstr "This account is not a member of any groups."
+
+#: src/user_handlers.py:709 src/user_handlers.py:733
+#, fuzzy
+msgid "🔙 Back to Account"
+msgstr "🔙 Back to Plan List"
+
+#: src/user_handlers.py:720
+#, fuzzy, python-brace-format
+msgid ""
+"<b>Groups for Account (Page {page_num}/{total_pages}):</b>\n"
+"\n"
+msgstr ""
+"<b>Groups List (Page {page_num}/{total_pages}):</b>\n"
+"\n"
+
+#: src/user_handlers.py:728
+msgid "⬅️ Previous"
+msgstr "⬅️ Previous"
+
+#: src/user_handlers.py:730
+msgid "Next ➡️"
+msgstr "Next ➡️"
+
+#: src/user_handlers.py:739
+msgid ""
+"An error occurred while fetching groups. The session might be invalid or "
+"revoked."
+msgstr ""
+"An error occurred while fetching groups. The session might be invalid or "
+"revoked."
+
+#: src/user_handlers.py:747
+#, python-brace-format
+msgid ""
+"<b>Group Stats:</b>\n"
+"\n"
+"<b>Name:</b> {name}\n"
+"<b>Created:</b> {date}"
+msgstr ""
+"<b>Group Stats:</b>\n"
+"\n"
+"<b>Name:</b> {name}\n"
+"<b>Created:</b> {date}"
+
+#: src/user_handlers.py:753
+msgid "Could not retrieve group stats."
+msgstr "Could not retrieve group stats."
+
+#: src/user_handlers.py:759
 msgid "activated"
 msgstr "activated"
 
-#: src/user_handlers.py:383
+#: src/user_handlers.py:759
 msgid "deactivated"
 msgstr "deactivated"
 
-#: src/user_handlers.py:384
+#: src/user_handlers.py:760
 #, python-brace-format
 msgid "Account has been {status}."
 msgstr "Account has been {status}."
 
-#: src/user_handlers.py:386
+#: src/user_handlers.py:764
 msgid "Could not change status."
 msgstr "Could not change status."
 
-#: src/user_handlers.py:397
+#: src/user_handlers.py:776
 msgid "Yes, delete it"
 msgstr "Yes, delete it"
 
-#: src/user_handlers.py:398
+#: src/user_handlers.py:777
 msgid "No, cancel"
 msgstr "No, cancel"
 
-#: src/user_handlers.py:406
+#: src/user_handlers.py:780
+msgid ""
+"Are you sure you want to delete this account? This action cannot be "
+"undone."
+msgstr ""
+"Are you sure you want to delete this account? This action cannot be "
+"undone."
+
+#: src/user_handlers.py:787
 msgid "✅ Account has been deleted."
 msgstr "✅ Account has been deleted."
 
-#: src/user_handlers.py:408
+#: src/user_handlers.py:804
 msgid "❌ Could not delete account."
 msgstr "❌ Could not delete account."
 
-#: src/user_handlers.py:413
-msgid "Cancelled."
-msgstr "Cancelled."
+#: src/user_handlers.py:69
+msgid "ℹ️ Information & Policies"
+msgstr "ℹ️ Information & Policies"
 
-#: src/user_handlers.py:428
-msgid "Please choose your language:"
-msgstr "Please choose your language:"
+#: src/user_handlers.py:160
+msgid "Please select a topic to read about:"
+msgstr "Please select a topic to read about:"
 
-#: src/user_handlers.py:442
-msgid "Could not change language."
-msgstr "Could not change language."
+#: src/user_handlers.py:163
+msgid "📜 Privacy Policy"
+msgstr "📜 Privacy Policy"
 
-#: src/user_handlers.py:442
-msgid "Language changed successfully."
-msgstr "Language changed successfully."
+#: src/user_handlers.py:164
+msgid "⚖️ Disclaimer"
+msgstr "⚖️ Disclaimer"
+
+#: src/user_handlers.py:167
+msgid "💳 Payment & Refunds"
+msgstr "💳 Payment & Refunds"
+
+#: src/user_handlers.py:170
+msgid "ℹ️ About the Project"
+msgstr "ℹ️ About the Project"
+
+#: src/user_handlers.py:173
+msgid "✨ Bot Features"
+msgstr "✨ Bot Features"
+
+#: src/user_handlers.py:195
+msgid "Content for this page is not available yet. Please check back later."
+msgstr "Content for this page is not available yet. Please check back later."
+
+#: src/user_handlers.py:201
+msgid "Information"
+msgstr "Information"
+
+#: src/admin_handlers.py:32
+msgid "📝 Manage Content"
+msgstr "📝 Manage Content"
+
+#: src/admin_handlers.py:75
+msgid "Please select the content page you want to edit:"
+msgstr "Please select the content page you want to edit:"
+
+#: src/admin_handlers.py:97
+#, python-brace-format
+msgid ""
+"You are editing the content for: <b>{page_key}</b>\n\n"
+"Please send the new text. Send /cancel to abort.\n\n"
+"<b>Current content:</b>\n\n<pre>{current_content}</pre>"
+msgstr ""
+"You are editing the content for: <b>{page_key}</b>\n\n"
+"Please send the new text. Send /cancel to abort.\n\n"
+"<b>Current content:</b>\n\n<pre>{current_content}</pre>"
+
+
+#: src/admin_handlers.py:113
+#, python-brace-format
+msgid "✅ Content for '<b>{page_key}</b>' updated successfully."
+msgstr "✅ Content for '<b>{page_key}</b>' updated successfully."
+
+#: src/admin_handlers.py:115
+#, python-brace-format
+msgid "❌ Failed to update content for '<b>{page_key}</b>'."
+msgstr "❌ Failed to update content for '<b>{page_key}</b>'."
+
+#: src/admin_handlers.py:125
+msgid "Content edit operation cancelled."
+msgstr "Content edit operation cancelled."
+
+#: src/admin_handlers.py:108
+msgid "Please choose which language to edit:"
+msgstr "Please choose which language to edit:"
+
+#: src/admin_handlers.py:137
+#, python-brace-format
+msgid "You are editing the content for: <b>{page_key} ({lang})</b>\n\n"
+"Please send the new text. Send /cancel to abort.\n\n"
+"<b>Current content:</b>\n\n<pre>{current_content}</pre>"
+msgstr "You are editing the content for: <b>{page_key} ({lang})</b>\n\n"
+"Please send the new text. Send /cancel to abort.\n\n"
+"<b>Current content:</b>\n\n<pre>{current_content}</pre>"
+
+#: src/admin_handlers.py:155
+#, python-brace-format
+msgid "✅ Content for '<b>{page_key} ({lang})</b>' updated successfully."
+msgstr "✅ Content for '<b>{page_key} ({lang})</b>' updated successfully."
+
+#: src/admin_handlers.py:157
+#, python-brace-format
+msgid "❌ Failed to update content for '<b>{page_key} ({lang})</b>'."
+msgstr "❌ Failed to update content for '<b>{page_key} ({lang})</b>'."
+
+#~ msgid "Left Channels"
+#~ msgstr "Left Channels"
+
+#~ msgid ""
+#~ "<b>Groups Report:</b>\n"
+#~ "  - Owned: {owned}\n"
+#~ "  - Supergroups: {supergroups}\n"
+#~ "  - Normal Groups: {normal}\n"
+#~ "\n"
+#~ msgstr ""
+#~ "<b>Groups Report:</b>\n"
+#~ "  - Owned: {owned}\n"
+#~ "  - Supergroups: {supergroups}\n"
+#~ "  - Normal Groups: {normal}\n"
+#~ "\n"
+
+#~ msgid "Convert '{chat_title}'"
+#~ msgstr "Convert '{chat_title}'"
+
+#~ msgid "Fetching left channels... Please wait."
+#~ msgstr "Fetching left channels... Please wait."
+
+#~ msgid "An error occurred while fetching left chats."
+#~ msgstr "An error occurred while fetching left chats."
+
+#~ msgid "No left channels found."
+#~ msgstr "No left channels found."
+
+#~ msgid ""
+#~ "<b>Left Channels:</b>\n"
+#~ "\n"
+#~ msgstr ""
+#~ "<b>Left Channels:</b>\n"
+#~ "\n"
+
+#~ msgid "<b>Channels:</b>\n"
+#~ msgstr "<b>Channels:</b>\n"
+
+#~ msgid "Attempting to convert to supergroup..."
+#~ msgstr "Attempting to convert to supergroup..."
+
+#~ msgid "✅ Group successfully converted to a supergroup!"
+#~ msgstr "✅ Group successfully converted to a supergroup!"
+
+#~ msgid ""
+#~ "❌ Failed to convert group. The "
+#~ "account may not have the required "
+#~ "permissions, or the group may already"
+#~ " be a supergroup."
+#~ msgstr ""
+#~ "❌ Failed to convert group. The "
+#~ "account may not have the required "
+#~ "permissions, or the group may already"
+#~ " be a supergroup."
+
+#: src/user_handlers.py:516
+msgid "Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number."
+msgstr "Telegram has blocked this login attempt with a CAPTCHA. This can be due to the phone number or the server's IP. Please try again later or with a different phone number."
+
+msgid "⚪️ Off"
+msgstr "⚪️ Off"
+
+msgid "⚠️ Error"
+msgstr "⚠️ Error"
+
+msgid "🟢 On"
+msgstr "🟢 On"
+
+msgid "🕒 Waiting"
+msgstr "🕒 Waiting"
+
+msgid "🟢 On (connected)"
+msgstr "🟢 On (connected)"
+
+msgid "🟡 On (connecting)"
+msgstr "🟡 On (connecting)"
+
+msgid "▶️ Enable Group Creation"
+msgstr "▶️ Enable Group Creation"
+
+msgid "⏹️ Disable Group Creation"
+msgstr "⏹️ Disable Group Creation"
+
+msgid "🔐 Enable Code Monitor"
+msgstr "🔐 Enable Code Monitor"
+
+msgid "🔓 Disable Code Monitor"
+msgstr "🔓 Disable Code Monitor"
+
+msgid "Group creation has been {status}."
+msgstr "Group creation has been {status}."
+
+msgid "Code monitor is enabled, but an active subscription is required to run it."
+msgstr "Code monitor is enabled, but an active subscription is required to run it."
+
+msgid "Code monitor enabled. Login codes and security notices will be forwarded here."
+msgstr "Code monitor enabled. Login codes and security notices will be forwarded here."
+
+msgid "Code monitor is enabled, but the account could not connect yet. It will retry automatically."
+msgstr "Code monitor is enabled, but the account could not connect yet. It will retry automatically."
+
+msgid "Code monitor disabled."
+msgstr "Code monitor disabled."
+
+msgid "Groups On"
+msgstr "Groups On"
+
+msgid "Groups Off"
+msgstr "Groups Off"
+
+msgid "Monitor On"
+msgstr "Monitor On"
+
+msgid "Monitor Off"
+msgstr "Monitor Off"
+
+msgid "👤 View Profile"
+msgstr "👤 View Profile"
+
+msgid "💬 Private Chats"
+msgstr "💬 Private Chats"
+
+msgid "📊 Group Report"
+msgstr "📊 Group Report"
+
+msgid "👤 <b>{name}</b>"
+msgstr "👤 <b>{name}</b>"
+
+msgid "🔗 @{username}"
+msgstr "🔗 @{username}"
+
+msgid "📱 <code>{phone}</code>"
+msgstr "📱 <code>{phone}</code>"
+
+msgid "🆔 <code>{user_id}</code>"
+msgstr "🆔 <code>{user_id}</code>"
+
+msgid "⭐ Telegram Premium"
+msgstr "⭐ Telegram Premium"
+
+msgid "🌐 Language: {lang}"
+msgstr "🌐 Language: {lang}"
+
+msgid "🎭 {status}"
+msgstr "🎭 {status}"
+
+msgid "📝 {bio}"
+msgstr "📝 {bio}"
+
+msgid "✨ <b>Collectible usernames</b>"
+msgstr "✨ <b>Collectible usernames</b>"
+
+msgid "🎁 <b>Gifts & collectibles</b> ({count})"
+msgstr "🎁 <b>Gifts & collectibles</b> ({count})"
+
+msgid "No gifts or collectibles on this profile."
+msgstr "No gifts or collectibles on this profile."
+
+msgid "Could not load gifts right now."
+msgstr "Could not load gifts right now."
+
+msgid "…and {count} more"
+msgstr "…and {count} more"
+
+msgid "🔄 Refresh"
+msgstr "🔄 Refresh"
+
+msgid "Loading profile…"
+msgstr "Loading profile…"
+
+msgid "Loading private chats…"
+msgstr "Loading private chats…"
+
+msgid "Opening conversation…"
+msgstr "Opening conversation…"
+
+msgid "💬 <b>Private chats</b> · {name}\n{count} conversations · page {page}/{pages}"
+msgstr "💬 <b>Private chats</b> · {name}\n{count} conversations · page {page}/{pages}"
+
+msgid "This account has no private conversations."
+msgstr "This account has no private conversations."
+
+msgid "💾 Saved Messages"
+msgstr "💾 Saved Messages"
+
+msgid "No messages in this conversation."
+msgstr "No messages in this conversation."
+
+msgid "💬 <b>{name}</b>\n{subtitle}\n"
+msgstr "💬 <b>{name}</b>\n{subtitle}\n"
+
+msgid "You"
+msgstr "You"
+
+msgid "📷 Photo"
+msgstr "📷 Photo"
+
+msgid "🎬 Video"
+msgstr "🎬 Video"
+
+msgid "🎤 Voice"
+msgstr "🎤 Voice"
+
+msgid "🎧 Audio"
+msgstr "🎧 Audio"
+
+msgid "📄 File"
+msgstr "📄 File"
+
+msgid "😊 Sticker"
+msgstr "😊 Sticker"
+
+msgid "GIF"
+msgstr "GIF"
+
+msgid "📍 Location"
+msgstr "📍 Location"
+
+msgid "👤 Contact"
+msgstr "👤 Contact"
+
+msgid "🔗 Link"
+msgstr "🔗 Link"
+
+msgid "📎 Media"
+msgstr "📎 Media"
+
+msgid "📊 Poll"
+msgstr "📊 Poll"
+
+msgid "⬅️ Newer"
+msgstr "⬅️ Newer"
+
+msgid "Older ➡️"
+msgstr "Older ➡️"
+
+msgid "🔙 Back to Chats"
+msgstr "🔙 Back to Chats"
+
+msgid "Page {page}/{pages}"
+msgstr "Page {page}/{pages}"
+
+msgid "This account could not connect. Check the proxy and try again."
+msgstr "This account could not connect. Check the proxy and try again."
+
+msgid "The session is invalid or revoked. Please re-add the account."
+msgstr "The session is invalid or revoked. Please re-add the account."
+
+msgid "An unexpected error occurred while loading this page."
+msgstr "An unexpected error occurred while loading this page."
+
+msgid "Telegram asked us to wait. Please try again in a moment."
+msgstr "Telegram asked us to wait. Please try again in a moment."
+
+msgid "Unknown"
+msgstr "Unknown"
+
+msgid "invalid"
+msgstr "invalid"
+
+msgid "❌ Invalid"
+msgstr "❌ Invalid"
+
+msgid "❌ Invalid — sign in again"
+msgstr "❌ Invalid — sign in again"
+
+msgid "⚠️ <b>Account invalid</b>"
+msgstr "⚠️ <b>Account invalid</b>"
+
+msgid "This session has expired or is no longer valid. You may need to sign in again — delete the account and add it once more."
+msgstr "This session has expired or is no longer valid. You may need to sign in again — delete the account and add it once more."
+
+msgid "This invite link is invalid or has been replaced."
+msgstr "This invite link is invalid or has been replaced."
+
+msgid "This team link is invalid or has been replaced."
+msgstr "This team link is invalid or has been replaced."
+
+msgid "This is your own team link. Share it with the person you want as a manager."
+msgstr "This is your own team link. Share it with the person you want as a manager."
+
+msgid "You can now view and manage {name}'s accounts from My Accounts. The numbers stay on their list, not yours."
+msgstr "You can now view and manage {name}'s accounts from My Accounts. The numbers stay on their list, not yours."
+
+msgid "👥 {person} can now view and manage your accounts."
+msgstr "👥 {person} can now view and manage your accounts."
+
+msgid "You already manage {name}'s accounts."
+msgstr "You already manage {name}'s accounts."
+
+msgid "Could not add you as a manager."
+msgstr "Could not add you as a manager."
+
+msgid "The account owner does not have an active subscription, so this number cannot be added right now."
+msgstr "The account owner does not have an active subscription, so this number cannot be added right now."
+
+msgid "The account owner has reached the maximum number of accounts on their plan."
+msgstr "The account owner has reached the maximum number of accounts on their plan."
+
+msgid ""
+"Enter the phone number to add to {name}'s account list.\n"
+"<i>(Must be in international format, e.g., +1234567890)</i>\n"
+"\n"
+"This number will not appear in your accounts."
+msgstr ""
+"Enter the phone number to add to {name}'s account list.\n"
+"<i>(Must be in international format, e.g., +1234567890)</i>\n"
+"\n"
+"This number will not appear in your accounts."
+
+msgid ""
+"✅ The number {phone} was added to {name}'s account list.\n"
+"\n"
+"It will not appear in your accounts."
+msgstr ""
+"✅ The number {phone} was added to {name}'s account list.\n"
+"\n"
+"It will not appear in your accounts."
+
+msgid "📥 {person} added the number {phone} to your accounts."
+msgstr "📥 {person} added the number {phone} to your accounts."
+
+msgid "👥 Shared accounts belong to someone who added you as a manager."
+msgstr "👥 Shared accounts belong to someone who added you as a manager."
+
+msgid "<b>Team</b>"
+msgstr "<b>Team</b>"
+
+msgid "Managers can view and manage every Telegram account you added. They cannot change this team or your invite links."
+msgstr "Managers can view and manage every Telegram account you added. They cannot change this team or your invite links."
+
+msgid "<b>Managers</b>"
+msgstr "<b>Managers</b>"
+
+msgid "No managers yet."
+msgstr "No managers yet."
+
+msgid "Share this link so someone can become a manager:"
+msgstr "Share this link so someone can become a manager:"
+
+msgid "Could not build the team link. Make sure the bot has a public username."
+msgstr "Could not build the team link. Make sure the bot has a public username."
+
+msgid "<b>You manage accounts for</b>"
+msgstr "<b>You manage accounts for</b>"
+
+msgid "To add a number to their list, ask them for their add-number invite link."
+msgstr "To add a number to their list, ask them for their add-number invite link."
+
+msgid "➕ Add manager by ID"
+msgstr "➕ Add manager by ID"
+
+msgid "❌ Remove {name}"
+msgstr "❌ Remove {name}"
+
+msgid "🔄 New team link"
+msgstr "🔄 New team link"
+
+msgid "<b>Add-number invite</b>"
+msgstr "<b>Add-number invite</b>"
+
+msgid "Anyone who opens this link can sign in a phone number. The number is added to <b>your</b> account list, it does not appear in theirs, and you get a notification."
+msgstr "Anyone who opens this link can sign in a phone number. The number is added to <b>your</b> account list, it does not appear in theirs, and you get a notification."
+
+msgid "They do not need their own subscription. The number counts against your plan limit."
+msgstr "They do not need their own subscription. The number counts against your plan limit."
+
+msgid "Your invite link:"
+msgstr "Your invite link:"
+
+msgid "Could not build the invite link. Make sure the bot has a public username."
+msgstr "Could not build the invite link. Make sure the bot has a public username."
+
+msgid "🔄 New invite link"
+msgstr "🔄 New invite link"
+
+msgid "New team link created. The old one no longer works."
+msgstr "New team link created. The old one no longer works."
+
+msgid "New invite link created. The old one no longer works."
+msgstr "New invite link created. The old one no longer works."
+
+msgid "Could not create a new link."
+msgstr "Could not create a new link."
+
+msgid "Could not remove that manager."
+msgstr "Could not remove that manager."
+
+msgid "Manager removed."
+msgstr "Manager removed."
+
+msgid ""
+"Send the manager's numeric Telegram user ID, or their @username if they have already used this bot.\n"
+"\n"
+"Use /cancel to go back."
+msgstr ""
+"Send the manager's numeric Telegram user ID, or their @username if they have already used this bot.\n"
+"\n"
+"Use /cancel to go back."
+
+msgid "No bot user with that username. They must press /start first, or send their numeric Telegram ID."
+msgstr "No bot user with that username. They must press /start first, or send their numeric Telegram ID."
+
+msgid "Please send a numeric Telegram user ID or an @username."
+msgstr "Please send a numeric Telegram user ID or an @username."
+
+msgid "You cannot add yourself as a manager."
+msgstr "You cannot add yourself as a manager."
+
+msgid "That person is already a manager."
+msgstr "That person is already a manager."
+
+msgid "{name} can now view and manage your accounts."
+msgstr "{name} can now view and manage your accounts."
+
+msgid "Could not add that manager. Please try again."
+msgstr "Could not add that manager. Please try again."
+
+msgid ""
+"Who should this account be added for?\n"
+"\n"
+"• <b>For myself</b>: the account will appear in your own list.\n"
+"• <b>For someone else</b>: the account will be added to another user's account in this bot "
+"(not yours). You will need their Telegram numeric ID."
+msgstr ""
+"Who should this account be added for?\n"
+"\n"
+"• <b>For myself</b>: the account will appear in your own list.\n"
+"• <b>For someone else</b>: the account will be added to another user's account in this bot "
+"(not yours). You will need their Telegram numeric ID."
+
+msgid "👤 Add for myself"
+msgstr "👤 Add for myself"
+
+msgid "👥 Add for someone else"
+msgstr "👥 Add for someone else"
+
+msgid ""
+"<b>Add for someone else</b>\n"
+"\n"
+"This means the Telegram account you are about to log in will be linked to "
+"<b>another person's</b> profile in this bot — it will appear in <b>their</b> "
+"\"My Accounts\" list, not yours.\n"
+"\n"
+"Please send that person's Telegram numeric ID now.\n"
+"<i>(They must have used this bot before and have an active subscription with free slots.)</i>"
+msgstr ""
+"<b>Add for someone else</b>\n"
+"\n"
+"This means the Telegram account you are about to log in will be linked to "
+"<b>another person's</b> profile in this bot — it will appear in <b>their</b> "
+"\"My Accounts\" list, not yours.\n"
+"\n"
+"Please send that person's Telegram numeric ID now.\n"
+"<i>(They must have used this bot before and have an active subscription with free slots.)</i>"
+
+msgid "Invalid ID. Please send a numeric Telegram user ID, or /cancel to stop."
+msgstr "Invalid ID. Please send a numeric Telegram user ID, or /cancel to stop."
+
+msgid "That is your own ID. Choose \"Add for myself\", or send another person's ID."
+msgstr "That is your own ID. Choose \"Add for myself\", or send another person's ID."
+
+msgid ""
+"No user with ID <code>{user_id}</code> was found in this bot. "
+"They must start the bot first."
+msgstr ""
+"No user with ID <code>{user_id}</code> was found in this bot. "
+"They must start the bot first."
+
+msgid "OK. The account will be added for {name}."
+msgstr "OK. The account will be added for {name}."
+
+msgid ""
+"This does not look like a valid phone number.\n"
+"Please send it in international format, e.g. <code>+1234567890</code> "
+"(starts with +, digits only, no letters)."
+msgstr ""
+"This does not look like a valid phone number.\n"
+"Please send it in international format, e.g. <code>+1234567890</code> "
+"(starts with +, digits only, no letters)."
+
+msgid "Invalid invoice payload"
+msgstr "Invalid invoice payload"
+
+msgid "Invoice does not belong to this user"
+msgstr "Invoice does not belong to this user"
+
+msgid "User is not registered. Send /start and try again"
+msgstr "User is not registered. Send /start and try again"
+
+msgid "Plan not found"
+msgstr "Plan not found"
+
+msgid "Plan is not active"
+msgstr "Plan is not active"
+
+msgid "Invalid plan price"
+msgstr "Invalid plan price"
+
+msgid "Unsupported currency"
+msgstr "Unsupported currency"
+
+msgid "📢 Channels & Groups"
+msgstr "📢 Channels & Groups"
+
+msgid "Advanced Channel & Group Management"
+msgstr "Advanced Channel & Group Management"
+
+msgid "View Left Channels"
+msgstr "View Left Channels"
+
+msgid "Group Tools"
+msgstr "Group Tools"
+
+msgid "Fetching group data..."
+msgstr "Fetching group data..."
+
+#, python-brace-format
+msgid ""
+"<b>Group Statistics</b>\n"
+"\n"
+"Total owned groups: {owned_count}\n"
+"Normal groups (can be upgraded): {normal_count}"
+msgstr ""
+"<b>Group Statistics</b>\n"
+"\n"
+"Total owned groups: {owned_count}\n"
+"Normal groups (can be upgraded): {normal_count}"
+
+msgid "Upgrade Normal Groups"
+msgstr "Upgrade Normal Groups"
+
+msgid "An error occurred while fetching group data."
+msgstr "An error occurred while fetching group data."
+
+msgid "Fetching left channels... Please wait."
+msgstr "Fetching left channels... Please wait."
+
+msgid "No left channels found."
+msgstr "No left channels found."
+
+msgid "<b>Left Channels:</b>\n\n"
+msgstr "<b>Left Channels:</b>\n\n"
+
+msgid "An error occurred while fetching left chats."
+msgstr "An error occurred while fetching left chats."
+
+msgid "Upgrading groups... This may take a moment."
+msgstr "Upgrading groups... This may take a moment."
+
+msgid "All upgradable groups have been processed."
+msgstr "All upgradable groups have been processed."
+
+msgid "An error occurred during the upgrade process."
+msgstr "An error occurred during the upgrade process."
+
+msgid "Amount does not match the plan price"
+msgstr "Amount does not match the plan price"
+
+#~ msgstr ""
+#~ "❌ Failed to convert group. The "
+#~ "account may not have the required "
+#~ "permissions, or the group may already"
+#~ " be a supergroup."
+
