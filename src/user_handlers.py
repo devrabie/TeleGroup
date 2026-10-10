@@ -46,14 +46,12 @@ from src.database import (
 from src.payments import parse_invoice_payload, validate_stars_payment
 from src.account_admin_menu import (
     cancel_add_account_admin,
-    receive_account_admin_text,
     remove_listed_admin,
     show_account_admins,
     start_add_account_admin,
 )
 from src.plugin_menu import (
     edit_plugin_setting,
-    receive_plugin_setting,
     show_plugin_category,
     show_plugin_detail,
     show_plugin_settings,
@@ -61,6 +59,7 @@ from src.plugin_menu import (
     toggle_account_plugin,
 )
 from src.runtime import build_user_client
+from src.text_router import route_pending_text
 from src.runtime.lease import use_account_client
 from src.translation import get_translation_func_for_user
 from src.code_monitor import build_proxy_dict, code_monitor_manager, is_socks_auth_error
@@ -2680,15 +2679,19 @@ user_handlers_list = [
     CommandHandler("language", language_handler),
     CallbackQueryHandler(set_language_callback, pattern="^set_lang_"),
     CommandHandler("my_accounts", my_accounts_handler),
+    # PTB runs only the first matching handler per group, so every
+    # ConversationHandler must come before the catch-all text router below.
+    # Otherwise the router swallows the phone/code/password replies.
+    add_account_conv_handler,
     transfer_account_conv_handler,
     two_step_conv_handler,
     team_add_conv_handler,
     CallbackQueryHandler(manage_account_callback, pattern="^mng_"),
-    MessageHandler(filters.TEXT & ~filters.COMMAND, receive_account_admin_text),
-    MessageHandler(filters.TEXT & ~filters.COMMAND, receive_plugin_setting),
     CallbackQueryHandler(team_callback, pattern="^team_"),
     CallbackQueryHandler(invite_callback, pattern="^invite_"),
     CallbackQueryHandler(info_page_callback, pattern="^info_"),
     CallbackQueryHandler(main_menu_callback, pattern="^main_"),
-    add_account_conv_handler,
+    # Single catch-all for pending single-message inputs (admin add, plugin
+    # setting). Keep it last.
+    MessageHandler(filters.TEXT & ~filters.COMMAND, route_pending_text),
 ]
